@@ -1,9 +1,9 @@
-# Hiến pháp Xưởng
+# Hiến pháp Dory
 
-- **Status:** Accepted (operator 2026-08-21 — chấp nhận tên riêng; hình A)
-- **Tên nội bộ:** Xưởng
-- **Slug / kho / lệnh:** `xuong` (không có tiền tố `flow-`)
-- **Poster:** được nói “gia đình Flow”. Lệnh, kho, cây skill: không.
+- **Status:** Accepted (operator 2026-08-21 — tên riêng `dory`; hình A)
+- **Tên sản phẩm / lệnh / kho:** Dory / `dory`
+- **Họ (poster):** Flow — cạnh `flow-skill` và `flow-deck`. Lệnh không phải `flow`.
+- **Tên tạm đã nghỉ:** Xưởng / `xuong` (quá tiếng Việt; không dùng lại).
 
 Đọc tờ này lạnh trước khi thêm file nào khác vào thư mục này.
 
@@ -13,29 +13,29 @@
 |---|---|---|---|
 | Thẩm phán | Quyết đúng/sai, giữ biên lai | `flow-skill` | Sống. Việc chịu tải tháng này. |
 | Bảng | Chiếu trạng thái thẻ | `flow-deck` | Đóng băng. Không tính năng mới. |
-| Máy phiên | Chọn thư mục, chạy phiên, sửa file, ra lệnh, ủy thác, hỏi trước việc nguy hiểm; nhật ký phiên là sự thật | Xưởng — động cơ 1 | Chưa viết. Học bằng xia `--compare` (Harness). |
-| Cửa sổ chỗ làm | Cửa sổ → thẻ → ô; máy chủ giữ tiến trình thật; một agent điều khiển agent khác | Xưởng — động cơ 2 | Chưa viết. Học bằng xia `--compare` (Herdr). |
+| Máy phiên | Chọn thư mục, chạy phiên, sửa file, ra lệnh, ủy thác, hỏi trước việc nguy hiểm; nhật ký phiên là sự thật | Dory — động cơ 1 | Chưa viết. Học bằng xia `--compare` (Harness). |
+| Cửa sổ chỗ làm | Cửa sổ → thẻ → ô; máy chủ giữ tiến trình thật; một agent điều khiển agent khác | Dory — động cơ 2 | Chưa viết. Học bằng xia `--compare` (Herdr). |
 
-Xưởng là **một gia đình, hai động cơ**. Không phải một đống. Không phải nâng cấp deck. Không phải nâng cấp flow.
+Dory là **một gia đình, hai động cơ**. Không phải một đống. Không phải nâng cấp deck. Không phải nâng cấp flow.
 
 ## Mũi tên
 
 ```
 flow-skill  (flow.sh; cổng và biên lai)
      ▲
-     │  Xưởng gọi flow.sh như mọi máy chủ lạ — KHÔNG BAO GIỜ ngược
+     │  Dory gọi flow.sh như mọi máy chủ lạ — KHÔNG BAO GIỜ ngược
      │
-Xưởng  (máy phiên + cửa sổ; sau này)
+Dory  (máy phiên + cửa sổ; sau này)
 ```
 
-- flow-skill **không** được chứa chữ `xuong`, chữ xưởng, hay chữ deck.
+- flow-skill **không** được chứa chữ `dory`, chữ xưởng, hay chữ deck.
 - flow-deck **không** được chứa máy phiên hay máy cửa sổ.
-- Vắng Xưởng **không** được làm hỏng cổng flow.
+- Vắng Dory **không** được làm hỏng cổng flow.
 
 ## Hàng và nhà máy
 
 - **Nhà máy** (người, hôm nay) được dùng Herdr / Cursor / Harness để làm việc.
-- **Hàng ra khỏi Xưởng** cấm gọi `dsh` hoặc `herdr` lúc chạy. Học, không thuê vòng chạy.
+- **Hàng ra khỏi Dory** cấm gọi `dsh` hoặc `herdr` lúc chạy. Học, không thuê vòng chạy.
 
 ## Cổng chết — commit động cơ
 
@@ -44,15 +44,15 @@ Cấm thêm `package.json`, `go.mod`, vòng agent, máy cửa sổ / PTY, nhân 
 1. Hai báo cáo xia `--compare` (Harness, rồi Herdr) đã ký, viết **trong repo này**, không viết trong `flow-deck`.
 2. Đủ người (hơn hai người full-time hoặc tiền tương đương) **hoặc** thư viết tay: ngừng tính năng flow-skill 6–12 tháng.
 
-Chưa đủ thì Xưởng chỉ là giấy + học.
+Chưa đủ thì Dory chỉ là giấy + học.
 
 ## Điều kiện giết
 
 Tờ này chết — và phải dừng mã — nếu bất kỳ điều nào:
 
-- Nhét Xưởng vào repo hoặc lệnh `flow-deck`.
-- Nhét Xưởng vào `@manhquy/flow-skill` hoặc cây skill của flow.
-- Hàng xuất xưởng gọi `dsh` / `herdr` như vòng chạy thật.
+- Nhét Dory vào repo hoặc lệnh `flow-deck`.
+- Nhét Dory vào `@manhquy/flow-skill` hoặc cây skill của flow.
+- Hàng xuất Dory gọi `dsh` / `herdr` như vòng chạy thật.
 - Có commit động cơ trước khi hai báo cáo xia được ký.
 - Xia chạy từ cửa sổ `flow-deck` rồi ghi báo cáo vào `flow-deck/plans/`.
 
@@ -62,7 +62,7 @@ Tờ này chết — và phải dừng mã — nếu bất kỳ điều nào:
 
 Cấm hình C (một tên ôm hết). Hình B (mở động cơ ngay) chỉ sau thư đốt flow-skill hoặc đủ người.
 
-## Học (lượt sau, cửa sổ phải là `xuong`)
+## Học (lượt sau, cửa sổ phải là `dory`)
 
 1. Đóng cửa sổ làm việc `flow-deck`. Mở thư mục này.
 2. `/ak:xia https://github.com/deepseek-ai/deepseek-harness.git máy phiên, nhật ký, duyệt, web local --compare`
@@ -73,4 +73,4 @@ Cấm hình C (một tên ôm hết). Hình B (mở động cơ ngay) chỉ sau 
 
 ## Một câu
 
-Học Harness và Herdr, xây Xưởng ở kho `xuong`; flow giữ cổng, deck giữ bảng — không gộp, không thuê vòng chạy của người ta.
+Học Harness và Herdr, xây Dory ở kho `dory`; flow giữ cổng, deck giữ bảng — không gộp, không thuê vòng chạy của người ta.

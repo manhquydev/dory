@@ -1,8 +1,7 @@
-# Xưởng
+# Dory
 
-Nhà thứ ba cạnh `flow-skill` (thẩm phán) và `flow-deck` (bảng).
+Nhà thứ ba cạnh `flow-skill` (thẩm phán) và `flow-deck` (bảng). Họ trên poster: Flow. Lệnh: `dory`.
 
-**Slug / lệnh:** `xuong`  
 **Hiến pháp:** [HIEN-PHAP.md](./HIEN-PHAP.md)
 
 Thư mục này **chỉ giấy** cho đến khi hai báo cáo học (xia `--compare`) được ký và cổng chết động cơ được mở. Không có máy. Không có `package.json`.
