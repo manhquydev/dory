@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Xia compare — Dory × DeepSeek Harness</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet">
+<style>
+:root, [data-theme="light"] {
+  --bg: #f4efe6;
+  --paper: #faf6ee;
+  --ink: #1c1612;
+  --muted: #6b6258;
+  --rule: #d8cfc0;
+  --accent: #b8232c;
+  --ok: #3d5a3a;
+  --warn: #8a5a12;
+  --bad: #8f1d22;
+  --chip: #efe6d6;
+  --text: #1c1612;
+  --text-dim: #6b6258;
+  --border: #d8cfc0;
+  --surface: #faf6ee;
+  --surface2: #efe6d6;
+  --font-body: "Newsreader", "Iowan Old Style", Palatino, Georgia, serif;
+  --font-mono: "IBM Plex Mono", "ui-monospace", Consolas, monospace;
+}
+[data-theme="dark"] {
+  --bg: #161310;
+  --paper: #1f1a16;
+  --ink: #f3ebe0;
+  --muted: #a89b8c;
+  --rule: #3a322b;
+  --accent: #e35a55;
+  --ok: #9dbe96;
+  --warn: #e0b56a;
+  --bad: #e35a55;
+  --chip: #2a241e;
+  --text: #f3ebe0;
+  --text-dim: #a89b8c;
+  --border: #3a322b;
+  --surface: #1f1a16;
+  --surface2: #2a241e;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 500px at 10% -10%, rgba(184,35,44,0.06), transparent 50%),
+    var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.55;
+}
+body::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.theme-toggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 300;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: background 0.15s, color 0.15s;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+.theme-toggle:hover { background: var(--surface2); color: var(--text); }
+.wrap {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 0 40px;
+  padding: 48px 40px 96px;
+}
+.main { min-width: 0; max-width: 78ch; }
+.toc {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+  padding: 14px 0;
+  grid-row: 1 / -1;
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+}
+.toc-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  padding: 0 0 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.toc a {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  text-decoration: none;
+  padding: 4px 8px;
+  border-left: 2px solid transparent;
+  line-height: 1.4;
+}
+.toc a:hover { color: var(--text); background: var(--surface2); }
+.toc a.active { color: var(--text); border-left-color: var(--accent); }
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 12px;
+}
+h1 {
+  font-weight: 600;
+  font-size: clamp(2.1rem, 4vw, 3.2rem);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin: 0 0 16px;
+}
+.lede { font-size: 1.2rem; color: var(--muted); margin: 0 0 28px; }
+.folio {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 40px;
+}
+.chip {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 4px 8px;
+  background: var(--chip);
+  border: 1px solid var(--rule);
+}
+.sec-head {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 56px 0 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+  scroll-margin-top: 24px;
+}
+h2 { font-size: 1.7rem; margin: 0 0 12px; font-weight: 600; letter-spacing: -0.02em; }
+p { margin: 0 0 14px; }
+a { color: var(--accent); }
+table { width: 100%; border-collapse: collapse; font-size: 15px; margin: 16px 0 24px; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--rule); }
+th {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 600;
+}
+.choice { font-family: var(--font-mono); font-size: 12px; }
+.choice.local { color: var(--ok); }
+.choice.hybrid { color: var(--warn); }
+.choice.conflict { color: var(--bad); }
+.flow {
+  display: grid;
+  gap: 0;
+  margin: 20px 0 28px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.flow-row {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 12px;
+}
+.rail { position: relative; }
+.rail::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--accent);
+}
+.flow-row:first-child .rail::before { top: 14px; }
+.flow-row:last-child .rail::before { bottom: 50%; }
+.dot {
+  width: 13px;
+  height: 13px;
+  border: 1px solid var(--accent);
+  background: var(--paper);
+  border-radius: 50%;
+  margin-top: 10px;
+  position: relative;
+  z-index: 1;
+}
+.box {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent);
+  padding: 10px 12px;
+  margin: 0 0 10px;
+}
+.note {
+  border-left: 3px solid var(--accent);
+  padding: 10px 14px;
+  background: var(--chip);
+  margin: 16px 0 24px;
+}
+.sign {
+  border: 1px solid var(--rule);
+  padding: 20px;
+  background: var(--paper);
+}
+code { font-family: var(--font-mono); font-size: 0.86em; }
+@media (max-width: 1000px) {
+  .wrap { grid-template-columns: 1fr; padding: 24px 20px 72px; }
+  .toc {
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    max-height: none;
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 0;
+    margin: 0 -20px 16px;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .toc-title { display: none; }
+  .toc a { white-space: nowrap; border-left: none; border-bottom: 2px solid transparent; }
+  .toc a.active { border-left: none; border-bottom-color: var(--accent); }
+  .sec-head { scroll-margin-top: 52px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeToggle" title="Toggle theme" aria-label="Toggle light/dark theme"></button>
+<div class="wrap">
+<nav class="toc" id="toc">
+  <div class="toc-title">Mục lục</div>
+  <a href="#s1">1 Manifest</a>
+  <a href="#s2">2 So sánh</a>
+  <a href="#s3">3 Luồng</a>
+  <a href="#s4">4 Challenge</a>
+  <a href="#s5">5 Quyết</a>
+  <a href="#s6">6 Khuyên</a>
+  <a href="#s7">7 Ký</a>
+</nav>
+<div class="main">
+  <p class="eyebrow">Xia · compare · học 1/2</p>
+  <h1>Dory máy phiên, đối Harness</h1>
+  <p class="lede">Bốn bề: máy phiên, nhật ký, duyệt, web local. Giấy đối giấy-kèm-máy. Không kế hoạch. Không động cơ.</p>
+  <div class="folio">
+    <span class="chip">source master@528c682</span>
+    <span class="chip">local dory@5c1e866</span>
+    <span class="chip">mode --compare</span>
+    <span class="chip">đã ký 2026-08-21</span>
+  </div>
+  <p>Bản đầy đủ: <a href="../reports/260821-1416-xia-compare-deepseek-harness.md"><code>plans/reports/260821-1416-xia-compare-deepseek-harness.md</code></a>. Trang này chỉ để duyệt local.</p>
+
+  <div class="sec-head" id="s1">01 — Manifest</div>
+  <h2>Nguồn và nhà</h2>
+  <table>
+    <thead><tr><th>Trường</th><th>Harness</th><th>Dory</th></tr></thead>
+    <tbody>
+      <tr><td>Là gì</td><td>Runtime agent. Mọi thứ là plugin (Cordis). Lệnh <code>dsh</code>.</td><td>Ba nhà, hai động cơ. Tháng này chỉ giấy.</td></tr>
+      <tr><td>Chín</td><td>Developer preview. Phá tương thích có chủ ý.</td><td>Cổng chết động cơ còn đóng.</td></tr>
+      <tr><td>Web</td><td><code>npx @deepseek-ai/dsh web</code> → 127.0.0.1:3080</td><td>Chữ «web local» trong list học. Cửa sổ = Herdr sau.</td></tr>
+      <tr><td>Luật sống</td><td>Session log = context model thấy.</td><td>Nhật ký phiên là sự thật.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="sec-head" id="s2">02 — Head-to-head</div>
+  <h2>Bốn bề hiến pháp</h2>
+  <table>
+    <thead><tr><th>Bề</th><th>dsh</th><th>Dory</th><th>Học</th></tr></thead>
+    <tbody>
+      <tr><td>Máy phiên</td><td>Workspace khóa composer. Turn/step. fs/shell. Subagent. Approval + sandbox fail-closed.</td><td>Chọn thư mục, chạy, sửa, lệnh, ủy thác, hỏi nguy hiểm — chưa viết.</td><td>Hành vi, không nhân Cordis.</td></tr>
+      <tr><td>Nhật ký</td><td>Append-only <code>SessionEvent</code>. <code>deriveMessages()</code>. Assert khớp log.</td><td>Cùng một câu luật. Chưa có đĩa.</td><td>Mạnh nhất. Format phải là của mình.</td></tr>
+      <tr><td>Duyệt</td><td>Ba khe: picker / glob-grep / web.</td><td>Một chữ.</td><td>Tách ba. Đừng gộp browser.</td></tr>
+      <tr><td>Web local</td><td>Trajectory = sổ cái trên log. Cấm bind 0.0.0.0.</td><td>Chiếu nhật ký. Không phải cửa sổ chỗ làm.</td><td>UI chiếu. Herdr giữ cửa sổ.</td></tr>
+    </tbody>
+  </table>
+  <div class="note">Thuê vòng <code>dsh</code> / Claude Code / Codex / <code>herdr</code> lúc chạy = giết hiến pháp. Học ≠ cài làm runtime.</div>
+
+  <div class="sec-head" id="s3">03 — Luồng</div>
+  <h2>Một phiên, một log</h2>
+  <div class="flow">
+    <div class="flow-row"><div class="rail"><div class="dot"></div></div><div class="box">Người chọn workspace — composer mới sống</div></div>
+    <div class="flow-row"><div class="rail"><div class="dot"></div></div><div class="box">turn/start → pre-step → step (model + tools)</div></div>
+    <div class="flow-row"><div class="rail"><div class="dot"></div></div><div class="box">fs / shell / duyệt / ủy thác đi qua approval + sandbox</div></div>
+    <div class="flow-row"><div class="rail"><div class="dot"></div></div><div class="box">Mọi sự thật: append SessionEvent</div></div>
+    <div class="flow-row"><div class="rail"><div class="dot"></div></div><div class="box">deriveMessages → model (phải khớp log)</div></div>
+    <div class="flow-row"><div class="rail"><div class="dot"></div></div><div class="box">Trajectory / web chỉ chiếu — không store thứ hai</div></div>
+  </div>
+  <p>Crash: đóng turn <code>interrupted</code>, không cắt log. Fork chỉ ngoài turn mở.</p>
+
+  <div class="sec-head" id="s4">04 — Challenge</div>
+  <h2>Tám câu, trước khi ai đó muốn port</h2>
+  <table>
+    <thead><tr><th>#</th><th>Câu</th><th>Nếu sai</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Cần sản phẩm hay chỉ ý nhật ký?</td><td>Ôm kernel preview. Critical.</td></tr>
+      <tr><td>2</td><td>80% bằng log + hỏi + workspace lock?</td><td>Overbuild thành dsh hai. Critical.</td></tr>
+      <tr><td>3</td><td>flow đã giữ cổng?</td><td>Hai thẩm phán, hoặc nhét chữ dory vào flow. Critical.</td></tr>
+      <tr><td>4</td><td>Ai nuôi format sau học?</td><td>Ghim RC, mở không được log. Critical.</td></tr>
+      <tr><td>5</td><td><code>npx dsh</code> «tạm»?</td><td>Thuê vòng. Giết. Critical.</td></tr>
+      <tr><td>6</td><td>Plugin paradigm vs hai động cơ?</td><td>Hình C. Cấm.</td></tr>
+      <tr><td>7</td><td>Web dsh = cửa sổ Dory?</td><td>Herdr vô nghĩa. Critical.</td></tr>
+      <tr><td>8</td><td>Duyệt một khe hay ba?</td><td>Nhầm picker với Exa.</td></tr>
+    </tbody>
+  </table>
+  <p>Sáu critical nếu có người <code>--port</code>. Tờ này: low — chỉ giấy.</p>
+
+  <div class="sec-head" id="s5">05 — Quyết</div>
+  <h2>Ma trận</h2>
+  <table>
+    <thead><tr><th>Quyết</th><th>Chọn</th></tr></thead>
+    <tbody>
+      <tr><td>Kernel Cordis</td><td><span class="choice conflict">local — từ chối</span></td></tr>
+      <tr><td>Luật nhật ký</td><td><span class="choice hybrid">hybrid — luật có, format không</span></td></tr>
+      <tr><td>Đĩa JSONL dsh</td><td><span class="choice local">local sau này</span></td></tr>
+      <tr><td>Workspace trước compose</td><td><span class="choice hybrid">học luật nguồn</span></td></tr>
+      <tr><td>Approval fail-closed</td><td><span class="choice hybrid">học luật nguồn</span></td></tr>
+      <tr><td>Ủy thác PATH</td><td><span class="choice conflict">cấm</span></td></tr>
+      <tr><td>Duyệt ba khe</td><td><span class="choice hybrid">học tách</span></td></tr>
+      <tr><td>Web = chiếu</td><td><span class="choice hybrid">học; Herdr giữ cửa sổ</span></td></tr>
+      <tr><td>Runtime <code>dsh</code></td><td><span class="choice conflict">cấm</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="sec-head" id="s6">06 — Khuyên</div>
+  <h2>Ký. Dừng. Không nấu.</h2>
+  <p>Học: log là sự thật; hỏi fail-closed; workspace trước gõ; fork ngoài turn; duyệt ba khe; UI chiếu nhật ký.</p>
+  <p>Từ chối: Cordis, CLI dsh, SDK bó Node, PATH Claude/Codex/herdr, format <code>~/.dsh</code>, web dsh như cửa sổ, <code>/ak:plan</code>, <code>package.json</code>.</p>
+  <p>Lượt sau, sau chữ ký: xia Herdr — cửa sổ thẻ ô, trạng thái agent, skill điều phối — <code>--compare</code>.</p>
+
+  <div class="sec-head" id="s7">07 — Chữ ký</div>
+  <h2>Học 1/2 — chờ người</h2>
+  <div class="sign">
+    <p>Xia đã viết. Operator <strong>đã ký</strong> 2026-08-21 — học Harness 1/2.</p>
+    <p>Canonical: <code>plans/reports/260821-1416-xia-compare-deepseek-harness.md</code>.</p>
+    <p>Chưa đủ mở cổng chết. Còn Herdr. Còn thư người hoặc đủ người. Dừng.</p>
+  </div>
+</div>
+</div>
+<script>
+(function() {
+  var toggle = document.getElementById('themeToggle');
+  var saved = localStorage.getItem('theme');
+  var initial = saved || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  if (saved) document.documentElement.setAttribute('data-theme', initial);
+  toggle.textContent = initial === 'dark' ? '\u2600' : '\u263E';
+  toggle.addEventListener('click', function() {
+    var current = document.documentElement.getAttribute('data-theme')
+      || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    var next = current === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    toggle.textContent = next === 'dark' ? '\u2600' : '\u263E';
+  });
+})();
+(function() {
+  const toc = document.getElementById('toc');
+  const links = toc.querySelectorAll('a');
+  const sections = [];
+  links.forEach(link => {
+    const id = link.getAttribute('href').slice(1);
+    const el = document.getElementById(id);
+    if (el) sections.push({ id, el, link });
+  });
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const match = sections.find(s => s.el === entry.target);
+        if (match) {
+          match.link.classList.add('active');
+          if (window.innerWidth <= 1000) {
+            match.link.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+          }
+        }
+      }
+    });
+  }, { rootMargin: '-20% 0px -60% 0px', threshold: 0.1 });
+  sections.forEach(s => observer.observe(s.el));
+})();
+</script>
+</body>
+</html>

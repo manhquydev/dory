@@ -41,10 +41,10 @@ Dory  (máy phiên + cửa sổ; sau này)
 
 Cấm thêm `package.json`, `go.mod`, vòng agent, máy cửa sổ / PTY, nhân plugin, cho đến khi **cả hai** đúng:
 
-1. Hai báo cáo xia `--compare` (Harness, rồi Herdr) đã ký, viết **trong repo này**, không viết trong `flow-deck`.
-2. Đủ người (hơn hai người full-time hoặc tiền tương đương) **hoặc** thư viết tay: ngừng tính năng flow-skill 6–12 tháng.
+1. Hai báo cáo xia `--compare` (Harness, rồi Herdr) đã ký, viết **trong repo này**, không viết trong `flow-deck`. — **đã đủ** 2026-08-21.
+2. Đủ người (hơn hai người full-time hoặc tiền tương đương) **hoặc** thư viết tay: ngừng tính năng flow-skill 6–12 tháng. — **chưa**.
 
-Chưa đủ thì Dory chỉ là giấy + học.
+Chưa đủ điều kiện 2 thì Dory chỉ là giấy + học. Cấm `/ak:plan`.
 
 ## Điều kiện giết
 
@@ -62,14 +62,14 @@ Tờ này chết — và phải dừng mã — nếu bất kỳ điều nào:
 
 Cấm hình C (một tên ôm hết). Hình B (mở động cơ ngay) chỉ sau thư đốt flow-skill hoặc đủ người.
 
-## Học (lượt sau, cửa sổ phải là `dory`)
+## Học (đã xong 2026-08-21, cửa sổ `dory`)
 
-1. Đóng cửa sổ làm việc `flow-deck`. Mở thư mục này.
-2. `/ak:xia https://github.com/deepseek-ai/deepseek-harness.git máy phiên, nhật ký, duyệt, web local --compare`
-3. Ký báo cáo. Dừng.
-4. `/ak:xia https://github.com/herdrdev/herdr.git cửa sổ thẻ ô, trạng thái agent, skill điều phối --compare`
-5. Ký. Dừng.
-6. Cấm `--port` / `--copy` / `--fast`. Cấm `/ak:plan` trước hai chữ ký.
+1. Đóng cửa sổ `flow-deck`. Mở thư mục này. — xong
+2. Xia Harness `--compare` — xong, ký: `plans/reports/260821-1416-xia-compare-deepseek-harness.md`
+3. Xia Herdr `--compare` — xong, ký: `plans/reports/260821-1436-xia-compare-herdr.md`
+4. Cấm `--port` / `--copy` / `--fast`. Cấm `/ak:plan` cho đến điều kiện 2 của cổng chết.
+
+Không giao học thứ ba. Không mở máy. Tab Xia để idle.
 
 ## Một câu
 
