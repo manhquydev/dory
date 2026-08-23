@@ -25,7 +25,7 @@ Authority: `CHARTER.md`, `plans/reports/260822-skill-cli-socket-contract.md` (ac
 
 Do **not** implement against `src/workplace/http.js`. Do **not** Xia `--copy` Herdr. Do **not** write `dory` into flow-skill.
 
-Successor slice (do **not** flip phases below from paper): `plans/260823-0011-close-coding-occupancy/` — factory coding occupancy. Contract §11 stays after that slice, not a Phase 6 gate.
+Successor slices (do **not** flip phases below from paper): occupancy `plans/260823-0011-close-coding-occupancy/`; §11 `plans/260823-0859-section-11-real-repo/` (`p5_s11`). Not a Phase 6 paper flip.
 
 ## Goals
 

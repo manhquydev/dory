@@ -1,0 +1,99 @@
+#!/bin/bash
+# Named §11 driver. Start as: /bin/bash /abs/occ_s11 <clone> <SKILL.md> <FLOW_BIN>
+# Opens SKILL.md, issues those verb texts via $DORY_BIN, taxis Flow on the clone.
+# argv0 comm is bash (allowlisted). Print DORY_OCC_READY before any dory RPC
+# so agent start can return on the single-threaded server.
+
+set -eu
+
+CLONE=${1:?clone}
+SKILL=${2:?skill}
+FLOW_BIN=${3:?flow-bin}
+
+if [ ! -f "$SKILL" ]; then
+  printf '%s\n' OCC_S11_NO_SKILL
+  exit 1
+fi
+if [ ! -d "$CLONE/.git" ]; then
+  printf '%s\n' OCC_S11_NO_CLONE
+  exit 1
+fi
+if [ -z "${DORY_BIN-}" ]; then
+  printf '%s\n' OCC_S11_NO_BIN
+  exit 1
+fi
+
+need() {
+  if ! grep -F -q "$1" "$SKILL"; then
+    printf '%s\n' "OCC_S11_NO_VERB:$1"
+    exit 1
+  fi
+}
+
+need 'test "${DORY_ENV:-}" = 1'
+need 'dory --help'
+need 'dory pane split --current --direction right --no-focus'
+need 'dory agent start'
+need 'dory agent prompt'
+need 'dory agent wait'
+need 'dory flow -- status'
+
+phrase=$(awk '
+  /After the env gate, a coding occupant inside the pane that is ready for prompts must run/ {
+    if (match($0, /After the env gate, a coding occupant inside the pane that is ready for prompts must run/)) {
+      print substr($0, RSTART, RLENGTH)
+      exit
+    }
+  }
+' "$SKILL")
+if [ -z "$phrase" ]; then
+  printf '%s\n' OCC_S11_NO_PHRASE
+  exit 1
+fi
+printf '%s\n' "$phrase"
+
+test "${DORY_ENV:-}" = 1 || {
+  printf '%s\n' "I am not running inside a Dory-managed pane"
+  exit 1
+}
+printf 'DORY_ENV='
+printenv DORY_ENV
+printf '%s\n' DORY_OCC_READY
+sleep 0.3
+
+"$DORY_BIN" --help || true
+
+printf '%s\n' '$DORY_BIN pane split --current --direction right --no-focus'
+split_out=$("$DORY_BIN" pane split --current --direction right --no-focus) || {
+  printf '%s\n' OCC_S11_SPLIT_FAIL
+  exit 1
+}
+printf '%s\n' "$split_out"
+new_pane=$(printf '%s\n' "$split_out" | sed -n 's/.*"pane":{"id":"\([^"]*\)".*/\1/p' | head -n 1)
+if [ -z "$new_pane" ] || [ "$new_pane" = w1 ]; then
+  printf '%s\n' OCC_S11_BAD_PANE
+  exit 1
+fi
+
+peer=s11peer
+printf '%s\n' "\$DORY_BIN agent start $peer --pane $new_pane --timeout 8000 -- /bin/sh -c READY"
+"$DORY_BIN" agent start "$peer" --pane "$new_pane" --timeout 8000 -- /bin/sh -c \
+  "printf '%s\\n' DORY_OCC_READY; while IFS= read -r line; do printf 'got:%s\\n' \"\$line\"; printf '%s\\n' DORY_OCC_READY; done"
+
+printf '%s\n' "\$DORY_BIN agent prompt $peer --wait --timeout 8000 -- S11_PEER_PROMPT"
+"$DORY_BIN" agent prompt "$peer" --wait --timeout 8000 -- S11_PEER_PROMPT
+
+printf '%s\n' "\$DORY_BIN agent wait $peer --timeout 8000"
+"$DORY_BIN" agent wait "$peer" --timeout 8000
+
+cd "$CLONE"
+export FLOW_BIN
+export FLOW_PROJECT_ROOT="$CLONE"
+printf '%s\n' "\$DORY_BIN flow -- status"
+set +e
+"$DORY_BIN" flow -- status
+flow_ec=$?
+set -e
+printf '%s%s%s\n' S11_FLOW_EX IT: "$flow_ec"
+
+printf '%s%s\n' S11_FIN ISH
