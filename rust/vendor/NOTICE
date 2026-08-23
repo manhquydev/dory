@@ -1,0 +1,9 @@
+# NOTICE
+# src/win/ stays in the extract; this product does not compile or bundle it.
+
+This product uses portable-pty 0.9.0 in-tree (rust/vendor/portable-pty).
+License: MIT (see rust/vendor/portable-pty/LICENSE.md). Copyright (c) 2018 Wez Furlong.
+
+Bound: Unix openpty only (src/unix.rs).
+Wez ConPTY / PASSTHROUGH_MODE / WIN32_INPUT_MODE / RESIZE_QUIRK are out.
+No conpty.dll is shipped.

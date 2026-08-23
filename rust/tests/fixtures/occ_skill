@@ -1,0 +1,62 @@
+#!/bin/sh
+# Occupant fixture. Start as /abs/path/to/occ_skill so argv0 comm is
+# occ_skill — not bash, sh, or omp. Open the skill, parse the idle-report
+# example, run it via $DORY_BIN. Sleep loop is a child.
+
+set -eu
+
+if [ -n "${DORY_SKILL-}" ]; then
+  skill=$DORY_SKILL
+else
+  skill=/home/manhquy/Downloads/flow/dory/skills/dory/SKILL.md
+fi
+
+if [ ! -f "$skill" ]; then
+  printf '%s\n' OCC_SKILL_NO_SKILL
+  exit 1
+fi
+
+report_line=$(awk '
+  /dory agent report --current --state idle/ {
+    gsub(/[`*]/, "")
+    sub(/^[[:space:]]+/, "")
+    sub(/[[:space:]]+$/, "")
+    print
+    exit
+  }
+' "$skill")
+
+case $report_line in
+  *'dory agent report --current --state idle'*) ;;
+  *)
+    printf '%s\n' OCC_SKILL_NO_EXAMPLE
+    exit 1
+    ;;
+esac
+
+phrase=$(awk '
+  /After the env gate, a coding occupant inside the pane that is ready for prompts must run/ {
+    if (match($0, /After the env gate, a coding occupant inside the pane that is ready for prompts must run/)) {
+      print substr($0, RSTART, RLENGTH)
+      exit
+    }
+  }
+' "$skill")
+
+if [ -z "$phrase" ]; then
+  printf '%s\n' OCC_SKILL_NO_PHRASE
+  exit 1
+fi
+
+printf '%s\n' "$phrase"
+
+if [ -z "${DORY_BIN-}" ]; then
+  printf '%s\n' OCC_SKILL_NO_BIN
+  exit 1
+fi
+
+"$DORY_BIN" agent report --current --state idle || true
+
+while :; do
+  sleep 3600
+done

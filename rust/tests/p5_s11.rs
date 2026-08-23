@@ -78,11 +78,7 @@ fn temp_xdg() -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    let path = std::env::temp_dir().join(format!(
-        "dory-p5-s11-{}-{}",
-        std::process::id(),
-        nanos
-    ));
+    let path = std::env::temp_dir().join(format!("dory-p5-s11-{}-{}", std::process::id(), nanos));
     fs::create_dir_all(&path).unwrap();
     path
 }
@@ -227,7 +223,9 @@ fn assert_ok(out: &Output, what: &str) {
 fn created_layout(h: &Harness) -> String {
     let snap = snapshot(h);
     assert!(snap.contains("\"live\":true"), "{snap}");
-    let snap_pane = json_field(&snap, "pane").expect("snapshot pane").to_string();
+    let snap_pane = json_field(&snap, "pane")
+        .expect("snapshot pane")
+        .to_string();
     assert_ne!(snap_pane, "w1");
 
     let created = cli(h, &snap_pane, &["workspace", "create"]);
@@ -248,7 +246,14 @@ fn pane_read_text(h: &Harness, pane: &str) -> String {
     let out = cli(
         h,
         pane,
-        &["pane", "read", "--pane", pane, "--source", "recent-unwrapped"],
+        &[
+            "pane",
+            "read",
+            "--pane",
+            pane,
+            "--source",
+            "recent-unwrapped",
+        ],
     );
     assert_ok(&out, "pane read");
     let body = stdout(&out);
@@ -315,11 +320,8 @@ fn clone_spec_kit() -> Scratch {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    let dest = std::env::temp_dir().join(format!(
-        "dory-s11-clone-{}-{}",
-        std::process::id(),
-        nanos
-    ));
+    let dest =
+        std::env::temp_dir().join(format!("dory-s11-clone-{}-{}", std::process::id(), nanos));
     let out = Command::new("git")
         .args([
             "clone",
@@ -475,11 +477,7 @@ fn p5_s11_named_driver_flow_on_spec_kit_clone() {
         "must not use eval/phase5-project: {text}"
     );
     assert!(
-        occupant_name(&rpc(
-            &h,
-            &format!(r#"{{"op":"pane.get","pane":"{pane}"}}"#)
-        ))
-        .as_deref()
+        occupant_name(&rpc(&h, &format!(r#"{{"op":"pane.get","pane":"{pane}"}}"#))).as_deref()
             == Some(DRIVER),
         "root pane occupant must remain the named driver"
     );

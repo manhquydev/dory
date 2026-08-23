@@ -1,0 +1,20 @@
+#!/bin/sh
+# Occupant fixture. Start as /abs/path/to/occ_raw so argv0 comm is
+# occ_raw — not bash, sh, or omp. Never emit CSI ? 2004 h. Emit
+# CSI ? 2004 l so last-wins is off if the pane shell already enabled
+# BP. Copy stdin bytes beside $DORY_SOCKET. Stay resident.
+# Do not exec an allowlisted comm as argv0.
+
+printf '\033[?2004l'
+printf '%s\n' DORY_OCC_RAW
+
+if [ -n "${DORY_SOCKET-}" ]; then
+  cap=$(dirname "$DORY_SOCKET")/occ_raw.stdin
+else
+  cap="${TMPDIR:-/tmp}/occ_raw.stdin.$$"
+fi
+: > "$cap"
+dd bs=1 of="$cap" 2>/dev/null
+while :; do
+  sleep 3600
+done

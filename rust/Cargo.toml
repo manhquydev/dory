@@ -1,0 +1,9 @@
+[package]
+name = "dory"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+portable-pty = { path = "vendor/portable-pty" }
+crossterm = "0.28"
+vt100 = "0.15"

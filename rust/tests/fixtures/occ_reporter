@@ -1,0 +1,17 @@
+#!/bin/sh
+# Occupant fixture. Start as /abs/path/to/occ_reporter so argv0 comm is
+# occ_reporter — not bash, sh, or omp. Stay resident; do not exec an
+# allowlisted comm as argv0. Report is the occupant's job via $DORY_BIN
+# (or the same-pane env), not this process's name.
+printf '%s\n' DORY_OCC_REPORTER
+if [ "${1-}" = "report-idle" ]; then
+  if [ -z "${DORY_BIN-}" ]; then
+    printf '%s\n' DORY_OCC_NO_BIN
+    exit 1
+  fi
+  "$DORY_BIN" agent report --current --state idle
+  printf '%s\n' DORY_OCC_REPORTED
+fi
+while :; do
+  sleep 3600
+done

@@ -1,19 +1,20 @@
-//! P5 layer-4c prompt honors live bracketed-paste — l4c_tst.
+//! P5 layer-4 skill-using occupant — l4_tst.
 //!
-//! Harness shape copied from `p5_report.rs`: `CARGO_BIN_EXE_dory`, temp
-//! `XDG_RUNTIME_DIR`, `dory server`, IDs parsed from snapshot / `.result`.
-//! Never hardcode the next id as `w1`.
+//! Stranger comm outside the allowlist opens `skills/dory/SKILL.md`, runs
+//! the documented report verb, and lets `agent wait` close. Harness shape
+//! copied from `p5_report.rs`: `CARGO_BIN_EXE_dory`, temp `XDG_RUNTIME_DIR`,
+//! `dory server`, IDs parsed from snapshot / `.result`. Never hardcode `w1`.
 //!
-//!  1 BP on: `agent start -- /abs/path/to/occ_paste` → state `unknown`
-//!    (argv0 comm is not allowlisted; not bash/sh/omp). Fixture emits
-//!    CSI ? 2004 h. `agent prompt name -- hello-paste` captured stdin
-//!    contains `\x1b[200~hello-paste\x1b[201~\r` and no raw `hello-paste\n`
-//!    outside the wrap. Submit after paste is CR, not LF.
-//!  2 BP off: `occ_raw` never emits 2004h (emits 2004l so last-wins is
-//!    off). Prompt `hello-raw`. Captured stdin is `hello-raw` plus one
-//!    trailing NL, no `\x1b[200~`.
+//!  1 `agent start -- /abs/path/occ_skill` → state `unknown`
+//!    (argv0 comm is not allowlisted; not bash/sh/omp)
+//!  2 pane transcript contains the SKILL.md occupant-first-action phrase
+//!    printed by the fixture after opening that file
+//!  3 `agent wait` settles `idle` or `done` (fixture reported; this test
+//!    does not slave-report)
+//!  4 fixture path does not contain `omp`
+//!  5 no `flow-skill` copy
 //!
-//! Does not exec `omp`. Does not copy `flow-skill`. Does not edit `rust/src`.
+//! Does not exec `omp`. Does not edit `rust/src`. Does not allowlist a comm.
 
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -24,13 +25,11 @@ use std::process::{Child, Command, Output, Stdio};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+const AGENT: &str = "skiller";
 const START_TIMEOUT: &str = "8000";
-const PASTE_NEEDLE: &str = "DORY_OCC_PASTE";
-const RAW_NEEDLE: &str = "DORY_OCC_RAW";
-const PASTE_TEXT: &str = "hello-paste";
-const RAW_TEXT: &str = "hello-raw";
-const BP_BEGIN: &[u8] = b"\x1b[200~";
-const BP_END: &[u8] = b"\x1b[201~";
+const SETTLE_TIMEOUT: &str = "8000";
+const SKILL_PHRASE: &str =
+    "After the env gate, a coding occupant inside the pane that is ready for prompts must run";
 
 struct Harness {
     xdg: PathBuf,
@@ -64,7 +63,7 @@ fn temp_xdg() -> PathBuf {
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     let path = std::env::temp_dir().join(format!(
-        "dory-p5-prompt-paste-{}-{}",
+        "dory-p5-skill-occ-{}-{}",
         std::process::id(),
         nanos
     ));
@@ -211,21 +210,43 @@ fn created_layout(h: &Harness) -> Created {
     Created { pane }
 }
 
-fn fixture(name: &str) -> PathBuf {
+fn skill_md() -> PathBuf {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("repo root above rust/")
+        .join("skills")
+        .join("dory")
+        .join("SKILL.md");
+    assert!(path.is_file(), "missing skill {}", path.display());
+    let abs = fs::canonicalize(&path).unwrap_or(path);
+    assert!(abs.is_absolute(), "{}", abs.display());
+    let shown = abs.to_string_lossy();
+    assert!(
+        shown.contains("/skills/dory/SKILL.md"),
+        "skill must be the repo skill, not a rust/ relative: {shown}"
+    );
+    assert!(
+        !shown.contains("/rust/skills/"),
+        "skill must not be a rust/ relative: {shown}"
+    );
+    abs
+}
+
+fn occ_skill() -> PathBuf {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
         .join("fixtures")
-        .join(name);
+        .join("occ_skill");
     assert!(path.is_file(), "missing fixture {}", path.display());
     assert_eq!(
         path.file_name().and_then(|n| n.to_str()),
-        Some(name),
-        "argv0 comm must be {name}, not bash/sh/omp: {}",
+        Some("occ_skill"),
+        "argv0 comm must be occ_skill, not bash/sh/omp: {}",
         path.display()
     );
     let mut perms = fs::metadata(&path).expect("fixture metadata").permissions();
     perms.set_mode(0o755);
-    fs::set_permissions(&path, perms).expect("chmod fixture");
+    fs::set_permissions(&path, perms).expect("chmod occ_skill");
     let abs = fs::canonicalize(&path).unwrap_or(path);
     assert!(abs.is_absolute(), "{}", abs.display());
     let shown = abs.to_string_lossy();
@@ -238,14 +259,19 @@ fn fixture(name: &str) -> PathBuf {
         .file_name()
         .and_then(|n| n.to_str())
         .expect("fixture comm");
-    assert_eq!(comm, name);
+    assert_eq!(comm, "occ_skill");
     assert_ne!(comm, "sh");
     assert_ne!(comm, "bash");
     assert_ne!(comm, "omp");
-    let src = fs::read_to_string(&abs).expect("read fixture");
+
+    let src = fs::read_to_string(&abs).expect("read occ_skill");
     assert!(
         !src.contains("flow-skill"),
         "fixture must not copy flow-skill: {src}"
+    );
+    assert!(
+        src.contains("DORY_SKILL") || src.contains("skills/dory/SKILL.md"),
+        "fixture must open SKILL.md ($DORY_SKILL or absolute), not hardcode: {src}"
     );
     abs
 }
@@ -265,21 +291,25 @@ fn agent_start(h: &Harness, pane: &str, name: &str, argv: &[&str]) -> Output {
     cli(h, pane, &args)
 }
 
-fn start_fixture(h: &Harness, pane: &str, name: &str, comm: &str) -> (Output, PathBuf) {
-    let path = fixture(comm);
-    let argv0 = path.to_str().expect("utf8 fixture path");
+fn start_skiller(h: &Harness, pane: &str, name: &str) -> (Output, PathBuf) {
+    let fixture = occ_skill();
+    let argv0 = fixture.to_str().expect("utf8 fixture path");
     assert!(argv0.starts_with('/'), "start must use abs path: {argv0}");
     assert!(!argv0.contains("omp"), "must not exec omp: {argv0}");
+    assert!(
+        !argv0.contains("flow-skill"),
+        "must not copy flow-skill: {argv0}"
+    );
     let out = agent_start(h, pane, name, &[argv0]);
-    (out, path)
+    (out, fixture)
 }
 
 fn agent_get(h: &Harness, pane: &str, name: &str) -> Output {
     cli(h, pane, &["agent", "get", name])
 }
 
-fn agent_prompt(h: &Harness, pane: &str, name: &str, text: &str) -> Output {
-    cli(h, pane, &["agent", "prompt", name, "--", text])
+fn agent_wait(h: &Harness, pane: &str, name: &str, timeout_ms: &str) -> Output {
+    cli(h, pane, &["agent", "wait", name, "--timeout", timeout_ms])
 }
 
 fn assert_ok(out: &Output, what: &str) {
@@ -292,28 +322,6 @@ fn assert_ok(out: &Output, what: &str) {
     );
     let body = stdout(out);
     assert!(body.contains("\"ok\":true"), "{what}: {body}");
-}
-
-fn wait_state(h: &Harness, pane: &str, name: &str, allowed: &[&str]) -> String {
-    let start = Instant::now();
-    let mut last;
-    loop {
-        let out = agent_get(h, pane, name);
-        if out.status.success() {
-            last = stdout(&out);
-            if let Some(state) = json_field(&last, "state") {
-                if allowed.iter().any(|w| *w == state) {
-                    return last;
-                }
-            }
-        } else {
-            last = format!("stdout={} stderr={}", stdout(&out), stderr(&out));
-        }
-        if start.elapsed() >= Duration::from_secs(8) {
-            panic!("timed out waiting for {name} in {allowed:?}: {last}");
-        }
-        thread::sleep(Duration::from_millis(40));
-    }
 }
 
 fn wait_pane_text(h: &Harness, pane: &str, needle: &str) {
@@ -347,40 +355,46 @@ fn wait_pane_text(h: &Harness, pane: &str, needle: &str) {
     }
 }
 
-fn capture_path(h: &Harness, name: &str) -> PathBuf {
-    h.sock
-        .parent()
-        .expect("session dir")
-        .join(format!("{name}.stdin"))
+fn assert_settled_state(json: &str) {
+    let state = json_field(json, "state").unwrap_or("");
+    assert!(
+        matches!(state, "idle" | "done"),
+        "expected idle|done, got {state} in {json}"
+    );
 }
 
-fn wait_capture(path: &Path, pred: impl Fn(&[u8]) -> bool) -> Vec<u8> {
-    let start = Instant::now();
-    let mut last = Vec::new();
-    loop {
-        if let Ok(body) = fs::read(path) {
-            last = body;
-            if pred(&last) {
-                return last;
-            }
-        }
-        if start.elapsed() >= Duration::from_secs(8) {
-            panic!(
-                "timed out waiting for capture {}: {:?}",
-                path.display(),
-                String::from_utf8_lossy(&last)
-            );
-        }
-        thread::sleep(Duration::from_millis(40));
+fn wait_settled_body(h: &Harness, pane: &str, name: &str, out: &Output, what: &str) -> String {
+    assert_ok(out, what);
+    let body = stdout(out);
+    if json_field(&body, "state").is_some() {
+        assert_settled_state(&body);
+        return body;
     }
+    let got = agent_get(h, pane, name);
+    assert_ok(&got, &format!("{what} get"));
+    let g = stdout(&got);
+    assert_settled_state(&g);
+    g
 }
 
-fn assert_unknown_start(h: &Harness, pane: &str, name: &str, started: &Output, fixture: &Path) {
-    assert_ok(started, "start occupant");
-    let start_body = stdout(started);
+#[test]
+fn p5_skill_occ_unknown_then_skill_phrase_then_wait() {
+    let skill = fs::read_to_string(skill_md()).expect("read SKILL.md");
+    assert!(
+        skill.contains(SKILL_PHRASE),
+        "SKILL.md must contain the occupant-first-action phrase"
+    );
+
+    let h = start();
+    let created = created_layout(&h);
+    let pane = created.pane.as_str();
+
+    let (started, fixture) = start_skiller(&h, pane, AGENT);
+    assert_ok(&started, "start occ_skill");
+    let start_body = stdout(&started);
     let start_state = json_field(&start_body, "state").map(str::to_string);
     let state = start_state.unwrap_or_else(|| {
-        let got = agent_get(h, pane, name);
+        let got = agent_get(&h, pane, AGENT);
         assert_ok(&got, "get after start");
         json_field(&stdout(&got), "state")
             .expect("state after start")
@@ -395,90 +409,19 @@ fn assert_unknown_start(h: &Harness, pane: &str, name: &str, started: &Output, f
         "must not exec omp: {}",
         fixture.display()
     );
-    let unknown = wait_state(h, pane, name, &["unknown"]);
-    assert_eq!(json_field(&unknown, "state"), Some("unknown"), "{unknown}");
-    assert_eq!(occupant_name(&pane_get(h, pane)).as_deref(), Some(name));
-}
-
-fn wrap_bytes(text: &str) -> Vec<u8> {
-    let mut out = BP_BEGIN.to_vec();
-    out.extend_from_slice(text.as_bytes());
-    out.extend_from_slice(BP_END);
-    out
-}
-
-fn has_raw_outside_wrap(buf: &[u8], text: &str) -> bool {
-    let wrap = wrap_bytes(text);
-    let raw_nl = format!("{text}\n");
-    let mut rest = buf;
-    while let Some(at) = rest.windows(wrap.len()).position(|w| w == wrap.as_slice()) {
-        rest = &rest[at + wrap.len()..];
-    }
-    rest.windows(raw_nl.len()).any(|w| w == raw_nl.as_bytes())
-}
-
-#[test]
-fn p5_prompt_paste_bp_on_wraps() {
-    let h = start();
-    let created = created_layout(&h);
-    let pane = created.pane.as_str();
-    let name = "paster";
-
-    let (started, path) = start_fixture(&h, pane, name, "occ_paste");
-    assert_unknown_start(&h, pane, name, &started, &path);
-    wait_pane_text(&h, pane, PASTE_NEEDLE);
-
-    let _ = agent_prompt(&h, pane, name, PASTE_TEXT);
-
-    let wrap = wrap_bytes(PASTE_TEXT);
-    let captured = wait_capture(&capture_path(&h, "occ_paste"), |b| {
-        b.windows(wrap.len()).any(|w| w == wrap.as_slice())
-    });
     assert!(
-        captured.windows(wrap.len()).any(|w| w == wrap.as_slice()),
-        "BP-on stdin must contain wrap, got {:?}",
-        String::from_utf8_lossy(&captured)
+        !fixture.to_string_lossy().contains("flow-skill"),
+        "must not copy flow-skill: {}",
+        fixture.display()
     );
-    let after = captured
-        .windows(wrap.len() + 1)
-        .find(|w| w[..wrap.len()] == wrap[..])
-        .map(|w| w[wrap.len()]);
+
+    wait_pane_text(&h, pane, SKILL_PHRASE);
+    assert_eq!(occupant_name(&pane_get(&h, pane)).as_deref(), Some(AGENT));
+
+    let wait = agent_wait(&h, pane, AGENT, SETTLE_TIMEOUT);
+    let settled = wait_settled_body(&h, pane, AGENT, &wait, "wait after skill report");
     assert!(
-        matches!(after, Some(b'\r') | Some(b'\n')),
-        "BP-on wrap must be followed by Enter (CR on master; cooked PTY may show NL): {:?}",
-        String::from_utf8_lossy(&captured)
-    );
-    assert!(
-        !has_raw_outside_wrap(&captured, PASTE_TEXT),
-        "BP-on stdin must not contain raw {PASTE_TEXT}\\n outside the wrap: {:?}",
-        String::from_utf8_lossy(&captured)
-    );
-}
-
-#[test]
-fn p5_prompt_paste_bp_off_raw_nl() {
-    let h = start();
-    let created = created_layout(&h);
-    let pane = created.pane.as_str();
-    let name = "rawer";
-
-    let (started, path) = start_fixture(&h, pane, name, "occ_raw");
-    assert_unknown_start(&h, pane, name, &started, &path);
-    wait_pane_text(&h, pane, RAW_NEEDLE);
-
-    let _ = agent_prompt(&h, pane, name, RAW_TEXT);
-
-    let expected = format!("{RAW_TEXT}\n");
-    let captured = wait_capture(&capture_path(&h, "occ_raw"), |b| b == expected.as_bytes());
-    assert_eq!(
-        captured,
-        expected.as_bytes(),
-        "BP-off stdin must be {RAW_TEXT} plus one NL, got {:?}",
-        String::from_utf8_lossy(&captured)
-    );
-    assert!(
-        !captured.windows(BP_BEGIN.len()).any(|w| w == BP_BEGIN),
-        "BP-off stdin must not contain BP begin: {:?}",
-        String::from_utf8_lossy(&captured)
+        matches!(json_field(&settled, "state"), Some("idle") | Some("done")),
+        "{settled}"
     );
 }

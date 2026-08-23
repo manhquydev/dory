@@ -1,12 +1,12 @@
 use crate::envelope;
 use crate::ids::Ids;
-use crate::pty::{self, HeldPty, Occupancy};
+use crate::pty::{self, AttachIO, HeldPty, Occupancy};
 
 use crate::socket::{self, SessionPaths};
 use std::env;
-use std::fs;
 use std::ffi::OsString;
-use std::io::{self, BufRead, BufReader, Write};
+use std::fs;
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::thread;
@@ -63,11 +63,11 @@ struct Pane {
     held: HeldPty,
 }
 
-
 struct Tab {
     id: String,
     root_pane: String,
     panes: Vec<Pane>,
+    layout: crate::layout::Layout,
 }
 
 struct Workspace {
@@ -102,6 +102,10 @@ pub fn stop() -> i32 {
         }
         Err(code) => code,
     }
+}
+
+pub fn connect_for_attach() -> Result<UnixStream, i32> {
+    connect_control()
 }
 
 /// One-shot newline JSON against `DORY_SOCKET`, else the default session sock.
@@ -166,6 +170,9 @@ fn serve_loop(listener: UnixListener, world: &mut World) -> Result<(), i32> {
         match handle_client(stream, world) {
             ClientAction::Continue => {}
             ClientAction::Stop => return Ok(()),
+            ClientAction::Attach { stream, io } => {
+                thread::spawn(move || proxy_attach(stream, io));
+            }
         }
     }
 }
@@ -173,6 +180,7 @@ fn serve_loop(listener: UnixListener, world: &mut World) -> Result<(), i32> {
 enum ClientAction {
     Continue,
     Stop,
+    Attach { stream: UnixStream, io: AttachIO },
 }
 
 fn handle_client(stream: UnixStream, world: &mut World) -> ClientAction {
@@ -206,6 +214,19 @@ fn handle_client(stream: UnixStream, world: &mut World) -> ClientAction {
                 let _ = writer.flush();
                 return ClientAction::Stop;
             }
+            LineReply::Attach { io, ack } => {
+                if writeln!(writer, "{ack}").is_err() {
+                    return ClientAction::Continue;
+                }
+                let _ = writer.flush();
+                drop(writer);
+                let leftover = reader.buffer().to_vec();
+                if !leftover.is_empty() {
+                    let _ = io.write_all(&leftover);
+                }
+                let stream = reader.into_inner();
+                return ClientAction::Attach { stream, io };
+            }
             LineReply::Msg(reply) => {
                 if writeln!(writer, "{reply}").is_err() {
                     return ClientAction::Continue;
@@ -219,6 +240,7 @@ fn handle_client(stream: UnixStream, world: &mut World) -> ClientAction {
 enum LineReply {
     Msg(String),
     Stop(String),
+    Attach { io: AttachIO, ack: String },
 }
 
 fn dispatch_line(world: &mut World, line: &str) -> LineReply {
@@ -286,6 +308,41 @@ fn dispatch_line(world: &mut World, line: &str) -> LineReply {
             Some(id) => get_pane(world, id),
             None => envelope::runtime_error("pane id required"),
         }),
+        Some("pane.focus") => LineReply::Msg(match json_str_field(line, "pane") {
+            Some(id) => focus_pane(world, id),
+            None => envelope::runtime_error("pane id required"),
+        }),
+        Some("pane.attach") => match take_attach(
+            world,
+            json_str_field(line, "pane"),
+            json_u16_field(line, "cols"),
+            json_u16_field(line, "rows"),
+            json_bool_field(line, "no_focus").unwrap_or(false),
+        ) {
+            Ok((io, ack)) => LineReply::Attach { io, ack },
+            Err(err) => LineReply::Msg(envelope::runtime_error(&err)),
+        },
+        Some("desk.snapshot") => LineReply::Msg(desk_snapshot(world)),
+        Some("desk.tree") => LineReply::Msg(desk_tree(world)),
+        Some("desk.layout") => LineReply::Msg(desk_layout(
+            world,
+            json_str_field(line, "tab"),
+            json_u16_field(line, "cols"),
+            json_u16_field(line, "rows"),
+        )),
+        Some("desk.divider") => LineReply::Msg(desk_divider(
+            world,
+            json_str_field(line, "a"),
+            json_str_field(line, "b"),
+            json_f32_field(line, "ratio"),
+        )),
+        Some("desk.neighbor") => LineReply::Msg(desk_neighbor(
+            world,
+            json_str_field(line, "from"),
+            json_str_field(line, "step"),
+            json_u16_field(line, "cols"),
+            json_u16_field(line, "rows"),
+        )),
         Some("pane.list") => LineReply::Msg(match json_str_field(line, "workspace") {
             Some(id) => list_panes(world, id),
             None => envelope::runtime_error("workspace id required"),
@@ -358,7 +415,6 @@ fn dispatch_line(world: &mut World, line: &str) -> LineReply {
             json_str_field(line, "state"),
         )),
         _ => LineReply::Msg(envelope::runtime_error("unknown op")),
-
     }
 }
 
@@ -378,6 +434,7 @@ fn create_workspace(world: &mut World) -> Result<(String, String, String), Strin
                 occupant: None,
                 held,
             }],
+            layout: crate::layout::Layout::Leaf { pane: pane.clone() },
         }],
     });
     if world.focused.is_empty() {
@@ -392,14 +449,8 @@ fn create_tab(world: &mut World, workspace_id: &str) -> Result<(String, String),
         .iter()
         .position(|w| w.id == workspace_id)
         .ok_or_else(|| format!("unknown workspace {workspace_id}"))?;
-    let tab = world
-        .ids
-        .tab(workspace_id)
-        .map_err(|e| e.to_string())?;
-    let pane = world
-        .ids
-        .pane(workspace_id)
-        .map_err(|e| e.to_string())?;
+    let tab = world.ids.tab(workspace_id).map_err(|e| e.to_string())?;
+    let pane = world.ids.pane(workspace_id).map_err(|e| e.to_string())?;
     let cwd = world.cwd.clone();
     let held = spawn_root(world, workspace_id, &tab, &pane, &cwd)?;
     world.workspaces[idx].tabs.push(Tab {
@@ -410,6 +461,7 @@ fn create_tab(world: &mut World, workspace_id: &str) -> Result<(String, String),
             occupant: None,
             held,
         }],
+        layout: crate::layout::Layout::Leaf { pane: pane.clone() },
     });
     Ok((tab, pane))
 }
@@ -521,7 +573,6 @@ fn workspace_object(ws: &Workspace) -> String {
                 .map(pane_occupant_json)
                 .unwrap_or_else(|| "null".to_string())
         ));
-
     }
     out.push_str("]}");
     out
@@ -547,7 +598,6 @@ fn pane_occupant_json(pane: &Pane) -> String {
         }
     }
 }
-
 
 struct PaneLoc {
     wi: usize,
@@ -594,12 +644,7 @@ fn retarget_focus(world: &mut World) {
         .unwrap_or_default();
 }
 
-fn split_pane(
-    world: &mut World,
-    pane_id: &str,
-    direction: Option<&str>,
-    no_focus: bool,
-) -> String {
+fn split_pane(world: &mut World, pane_id: &str, direction: Option<&str>, no_focus: bool) -> String {
     let Some(loc) = locate_pane(world, pane_id) else {
         return envelope::runtime_error(&format!("unknown pane {pane_id}"));
     };
@@ -629,6 +674,16 @@ fn split_pane(
         Ok(held) => held,
         Err(err) => return envelope::runtime_error(&err),
     };
+    {
+        let tab = &mut world.workspaces[loc.wi].tabs[loc.ti];
+        let old_ids: Vec<String> = tab.panes.iter().map(|p| p.id.clone()).collect();
+        tab.layout = crate::layout::ensure_layout(&tab.layout, &old_ids);
+        let parsed = crate::layout::SplitDir::parse(dir).unwrap_or(crate::layout::SplitDir::Right);
+        if !crate::layout::split_leaf(&mut tab.layout, pane_id, parsed, &new_id) {
+            tab.layout = crate::layout::synthesize(&old_ids);
+            let _ = crate::layout::split_leaf(&mut tab.layout, pane_id, parsed, &new_id);
+        }
+    }
     world.workspaces[loc.wi].tabs[loc.ti].panes.push(Pane {
         id: new_id.clone(),
         occupant: None,
@@ -671,6 +726,325 @@ fn write_pane(world: &World, pane_id: &str, text: &str) -> String {
     }
 }
 
+fn focus_pane(world: &mut World, pane_id: &str) -> String {
+    let Some(loc) = locate_pane(world, pane_id) else {
+        return envelope::runtime_error(&format!("unknown pane {pane_id}"));
+    };
+    world.focused = world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi]
+        .id
+        .clone();
+    {
+        let pane = &mut world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
+        if let Some(occ) = pane.occupant.as_mut() {
+            occ.seen = true;
+        }
+    }
+    get_pane(world, pane_id)
+}
+
+fn take_attach(
+    world: &mut World,
+    pane_id: Option<&str>,
+    cols: Option<u16>,
+    rows: Option<u16>,
+    no_focus: bool,
+) -> Result<(AttachIO, String), String> {
+    let id = pane_id
+        .filter(|s| !s.is_empty())
+        .unwrap_or(world.focused.as_str());
+    if id.is_empty() {
+        return Err("no pane to attach".to_string());
+    }
+    let loc = locate_pane(world, id).ok_or_else(|| format!("unknown pane {id}"))?;
+    if let (Some(cols), Some(rows)) = (cols, rows) {
+        world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi]
+            .held
+            .resize(cols, rows)
+            .map_err(|e| e.to_string())?;
+    }
+    if !no_focus {
+        world.focused = world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi]
+            .id
+            .clone();
+        let pane = &mut world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
+        if let Some(occ) = pane.occupant.as_mut() {
+            occ.seen = true;
+        }
+    }
+    let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
+    let io = pane.held.attach_io();
+    let ack = envelope::success(&format!(
+        "{{\"pane\":{{\"id\":{}}},\"workspace\":{{\"id\":{}}},\"tab\":{{\"id\":{}}}}}",
+        envelope::json_string(&pane.id),
+        envelope::json_string(&world.workspaces[loc.wi].id),
+        envelope::json_string(&world.workspaces[loc.wi].tabs[loc.ti].id)
+    ));
+    Ok((io, ack))
+}
+
+fn desk_tree(world: &World) -> String {
+    let mut items = String::from("[");
+    let mut first = true;
+    for ws in &world.workspaces {
+        if !first {
+            items.push(',');
+        }
+        first = false;
+        items.push_str(&format!(
+            "{{\"k\":\"w\",\"id\":{}}}",
+            envelope::json_string(&ws.id)
+        ));
+        for tab in &ws.tabs {
+            items.push(',');
+            items.push_str(&format!(
+                "{{\"k\":\"t\",\"id\":{}}}",
+                envelope::json_string(&tab.id)
+            ));
+            for pane in &tab.panes {
+                let (word, _, _) = classify_word(pane);
+                let occ = pane
+                    .occupant
+                    .as_ref()
+                    .map(|o| o.name.as_str())
+                    .unwrap_or("");
+                items.push(',');
+                items.push_str(&format!(
+                    "{{\"k\":\"p\",\"id\":{},\"occ\":{},\"st\":{}}}",
+                    envelope::json_string(&pane.id),
+                    envelope::json_string(occ),
+                    envelope::json_string(if pane.occupant.is_some() {
+                        word.as_str()
+                    } else {
+                        ""
+                    })
+                ));
+            }
+        }
+    }
+    items.push(']');
+    envelope::success(&format!(
+        "{{\"focused\":{},\"items\":{}}}",
+        envelope::json_string(&world.focused),
+        items
+    ))
+}
+
+fn desk_snapshot(world: &World) -> String {
+    let mut text = String::from("dory  workspace / tab / pane\n");
+    for ws in &world.workspaces {
+        text.push_str(&format!("{}\n", ws.id));
+        for tab in &ws.tabs {
+            text.push_str(&format!("  {}\n", tab.id));
+            for pane in &tab.panes {
+                let mark = if pane.id == world.focused { " *" } else { "" };
+                text.push_str(&format!("    {}{}\n", pane.id, mark));
+            }
+        }
+    }
+    let mut inner = format!(
+        "{{\"focused\":{},\"text\":{},",
+        envelope::json_string(&world.focused),
+        envelope::json_string(&text)
+    );
+    let listed = list_workspaces(world);
+    inner.push_str(listed.trim_start_matches('{'));
+    envelope::success(&inner)
+}
+
+fn desk_layout(
+    world: &World,
+    tab_id: Option<&str>,
+    cols: Option<u16>,
+    rows: Option<u16>,
+) -> String {
+    let (Some(cols), Some(rows)) = (cols, rows) else {
+        return envelope::runtime_error("cols and rows required");
+    };
+    let Some((wi, ti)) = tab_loc(world, tab_id) else {
+        return envelope::runtime_error("unknown tab");
+    };
+    let tab = &world.workspaces[wi].tabs[ti];
+    let ids: Vec<String> = tab.panes.iter().map(|p| p.id.clone()).collect();
+    let lay = crate::layout::ensure_layout(&tab.layout, &ids);
+    let cells = crate::layout::tiles(&lay, 0, 0, cols, rows);
+    let mut json = String::from("[");
+    for (i, cell) in cells.iter().enumerate() {
+        if i > 0 {
+            json.push(',');
+        }
+        let (occ, st) = pane_occ_st(world, &cell.id);
+        json.push_str(&format!(
+            "{{\"id\":{},\"x\":{},\"y\":{},\"w\":{},\"h\":{},\"occ\":{},\"st\":{}}}",
+            envelope::json_string(&cell.id),
+            cell.x,
+            cell.y,
+            cell.w,
+            cell.h,
+            envelope::json_string(&occ),
+            envelope::json_string(&st)
+        ));
+    }
+    json.push(']');
+    envelope::success(&format!(
+        "{{\"tab\":{},\"focused\":{},\"cols\":{cols},\"rows\":{rows},\"cells\":{json}}}",
+        envelope::json_string(&tab.id),
+        envelope::json_string(&world.focused)
+    ))
+}
+
+fn desk_divider(world: &mut World, a: Option<&str>, b: Option<&str>, ratio: Option<f32>) -> String {
+    let (Some(a), Some(b), Some(ratio)) = (a, b, ratio) else {
+        return envelope::runtime_error("a, b, and ratio required");
+    };
+    let Some(loc) = locate_pane(world, a) else {
+        return envelope::runtime_error(&format!("unknown pane {a}"));
+    };
+    if locate_pane(world, b).is_none() {
+        return envelope::runtime_error(&format!("unknown pane {b}"));
+    }
+    let tab = &mut world.workspaces[loc.wi].tabs[loc.ti];
+    let ids: Vec<String> = tab.panes.iter().map(|p| p.id.clone()).collect();
+    tab.layout = crate::layout::ensure_layout(&tab.layout, &ids);
+    if !crate::layout::set_ratio(&mut tab.layout, a, b, ratio) {
+        return envelope::runtime_error("no shared split");
+    }
+    envelope::success(&format!(
+        "{{\"a\":{},\"b\":{},\"ratio\":{}}}",
+        envelope::json_string(a),
+        envelope::json_string(b),
+        crate::layout::clamp_ratio(ratio)
+    ))
+}
+
+fn desk_neighbor(
+    world: &World,
+    from: Option<&str>,
+    step: Option<&str>,
+    cols: Option<u16>,
+    rows: Option<u16>,
+) -> String {
+    let spatial = matches!(step, Some("left" | "right" | "up" | "down"));
+    if spatial {
+        let (Some(cols), Some(rows)) = (cols, rows) else {
+            return envelope::runtime_error("cols and rows required");
+        };
+        let from = from
+            .filter(|s| !s.is_empty())
+            .unwrap_or(world.focused.as_str());
+        let Some(loc) = locate_pane(world, from) else {
+            return envelope::runtime_error("unknown pane");
+        };
+        let tab = &world.workspaces[loc.wi].tabs[loc.ti];
+        let ids: Vec<String> = tab.panes.iter().map(|p| p.id.clone()).collect();
+        let lay = crate::layout::ensure_layout(&tab.layout, &ids);
+        let cells = crate::layout::tiles(&lay, 0, 0, cols, rows);
+        return match crate::layout::neighbor_step(&cells, from, step.unwrap_or("")) {
+            Some(id) => envelope::success(&format!(
+                "{{\"pane\":{{\"id\":{}}}}}",
+                envelope::json_string(&id)
+            )),
+            None => envelope::runtime_error("no neighbor"),
+        };
+    }
+    let mut ids = Vec::new();
+    for ws in &world.workspaces {
+        for tab in &ws.tabs {
+            for pane in &tab.panes {
+                ids.push(pane.id.clone());
+            }
+        }
+    }
+    if ids.is_empty() {
+        return envelope::runtime_error("no pane");
+    }
+    let from = from
+        .filter(|s| !s.is_empty())
+        .unwrap_or(world.focused.as_str());
+    let idx = ids.iter().position(|id| id == from).unwrap_or(0);
+    let next = match step {
+        Some("prev") => {
+            if idx == 0 {
+                ids.len() - 1
+            } else {
+                idx - 1
+            }
+        }
+        _ => (idx + 1) % ids.len(),
+    };
+    envelope::success(&format!(
+        "{{\"pane\":{{\"id\":{}}}}}",
+        envelope::json_string(&ids[next])
+    ))
+}
+
+fn tab_loc(world: &World, tab_id: Option<&str>) -> Option<(usize, usize)> {
+    if let Some(id) = tab_id.filter(|s| !s.is_empty()) {
+        for (wi, ws) in world.workspaces.iter().enumerate() {
+            if let Some(ti) = ws.tabs.iter().position(|t| t.id == id) {
+                return Some((wi, ti));
+            }
+        }
+        return None;
+    }
+    locate_pane(world, &world.focused).map(|p| (p.wi, p.ti))
+}
+
+fn pane_occ_st(world: &World, pane_id: &str) -> (String, String) {
+    let Some(loc) = locate_pane(world, pane_id) else {
+        return (String::new(), String::new());
+    };
+    let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
+    let occ = pane
+        .occupant
+        .as_ref()
+        .map(|o| o.name.clone())
+        .unwrap_or_default();
+    let st = if pane.occupant.is_some() {
+        classify_word(pane).0.as_str().to_string()
+    } else {
+        String::new()
+    };
+    (occ, st)
+}
+
+fn proxy_attach(mut stream: UnixStream, io: AttachIO) {
+    let _ = stream.set_nonblocking(true);
+    let mut cursor = io.cursor();
+    let replay = io.snapshot();
+    if !replay.is_empty() {
+        if stream.write_all(&replay).is_err() {
+            return;
+        }
+        let _ = stream.flush();
+        cursor = io.cursor();
+    }
+    let mut buf = [0u8; 4096];
+    loop {
+        if io.is_dead() {
+            break;
+        }
+        let (next, out) = io.wait_since(cursor, Duration::from_millis(20));
+        if !out.is_empty() && stream.write_all(&out).is_err() {
+            break;
+        }
+        if !out.is_empty() {
+            let _ = stream.flush();
+        }
+        cursor = next;
+        match stream.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => {
+                if io.write_all(&buf[..n]).is_err() {
+                    break;
+                }
+            }
+            Err(err) if err.kind() == io::ErrorKind::WouldBlock => {}
+            Err(err) if err.kind() == io::ErrorKind::Interrupted => {}
+            Err(_) => break,
+        }
+    }
+}
+
 fn get_pane(world: &World, pane_id: &str) -> String {
     let Some(loc) = locate_pane(world, pane_id) else {
         return envelope::runtime_error(&format!("unknown pane {pane_id}"));
@@ -681,8 +1055,6 @@ fn get_pane(world: &World, pane_id: &str) -> String {
         pane.id,
         pane.held.child_pid(),
         pane_occupant_json(pane)
-
-
     ))
 }
 
@@ -729,7 +1101,10 @@ fn shell_quote(arg: &str) -> String {
 }
 
 fn shell_join(argv: &[String]) -> String {
-    argv.iter().map(|a| shell_quote(a)).collect::<Vec<_>>().join(" ")
+    argv.iter()
+        .map(|a| shell_quote(a))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn classify_word(pane: &Pane) -> (OccupantWord, bool, bool) {
@@ -788,17 +1163,11 @@ fn refresh_occupant(pane: &mut Pane) {
     }
 }
 
-
-
 fn live_occupant_name(world: &World, name: &str) -> Option<PaneLoc> {
     for (wi, ws) in world.workspaces.iter().enumerate() {
         for (ti, tab) in ws.tabs.iter().enumerate() {
             for (pi, pane) in tab.panes.iter().enumerate() {
-                if pane
-                    .occupant
-                    .as_ref()
-                    .is_some_and(|o| o.name == name)
-                {
+                if pane.occupant.as_ref().is_some_and(|o| o.name == name) {
                     return Some(PaneLoc { wi, ti, pi });
                 }
             }
@@ -807,11 +1176,7 @@ fn live_occupant_name(world: &World, name: &str) -> Option<PaneLoc> {
     None
 }
 
-fn locate_agent(
-    world: &World,
-    name: Option<&str>,
-    pane: Option<&str>,
-) -> Result<PaneLoc, String> {
+fn locate_agent(world: &World, name: Option<&str>, pane: Option<&str>) -> Result<PaneLoc, String> {
     if let Some(n) = name {
         if let Some(loc) = live_occupant_name(world, n) {
             return Ok(loc);
@@ -854,7 +1219,6 @@ fn agent_snapshot(pane: &Pane) -> String {
         if occ.seen { "true" } else { "false" }
     )
 }
-
 
 fn agent_start(
     world: &mut World,
@@ -1021,7 +1385,12 @@ fn agent_prompt(
         }
     }
     if wait {
-        agent_wait_loop(world, loc, None, timeout_ms.unwrap_or(DEFAULT_AGENT_TIMEOUT_MS))
+        agent_wait_loop(
+            world,
+            loc,
+            None,
+            timeout_ms.unwrap_or(DEFAULT_AGENT_TIMEOUT_MS),
+        )
     } else {
         let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
         envelope::success(&agent_snapshot(pane))
@@ -1095,12 +1464,7 @@ fn agent_get(world: &mut World, name: Option<&str>, pane_id: Option<&str>) -> St
     envelope::success(&agent_snapshot(pane))
 }
 
-fn agent_read(
-    world: &World,
-    name: Option<&str>,
-    pane_id: Option<&str>,
-    source: &str,
-) -> String {
+fn agent_read(world: &World, name: Option<&str>, pane_id: Option<&str>, source: &str) -> String {
     let loc = match locate_agent(world, name, pane_id) {
         Ok(loc) => loc,
         Err(err) => return envelope::runtime_error(&err),
@@ -1141,7 +1505,6 @@ fn agent_focus(world: &mut World, name: Option<&str>, pane_id: Option<&str>) -> 
     let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
     envelope::success(&agent_snapshot(pane))
 }
-
 
 fn agent_send_keys(
     world: &mut World,
@@ -1199,7 +1562,6 @@ fn agent_report(world: &mut World, pane_id: Option<&str>, state: Option<&str>) -
     let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
     envelope::success(&agent_snapshot(pane))
 }
-
 
 fn read_pane(world: &World, pane_id: &str, source: &str) -> String {
     let Some(loc) = locate_pane(world, pane_id) else {
@@ -1316,6 +1678,13 @@ fn kill_all(world: &mut World) {
     }
 }
 
+pub fn rpc_line_quiet(line: &str) -> Result<String, i32> {
+    let mut stream = connect_control_quiet()?;
+    writeln!(stream, "{line}").map_err(|_| 1)?;
+    let _ = stream.flush();
+    read_reply_quiet(stream)
+}
+
 fn connect_control() -> Result<UnixStream, i32> {
     if let Some(path) = env::var_os("DORY_SOCKET").filter(|v| !v.is_empty()) {
         return UnixStream::connect(path).map_err(|err| {
@@ -1328,6 +1697,28 @@ fn connect_control() -> Result<UnixStream, i32> {
         eprintln!("dory: {err}");
         1
     })
+}
+
+fn connect_control_quiet() -> Result<UnixStream, i32> {
+    if let Some(path) = env::var_os("DORY_SOCKET").filter(|v| !v.is_empty()) {
+        return UnixStream::connect(path).map_err(|_| 1);
+    }
+    let paths = match socket::session_paths(DEFAULT_SESSION) {
+        Ok(p) => p,
+        Err(_) => return Err(1),
+    };
+    UnixStream::connect(&paths.sock).map_err(|_| 1)
+}
+
+fn read_reply_quiet(stream: UnixStream) -> Result<String, i32> {
+    let mut reply = String::new();
+    BufReader::new(stream)
+        .read_line(&mut reply)
+        .map_err(|_| 1)?;
+    if reply.trim().is_empty() {
+        return Err(1);
+    }
+    Ok(reply)
 }
 
 fn send_op(session: &str, op: &str) -> Result<String, i32> {
@@ -1407,6 +1798,37 @@ fn json_bool_field(line: &str, key: &str) -> Option<bool> {
     } else {
         None
     }
+}
+
+fn json_f32_field(line: &str, key: &str) -> Option<f32> {
+    let needle = format!("\"{key}\"");
+    let idx = line.find(&needle)?;
+    let mut rest = line[idx + needle.len()..].trim_start();
+    rest = rest.strip_prefix(':')?.trim_start();
+    let mut s = String::new();
+    let mut chars = rest.chars().peekable();
+    if chars.peek() == Some(&'-') {
+        s.push(chars.next()?);
+    }
+    let mut saw_dot = false;
+    let mut saw_digit = false;
+    while let Some(&c) = chars.peek() {
+        if c.is_ascii_digit() {
+            saw_digit = true;
+            s.push(c);
+            chars.next();
+        } else if c == '.' && !saw_dot {
+            saw_dot = true;
+            s.push(c);
+            chars.next();
+        } else {
+            break;
+        }
+    }
+    if !saw_digit {
+        return None;
+    }
+    s.parse().ok()
 }
 
 fn json_u16_field(line: &str, key: &str) -> Option<u16> {
@@ -1511,7 +1933,6 @@ fn json_str_array_field(line: &str, key: &str) -> Option<Vec<String>> {
     }
 }
 
-
 #[derive(Clone)]
 enum ReAtom {
     Any,
@@ -1547,7 +1968,11 @@ fn compile_regex(pat: &str) -> Result<CompiledRegex, String> {
         i = 1;
     }
     let end = chars.last() == Some(&'$') && chars.get(chars.len().saturating_sub(2)) != Some(&'\\');
-    let last = if end { chars.len().saturating_sub(1) } else { chars.len() };
+    let last = if end {
+        chars.len().saturating_sub(1)
+    } else {
+        chars.len()
+    };
     let mut ops = Vec::new();
     while i < last {
         let (atom, next) = parse_re_atom(&chars, i, last)?;
@@ -1709,7 +2134,6 @@ fn atom_hit(atom: &ReAtom, c: char) -> bool {
     }
 }
 
-
 fn parse_op(line: &str) -> Option<&str> {
     json_str_field(line, "op")
 }
@@ -1746,11 +2170,7 @@ mod tests {
             path.pop();
         }
         let bin = path.join(env!("CARGO_PKG_NAME"));
-        assert!(
-            bin.is_file(),
-            "dory binary missing at {}",
-            bin.display()
-        );
+        assert!(bin.is_file(), "dory binary missing at {}", bin.display());
         bin
     }
 
@@ -1759,11 +2179,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_nanos())
             .unwrap_or(0);
-        let path = env::temp_dir().join(format!(
-            "dory-srv-{}-{}",
-            std::process::id(),
-            nanos
-        ));
+        let path = env::temp_dir().join(format!("dory-srv-{}-{}", std::process::id(), nanos));
         fs::create_dir_all(&path).unwrap();
         path
     }
@@ -1919,7 +2335,10 @@ mod tests {
         assert_eq!(parse_op("{\"op\":\"ping\"}\n"), Some("ping"));
         assert_eq!(parse_op(" { \"op\" : \"stop\" } "), Some("stop"));
         assert_eq!(parse_op("{\"op\":\"snapshot\"}"), Some("snapshot"));
-        assert_eq!(parse_op("{\"op\":\"workspace.create\"}"), Some("workspace.create"));
+        assert_eq!(
+            parse_op("{\"op\":\"workspace.create\"}"),
+            Some("workspace.create")
+        );
         assert_eq!(
             json_str_field("{\"op\":\"tab.create\",\"workspace\":\"w2\"}", "workspace"),
             Some("w2")
@@ -2072,7 +2491,10 @@ mod tests {
         let tab = result_id(&body, "tab");
         let root = result_id(&body, "root_pane");
         assert!(ws.starts_with('w'), "{ws}");
-        assert_ne!(ws, "w1", "P3-3: do not assume first create is w1 as next input");
+        assert_ne!(
+            ws, "w1",
+            "P3-3: do not assume first create is w1 as next input"
+        );
         assert!(tab.contains(':'), "{tab}");
         assert!(root.contains(":p"), "{root}");
         assert!(body.contains("\"occupant\":null"), "{body}");
@@ -2087,12 +2509,7 @@ mod tests {
         let get_body = String::from_utf8_lossy(&got.stdout);
         assert_eq!(result_id(&get_body, "workspace"), ws);
 
-        let tab_out = cli(
-            &xdg,
-            &sock,
-            true,
-            &["tab", "create", "--workspace", &ws],
-        );
+        let tab_out = cli(&xdg, &sock, true, &["tab", "create", "--workspace", &ws]);
         assert!(
             tab_out.status.success(),
             "tab create: {}",
@@ -2114,12 +2531,7 @@ mod tests {
         let closed_body = String::from_utf8_lossy(&closed.stdout);
         assert!(closed_body.contains("\"retired\":true"), "{closed_body}");
 
-        let again = cli(
-            &xdg,
-            &sock,
-            true,
-            &["tab", "create", "--workspace", &ws],
-        );
+        let again = cli(&xdg, &sock, true, &["tab", "create", "--workspace", &ws]);
         assert!(again.status.success());
         let again_tab = result_id(&String::from_utf8_lossy(&again.stdout), "tab");
         assert_ne!(again_tab, new_tab, "P3-6 retired tab id must not return");
@@ -2197,7 +2609,10 @@ mod tests {
         let snap2 = rpc_op(&sock, "snapshot");
         assert_eq!(json_field(&snap2, "focused"), caller.as_str());
 
-        let got = rpc(&sock, &format!(r#"{{"op":"pane.get","pane":"{new_pane}"}}"#));
+        let got = rpc(
+            &sock,
+            &format!(r#"{{"op":"pane.get","pane":"{new_pane}"}}"#),
+        );
         assert!(got.contains("\"ok\":true"), "{got}");
         let pid = json_u32(&got, "pid");
         let env = wait_environ(pid, "DORY_ENV=1", Duration::from_secs(3));
@@ -2210,13 +2625,19 @@ mod tests {
             env.contains(&format!("DORY_PANE_ID={new_pane}")),
             "pane pid {pid} environ missing DORY_PANE_ID"
         );
-        assert!(env.contains("DORY_SOCKET="), "pane pid {pid} missing DORY_SOCKET");
+        assert!(
+            env.contains("DORY_SOCKET="),
+            "pane pid {pid} missing DORY_SOCKET"
+        );
         assert!(env.contains("DORY_BIN="), "pane pid {pid} missing DORY_BIN");
         assert!(
             env.contains("DORY_WORKSPACE_ID="),
             "pane pid {pid} missing DORY_WORKSPACE_ID"
         );
-        assert!(env.contains("DORY_TAB_ID="), "pane pid {pid} missing DORY_TAB_ID");
+        assert!(
+            env.contains("DORY_TAB_ID="),
+            "pane pid {pid} missing DORY_TAB_ID"
+        );
 
         let ws2 = cli(&xdg, &sock, true, &["workspace", "create"]);
         assert!(
@@ -2366,7 +2787,10 @@ mod tests {
         let body = String::from_utf8_lossy(&out.stdout);
         let new_pane = result_id(&body, "pane");
         assert_ne!(new_pane, caller);
-        assert_eq!(json_field(&rpc_op(&sock, "snapshot"), "focused"), caller.as_str());
+        assert_eq!(
+            json_field(&rpc_op(&sock, "snapshot"), "focused"),
+            caller.as_str()
+        );
 
         let missing = Command::new(dory_bin())
             .args(["pane", "split", "--current"])
@@ -2511,7 +2935,6 @@ mod tests {
         let _ = fs::remove_dir_all(&xdg);
     }
 
-
     #[test]
     fn tab_pane_list_get_are_inspect() {
         let xdg = temp_xdg();
@@ -2537,7 +2960,10 @@ mod tests {
         );
         let tabs_body = String::from_utf8_lossy(&tabs.stdout);
         assert!(tabs_body.contains("\"ok\":true"), "{tabs_body}");
-        assert!(tabs_body.contains(&format!("\"id\":\"{tab}\"")), "{tabs_body}");
+        assert!(
+            tabs_body.contains(&format!("\"id\":\"{tab}\"")),
+            "{tabs_body}"
+        );
         assert!(tabs_body.contains("\"occupant\":null"), "{tabs_body}");
         assert!(!tabs_body.contains(":7380"), "{tabs_body}");
 
@@ -2571,7 +2997,10 @@ mod tests {
             String::from_utf8_lossy(&after.stderr)
         );
         let after_body = String::from_utf8_lossy(&after.stdout);
-        assert!(after_body.contains(&format!("\"id\":\"{root}\"")), "{after_body}");
+        assert!(
+            after_body.contains(&format!("\"id\":\"{root}\"")),
+            "{after_body}"
+        );
         assert!(
             after_body.contains(&format!("\"id\":\"{new_pane}\"")),
             "{after_body}"

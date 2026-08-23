@@ -1,0 +1,19 @@
+#!/bin/sh
+# Occupant fixture. Start as /abs/path/to/occ_paste so argv0 comm is
+# occ_paste — not bash, sh, or omp. Enable live bracketed-paste, copy
+# stdin bytes to a file beside $DORY_SOCKET (under XDG). Stay resident.
+# Do not exec an allowlisted comm as argv0.
+
+printf '\033[?2004h'
+printf '%s\n' DORY_OCC_PASTE
+
+if [ -n "${DORY_SOCKET-}" ]; then
+  cap=$(dirname "$DORY_SOCKET")/occ_paste.stdin
+else
+  cap="${TMPDIR:-/tmp}/occ_paste.stdin.$$"
+fi
+: > "$cap"
+dd bs=1 of="$cap" 2>/dev/null
+while :; do
+  sleep 3600
+done
