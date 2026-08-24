@@ -16,6 +16,7 @@ use crossterm::terminal::{
     enable_raw_mode,
 };
 use crossterm::{execute, queue};
+use std::env;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::os::unix::net::UnixStream;
 use std::time::{Duration, Instant};
@@ -771,7 +772,15 @@ impl Desk {
     }
 
     fn new_workspace(&mut self) {
-        let body = match server::rpc_line_quiet(r#"{"op":"workspace.create"}"#) {
+        let line = match env::current_dir()
+            .ok()
+            .and_then(|p| p.into_os_string().into_string().ok())
+            .filter(|s| !s.is_empty() && !s.contains(['"', '\\', '\n']))
+        {
+            Some(cwd) => format!(r#"{{"op":"workspace.create","cwd":"{cwd}"}}"#),
+            None => r#"{"op":"workspace.create"}"#.to_string(),
+        };
+        let body = match server::rpc_line_quiet(&line) {
             Ok(b) => b,
             Err(_) => {
                 self.status = "workspace.create failed".to_string();

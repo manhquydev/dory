@@ -48,6 +48,10 @@ Usage:
 
 Mutating workspace/tab/pane/agent/flow verbs require DORY_ENV=1.
 Bare `dory` opens the desk (sidebar + tiled live panes). Starts the server if needed.
+Sit-down shells use $SHELL with rc (`DORY_SIT_SHELL=1`). `dory server` in tests stays
+`bash --norc --noprofile`. New tabs follow the focused pane cwd; desk new workspace
+uses the directory where you typed `dory`. `dory server stop` then `dory` if an old
+daemon still has a bare bash-5.2 pane.
 Desk prefix is Ctrl-b: q/d detach; w workspace picker; Shift-n new workspace;
 n/p and 1-9 tabs in this workspace; hjkl panes; x close pane; Shift-x close tab;
 Shift-d close workspace; z zoom (streams stay); b sidebar; ? help; drag>=2 copy.

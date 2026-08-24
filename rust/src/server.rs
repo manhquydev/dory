@@ -148,7 +148,7 @@ fn serve_session(session: &str) -> Result<(), i32> {
         cwd,
         focused: String::new(),
     };
-    create_workspace(&mut world).map_err(|err| {
+    create_workspace(&mut world, None).map_err(|err| {
         eprintln!("{err}");
         1
     })?;
@@ -252,7 +252,8 @@ fn dispatch_line(world: &mut World, line: &str) -> LineReply {
             kill_all(world);
             LineReply::Stop(dead_snapshot(pid))
         }
-        Some("workspace.create") => LineReply::Msg(match create_workspace(world) {
+        Some("workspace.create") => {
+            LineReply::Msg(match create_workspace(world, json_str_field(line, "cwd")) {
             Ok((ws, tab, pane)) => {
                 let mut result = envelope::result_workspace(&ws, &tab, &pane);
                 result.pop();
@@ -260,14 +261,15 @@ fn dispatch_line(world: &mut World, line: &str) -> LineReply {
                 envelope::success(&result)
             }
             Err(err) => envelope::runtime_error(&err),
-        }),
+        })
+        }
         Some("workspace.list") => LineReply::Msg(envelope::success(&list_workspaces(world))),
         Some("workspace.get") => LineReply::Msg(match json_str_field(line, "workspace") {
             Some(id) => get_workspace(world, id),
             None => envelope::runtime_error("workspace id required"),
         }),
         Some("tab.create") => LineReply::Msg(match json_str_field(line, "workspace") {
-            Some(id) => match create_tab(world, id) {
+            Some(id) => match create_tab(world, id, json_str_field(line, "cwd")) {
                 Ok((tab, pane)) => envelope::success(&result_tab(&tab, &pane)),
                 Err(err) => envelope::runtime_error(&err),
             },
@@ -426,11 +428,32 @@ fn dispatch_line(world: &mut World, line: &str) -> LineReply {
     }
 }
 
-fn create_workspace(world: &mut World) -> Result<(String, String, String), String> {
+fn spawn_cwd(world: &World, explicit: Option<&str>) -> PathBuf {
+    if let Some(raw) = explicit {
+        let path = PathBuf::from(raw);
+        if path.is_absolute() && path.is_dir() {
+            return path;
+        }
+    }
+    if !world.focused.is_empty() {
+        if let Some(loc) = locate_pane(world, &world.focused) {
+            let pid = world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi]
+                .held
+                .child_pid();
+            return proc_cwd(pid, &world.cwd);
+        }
+    }
+    world.cwd.clone()
+}
+
+fn create_workspace(
+    world: &mut World,
+    cwd: Option<&str>,
+) -> Result<(String, String, String), String> {
     let ws = world.ids.workspace().map_err(|e| e.to_string())?;
     let tab = world.ids.tab(&ws).map_err(|e| e.to_string())?;
     let pane = world.ids.pane(&ws).map_err(|e| e.to_string())?;
-    let cwd = world.cwd.clone();
+    let cwd = spawn_cwd(world, cwd);
     let held = spawn_root(world, &ws, &tab, &pane, &cwd)?;
     world.workspaces.push(Workspace {
         id: ws.clone(),
@@ -451,7 +474,11 @@ fn create_workspace(world: &mut World) -> Result<(String, String, String), Strin
     Ok((ws, tab, pane))
 }
 
-fn create_tab(world: &mut World, workspace_id: &str) -> Result<(String, String), String> {
+fn create_tab(
+    world: &mut World,
+    workspace_id: &str,
+    cwd: Option<&str>,
+) -> Result<(String, String), String> {
     let idx = world
         .workspaces
         .iter()
@@ -459,7 +486,7 @@ fn create_tab(world: &mut World, workspace_id: &str) -> Result<(String, String),
         .ok_or_else(|| format!("unknown workspace {workspace_id}"))?;
     let tab = world.ids.tab(workspace_id).map_err(|e| e.to_string())?;
     let pane = world.ids.pane(workspace_id).map_err(|e| e.to_string())?;
-    let cwd = world.cwd.clone();
+    let cwd = spawn_cwd(world, cwd);
     let held = spawn_root(world, workspace_id, &tab, &pane, &cwd)?;
     world.workspaces[idx].tabs.push(Tab {
         id: tab.clone(),
@@ -1871,7 +1898,7 @@ fn session_paths_or_exit(session: &str) -> Result<SessionPaths, i32> {
     }
 }
 
-fn first_shell() -> Vec<OsString> {
+fn bare_shell() -> Vec<OsString> {
     if Path::new("/bin/bash").exists() {
         vec![
             OsString::from("/bin/bash"),
@@ -1881,6 +1908,31 @@ fn first_shell() -> Vec<OsString> {
     } else {
         vec![OsString::from("/bin/sh")]
     }
+}
+
+fn first_shell() -> Vec<OsString> {
+    if env::var_os("DORY_SIT_SHELL").is_none() || env::var_os("DORY_BARE_SHELL").is_some() {
+        return bare_shell();
+    }
+    let shell = env::var_os("SHELL").filter(|s| !s.is_empty()).unwrap_or_else(|| {
+        if Path::new("/bin/bash").exists() {
+            OsString::from("/bin/bash")
+        } else {
+            OsString::from("/bin/sh")
+        }
+    });
+    let base = Path::new(&shell)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+    if matches!(
+        base.to_ascii_lowercase().as_str(),
+        "herdr" | "herdr.exe" | "dsh" | "dsh.exe"
+    ) || shell.to_string_lossy().contains("@deepseek-ai/dsh")
+    {
+        return bare_shell();
+    }
+    vec![shell]
 }
 
 fn json_str_field<'a>(line: &'a str, key: &str) -> Option<&'a str> {
@@ -2322,6 +2374,61 @@ mod tests {
         }
         let _ = child.kill();
         panic!("dory server did not bind {}", sock.display());
+    }
+
+    fn start_server_sit(xdg: &Path) -> Child {
+        let mut child = Command::new(dory_bin())
+            .arg("server")
+            .env("XDG_RUNTIME_DIR", xdg)
+            .env("DORY_SIT_SHELL", "1")
+            .env("SHELL", "/bin/bash")
+            .current_dir(xdg)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn sit dory server");
+        let sock = session_sock(xdg);
+        let start = Instant::now();
+        while start.elapsed() < Duration::from_secs(5) {
+            if UnixStream::connect(&sock).is_ok() {
+                return child;
+            }
+            if let Ok(Some(status)) = child.try_wait() {
+                let mut err = String::new();
+                if let Some(mut stderr) = child.stderr.take() {
+                    let _ = stderr.read_to_string(&mut err);
+                }
+                panic!("sit server exited {status}: {err}");
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+        let _ = child.kill();
+        panic!("sit server did not bind {}", sock.display());
+    }
+
+    fn proc_cmdline(pid: u32) -> String {
+        fs::read(format!("/proc/{pid}/cmdline"))
+            .map(|b| String::from_utf8_lossy(&b).replace('\0', " "))
+            .unwrap_or_default()
+    }
+
+    fn wait_cwd(pid: u32, want: &Path, budget: Duration) -> PathBuf {
+        let start = Instant::now();
+        loop {
+            let got = proc_cwd(pid, Path::new("/"));
+            if got == want {
+                return got;
+            }
+            if start.elapsed() >= budget {
+                panic!(
+                    "pid {pid} cwd {} != {}",
+                    got.display(),
+                    want.display()
+                );
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
     }
 
     fn rpc(sock: &Path, line: &str) -> String {
@@ -3131,6 +3238,94 @@ mod tests {
 
         let omitted = cli(&xdg, &sock, false, &["pane", "get"]);
         assert_eq!(omitted.status.code(), Some(2));
+
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn sit_shell_drops_norc_default_keeps_it() {
+        let xdg = temp_xdg();
+        let mut bare = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let pid = json_u32(&rpc_op(&sock, "snapshot"), "pid");
+        let cmd = proc_cmdline(pid);
+        assert!(
+            cmd.contains("--norc"),
+            "test server must stay bare: {cmd}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = bare.wait();
+        let _ = fs::remove_dir_all(&xdg);
+
+        let xdg = temp_xdg();
+        let mut sit = start_server_sit(&xdg);
+        let sock = session_sock(&xdg);
+        let pid = json_u32(&rpc_op(&sock, "snapshot"), "pid");
+        let cmd = proc_cmdline(pid);
+        assert!(
+            !cmd.contains("--norc") && !cmd.contains("--noprofile"),
+            "sit shell must load rc: {cmd}"
+        );
+        assert!(cmd.contains("bash"), "{cmd}");
+        let _ = stop_server(&xdg);
+        let _ = sit.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn tab_and_workspace_follow_pane_or_explicit_cwd() {
+        let xdg = temp_xdg();
+        let dest = xdg.join("work");
+        fs::create_dir(&dest).unwrap();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let snap = rpc_op(&sock, "snapshot");
+        let pane = json_field(&snap, "pane").to_string();
+        let ws = json_field(&snap, "workspace").to_string();
+        let pid = json_u32(&snap, "pid");
+
+        let wrote = rpc(
+            &sock,
+            &format!(
+                r#"{{"op":"pane.write","pane":"{pane}","text":"cd {}"}}"#,
+                dest.display()
+            ),
+        );
+        assert!(wrote.contains("\"ok\":true"), "{wrote}");
+        wait_cwd(pid, &dest, Duration::from_secs(5));
+
+        let tab = rpc(
+            &sock,
+            &format!(r#"{{"op":"tab.create","workspace":"{ws}"}}"#),
+        );
+        assert!(tab.contains("\"ok\":true"), "{tab}");
+        let tab_pane = result_id(&tab, "root_pane");
+        let tab_got = rpc(
+            &sock,
+            &format!(r#"{{"op":"pane.get","pane":"{tab_pane}"}}"#),
+        );
+        let tab_pid = json_u32(&tab_got, "pid");
+        wait_cwd(tab_pid, &dest, Duration::from_secs(5));
+
+        let other = xdg.join("other");
+        fs::create_dir(&other).unwrap();
+        let created = rpc(
+            &sock,
+            &format!(
+                r#"{{"op":"workspace.create","cwd":"{}"}}"#,
+                other.display()
+            ),
+        );
+        assert!(created.contains("\"ok\":true"), "{created}");
+        let new_pane = result_id(&created, "root_pane");
+        let new_got = rpc(
+            &sock,
+            &format!(r#"{{"op":"pane.get","pane":"{new_pane}"}}"#),
+        );
+        let new_pid = json_u32(&new_got, "pid");
+        wait_cwd(new_pid, &other, Duration::from_secs(5));
 
         let _ = stop_server(&xdg);
         let _ = server.wait();

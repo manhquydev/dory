@@ -339,6 +339,7 @@ pub fn ensure_server() -> Result<(), i32> {
     })?;
     let mut cmd = Command::new(exe);
     cmd.arg("server")
+        .env("DORY_SIT_SHELL", "1")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
