@@ -1,0 +1,16 @@
+{
+  "name": "dory",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Session OS first mile: journal-authoritative local serve",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "dory": "./bin/dory.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

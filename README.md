@@ -59,6 +59,19 @@ Nhà máy (Herdr / Cursor) được thuê để xây. Hàng Dory **không** gọ
 1. **Session OS** — chọn thư mục, chạy phiên, sửa file, ra lệnh, ủy thác, hỏi trước việc nguy hiểm. Nhật ký phiên là sự thật. Web local chiếu nhật ký, không phải cửa sổ.
 2. **Workplace OS** — cửa sổ → thẻ → ô. Máy chủ giữ tiến trình thật. Một agent điều khiển agent khác. Rời UI không phải tắt việc.
 
+## Hai cửa
+
+Desk vẫn là cửa mặc định khi gõ `dory`. Đèn nhật ký là cửa khác, sau khi **ai đó đã bật**.
+
+| Cửa | Lệnh | Cho ai | Cần |
+|---|---|---|---|
+| Desk (Workplace OS) | `dory` | Operator đã quen terminal | tty |
+| Đèn nhật ký (Session OS) | `node bin/dory.js serve --workspace /abs` rồi mở `http://127.0.0.1:7380/` | Người không cần tty để làm việc trên trang | Helper bật đèn một lần |
+
+Không phải icon hay file `.app`. Thư mục phiên là `--workspace` tuyệt đối; trang chỉ chiếu path.
+
+Binary Rust gặp `dory serve` chỉ nhắc đây là đèn Node, không mở desk. Đèn: `node bin/dory.js serve --workspace /abs`.
+
 ## Xong tới đâu
 
 Trạng thái dưới đây là **điểm vào**, không phải inventory. Đếm test / verb / phase: đọc owner, đừng chép vào đây.
