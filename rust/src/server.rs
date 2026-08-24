@@ -277,6 +277,14 @@ fn dispatch_line(world: &mut World, line: &str) -> LineReply {
             Some(id) => close_tab(world, id),
             None => envelope::runtime_error("tab id required"),
         }),
+        Some("workspace.close") => LineReply::Msg(match json_str_field(line, "workspace") {
+            Some(id) => close_workspace(world, id),
+            None => envelope::runtime_error("workspace id required"),
+        }),
+        Some("pane.close") => LineReply::Msg(match json_str_field(line, "pane") {
+            Some(id) => close_pane(world, id),
+            None => envelope::runtime_error("pane id required"),
+        }),
         Some("tab.list") => LineReply::Msg(match json_str_field(line, "workspace") {
             Some(id) => list_tabs(world, id),
             None => envelope::runtime_error("workspace id required"),
@@ -466,6 +474,19 @@ fn create_tab(world: &mut World, workspace_id: &str) -> Result<(String, String),
     Ok((tab, pane))
 }
 
+fn live_pane_count(world: &World) -> usize {
+    world
+        .workspaces
+        .iter()
+        .flat_map(|w| w.tabs.iter())
+        .map(|t| t.panes.len())
+        .sum()
+}
+
+fn last_room_error() -> String {
+    envelope::runtime_error("refusing to close the last live pane")
+}
+
 fn close_tab(world: &mut World, tab_id: &str) -> String {
     let mut found = None;
     for (wi, ws) in world.workspaces.iter().enumerate() {
@@ -477,16 +498,90 @@ fn close_tab(world: &mut World, tab_id: &str) -> String {
     let Some((wi, ti)) = found else {
         return envelope::runtime_error(&format!("unknown tab {tab_id}"));
     };
+    let closing = world.workspaces[wi].tabs[ti].panes.len();
+    if live_pane_count(world) <= closing {
+        return last_room_error();
+    }
     let mut tab = world.workspaces[wi].tabs.remove(ti);
     for pane in &mut tab.panes {
         let _ = pane.held.kill_group();
         world.ids.retire(&pane.id);
     }
     world.ids.retire(&tab.id);
-    retarget_focus(world);
+    if world.workspaces[wi].tabs.is_empty() {
+        let ws_id = world.workspaces[wi].id.clone();
+        world.workspaces.remove(wi);
+        world.ids.retire(&ws_id);
+        retarget_focus(world, None);
+    } else {
+        let ti = ti.min(world.workspaces[wi].tabs.len() - 1);
+        retarget_focus(world, Some((wi, ti)));
+    }
     envelope::success(&format!(
         "{{\"tab\":{{\"id\":\"{}\"}},\"retired\":true}}",
         tab.id
+    ))
+}
+
+fn close_workspace(world: &mut World, workspace_id: &str) -> String {
+    let Some(wi) = world.workspaces.iter().position(|w| w.id == workspace_id) else {
+        return envelope::runtime_error(&format!("unknown workspace {workspace_id}"));
+    };
+    if world.workspaces.len() == 1 {
+        return last_room_error();
+    }
+    let closing: usize = world.workspaces[wi].tabs.iter().map(|t| t.panes.len()).sum();
+    if live_pane_count(world) <= closing {
+        return last_room_error();
+    }
+    let mut ws = world.workspaces.remove(wi);
+    for tab in &mut ws.tabs {
+        for pane in &mut tab.panes {
+            let _ = pane.held.kill_group();
+            world.ids.retire(&pane.id);
+        }
+        world.ids.retire(&tab.id);
+    }
+    world.ids.retire(&ws.id);
+    retarget_focus(world, None);
+    envelope::success(&format!(
+        "{{\"workspace\":{{\"id\":\"{}\"}},\"retired\":true}}",
+        ws.id
+    ))
+}
+
+fn close_pane(world: &mut World, pane_id: &str) -> String {
+    let Some(loc) = locate_pane(world, pane_id) else {
+        return envelope::runtime_error(&format!("unknown pane {pane_id}"));
+    };
+    if live_pane_count(world) <= 1 {
+        return last_room_error();
+    }
+    let tab_id = world.workspaces[loc.wi].tabs[loc.ti].id.clone();
+    if world.workspaces[loc.wi].tabs[loc.ti].panes.len() <= 1 {
+        return close_tab(world, &tab_id);
+    }
+    let mut pane = world.workspaces[loc.wi].tabs[loc.ti].panes.remove(loc.pi);
+    let _ = pane.held.kill_group();
+    world.ids.retire(&pane.id);
+    let tab = &mut world.workspaces[loc.wi].tabs[loc.ti];
+    if !crate::layout::remove_leaf(&mut tab.layout, pane_id) {
+        tab.layout = crate::layout::ensure_layout(
+            &tab.layout,
+            &tab.panes.iter().map(|p| p.id.clone()).collect::<Vec<_>>(),
+        );
+    }
+    if tab.root_pane == pane_id {
+        tab.root_pane = tab
+            .panes
+            .first()
+            .map(|p| p.id.clone())
+            .unwrap_or_default();
+    }
+    retarget_focus(world, Some((loc.wi, loc.ti)));
+    envelope::success(&format!(
+        "{{\"pane\":{{\"id\":\"{}\"}},\"retired\":true}}",
+        pane.id
     ))
 }
 
@@ -630,9 +725,21 @@ fn proc_cwd(pid: u32, fallback: &Path) -> PathBuf {
     fs::read_link(format!("/proc/{pid}/cwd")).unwrap_or_else(|_| fallback.to_path_buf())
 }
 
-fn retarget_focus(world: &mut World) {
+fn retarget_focus(world: &mut World, prefer: Option<(usize, usize)>) {
     if locate_pane(world, &world.focused).is_some() {
         return;
+    }
+    if let Some((wi, ti)) = prefer {
+        if let Some(ws) = world.workspaces.get(wi) {
+            if let Some(pane) = ws.tabs.get(ti).and_then(|t| t.panes.first()) {
+                world.focused = pane.id.clone();
+                return;
+            }
+            if let Some(pane) = ws.tabs.iter().find_map(|t| t.panes.first()) {
+                world.focused = pane.id.clone();
+                return;
+            }
+        }
     }
     world.focused = world
         .workspaces

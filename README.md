@@ -12,21 +12,31 @@ Trong một terminal thật:
 dory
 ```
 
-Lần đầu sẽ bật `dory server` rồi mở **desk**: cây cửa sổ → thẻ → ô bên trái, **nhiều PTY sống** của thẻ đang chọn bên phải.
+Lần đầu sẽ bật `dory server` rồi mở **desk**: Spaces + Agents bên trái, hàng thẻ, **nhiều PTY sống** của thẻ đang chọn bên phải.
+
+Prefix là `Ctrl-b`. Không có phím trần `x` / `1` / `w`.
 
 | Phím / chuột | Việc |
 |---|---|
-| Click ô / cây | Đổi ô đang gõ |
+| Click card / agent / chip / ô | Đổi ô đang gõ |
 | Kéo vách giữa ô | Đổi tỉ lệ |
+| Kéo chọn ≥ 2 ô trên tile | Copy OSC 52 (footer `copied` = đã gửi) |
 | `Ctrl-b h/j/k/l` | Ô theo hướng |
-| `Ctrl-b n` / `Ctrl-b p` | Ô kế / trước (danh sách) |
+| `Ctrl-b n` / `Ctrl-b p` / `Ctrl-b 1..9` | Thẻ cùng cửa sổ |
 | `Ctrl-b c` | Thẻ mới |
 | `Ctrl-b v` / `Ctrl-b -` | Tách ô phải / dưới (focus ô mới) |
-| `Ctrl-b z` | Phóng ô đang chọn / trả lưới |
-| `Ctrl-b w` | Cửa sổ mới |
+| `Ctrl-b z` | Phóng ô đang chọn; stream anh em vẫn sống |
+| `Ctrl-b w` | Picker cửa sổ (không tạo) |
+| `Ctrl-b Shift-n` | Cửa sổ mới |
+| `Ctrl-b b` | Thu sidebar 22↔4↔0 |
+| `Ctrl-b Ctrl-b` | Gửi `C-b` vào ô |
+| `Ctrl-b x` | Đóng ô (xác nhận nếu ô cuối trên thẻ) |
+| `Ctrl-b Shift-x` | Đóng thẻ |
+| `Ctrl-b Shift-d` | Đóng cửa sổ |
 | `Ctrl-b q` hoặc `Ctrl-b d` | Rời UI; PTY vẫn sống |
+| `Ctrl-b ?` | Bảng phím |
 
-`dory attach --plain` là client PTY thô (không sidebar). Trong ô (`DORY_ENV=1`): skill vẫn gọi CLI. `dory server stop` mới tắt việc. Desk là client của socket, không phải clone TUI Herdr.
+`dory attach --plain` là client PTY thô (không sidebar). Trong `--plain`, `n`/`p` vẫn đi **ô**, không phải thẻ. Trong ô (`DORY_ENV=1`): occupant gọi CLI, không ngồi desk. `dory server stop` mới tắt việc. Desk là client của socket, không phải clone TUI Herdr. Không ngồi TTY trong pane factory / agent.
 
 **Đích:** Session OS (nhật ký là sự thật) + Workplace OS (process sống là sự thật), gọi Flow như governance plane bên ngoài. Chi tiết: [north star](plans/reports/260822-north-star-aoe.md).
 
@@ -60,7 +70,7 @@ Trạng thái dưới đây là **điểm vào**, không phải inventory. Đế
 | Workplace OS (PTY + `DORY_ENV=1` + skill) | Có — crate `rust/`, skill `skills/dory/SKILL.md` | Binary + skill. Plan giấy [0847](plans/260822-0847-workplace-skill-mux/plan.md) **không** lật từ giấy; không dùng phase markdown làm sự thật. |
 | Occupant (argv PATH, `report`, không `--kind`) | Có | [occupant-lock](plans/reports/260822-1942-brainstorm-occupant-lock.md) · `rust/src/server.rs` · factory `plans/reports/260823-layer4f2-omp-factory.md` |
 | Hợp đồng §11 (agent trong pane, Flow trên repo ngoài) | **PASS** | [bảng](plans/reports/260823-s11-table.md) · `rust/tests/p5_s11.rs`. Scout [260822-p5-accept-s11.md](plans/reports/260822-p5-accept-s11.md) là **PARTIAL cũ**, đừng chấm lại. `eval/phase5-project` vẫn không đủ. |
-| Mở chỗ ngồi (`dory`) | Có — desk lưới (sidebar + N PTY), detach ≠ kill | `rust/src/desk.rs` · `layout.rs`. `--plain` vẫn ở `attach.rs`. |
+| Mở chỗ ngồi (`dory`) | Có — desk glance + prefix (picker / close / zoom-alive / copy). Detach ≠ kill. Chưa ngồi TTY từ pane factory. | `rust/src/desk.rs` · `layout.rs`. `--plain` `n/p` vẫn ô, ở `attach.rs`. |
 | Node `:7380` + `script` + `/workplace` | Spike / học. Giữ cây. Không phải skill. | `src/` journal lamp |
 
 Luật: [CHARTER.md](CHARTER.md) (formerly `HIEN-PHAP.md`).

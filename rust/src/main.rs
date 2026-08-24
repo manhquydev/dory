@@ -25,10 +25,12 @@ Usage:
   dory workspace create
   dory workspace list
   dory workspace get <id>
+  dory workspace close <id>
   dory tab create --workspace <id>
   dory tab list --workspace <id>
   dory tab close <id>
   dory pane list --workspace <id>
+  dory pane close [--current | --pane <id>]
   dory pane get [--current | --pane <id>]
   dory pane split [--current | --pane <id>] [--direction right|down] [--no-focus]
   dory pane run [--current | --pane <id>] <text>
@@ -46,6 +48,10 @@ Usage:
 
 Mutating workspace/tab/pane/agent/flow verbs require DORY_ENV=1.
 Bare `dory` opens the desk (sidebar + tiled live panes). Starts the server if needed.
+Desk prefix is Ctrl-b: q/d detach; w workspace picker; Shift-n new workspace;
+n/p and 1-9 tabs in this workspace; hjkl panes; x close pane; Shift-x close tab;
+Shift-d close workspace; z zoom (streams stay); b sidebar; ? help; drag>=2 copy.
+`dory attach --plain` n/p still walk panes, not tabs. Occupants use CLI, not the desk.
 `dory attach --plain` is the raw PTY client.
 The Node `dory serve` lamp is not this binary.
 ";
@@ -120,6 +126,20 @@ fn workspace_cmd(args: &[String]) -> i32 {
             }
             print_rpc(&format!(r#"{{"op":"workspace.get","workspace":"{id}"}}"#))
         }
+        Some("close") => {
+            let Some(id) = args.get(2).map(String::as_str).and_then(json_safe_id) else {
+                eprintln!("dory: usage: dory workspace close <id>");
+                return 2;
+            };
+            if args.len() != 3 {
+                eprintln!("dory: usage: dory workspace close <id>");
+                return 2;
+            }
+            if let Err(code) = require_skill_env() {
+                return code;
+            }
+            print_rpc(&format!(r#"{{"op":"workspace.close","workspace":"{id}"}}"#))
+        }
         Some(other) => {
             eprintln!("dory: unknown workspace subcommand '{other}'");
             2
@@ -179,6 +199,7 @@ fn pane_cmd(args: &[String]) -> i32 {
         }
         Some("list") => pane_list_cmd(args),
         Some("get") => pane_get_cmd(args),
+        Some("close") => pane_close_cmd(args),
         Some("split") => pane_split_cmd(args),
         Some("run") => pane_run_cmd(args),
         Some("read") => pane_read_cmd(args),
@@ -196,6 +217,18 @@ fn pane_list_cmd(args: &[String]) -> i32 {
         return 2;
     };
     print_rpc(&format!(r#"{{"op":"pane.list","workspace":"{id}"}}"#))
+}
+
+fn pane_close_cmd(args: &[String]) -> i32 {
+    const USAGE_CLOSE: &str = "dory: usage: dory pane close [--current | --pane <id>]";
+    let target = match pane_target(args, USAGE_CLOSE) {
+        Ok(id) => id,
+        Err(code) => return code,
+    };
+    if let Err(code) = require_skill_env() {
+        return code;
+    }
+    print_rpc(&format!(r#"{{"op":"pane.close","pane":"{target}"}}"#))
 }
 
 fn pane_get_cmd(args: &[String]) -> i32 {
@@ -593,6 +626,8 @@ mod tests {
     #[test]
     fn workspace_create_without_env_is_runtime_error() {
         assert_eq!(dispatch(&args(&["workspace", "create"])), 1);
+        assert_eq!(dispatch(&args(&["workspace", "close", "w1"])), 1);
+        assert_eq!(dispatch(&args(&["pane", "close", "--pane", "w1:p1"])), 1);
         assert_eq!(dispatch(&args(&["tab", "create", "--workspace", "w2"])), 1);
         assert_eq!(dispatch(&args(&["pane", "split", "--current"])), 1);
         assert_eq!(dispatch(&args(&["pane", "split", "--pane", "w1:p1"])), 1);
@@ -627,6 +662,8 @@ mod tests {
         assert_eq!(dispatch(&args(&["pane", "read"])), 2);
         assert_eq!(dispatch(&args(&["pane", "wait-output", "--match", "x"])), 2);
         assert_eq!(dispatch(&args(&["pane", "get"])), 2);
+        assert_eq!(dispatch(&args(&["pane", "close"])), 2);
+        assert_eq!(dispatch(&args(&["workspace", "close"])), 2);
         assert_eq!(dispatch(&args(&["tab", "list"])), 2);
         assert_eq!(dispatch(&args(&["pane", "list"])), 2);
     }
@@ -645,6 +682,11 @@ mod tests {
         assert!(super::USAGE.contains("dory pane read"));
         assert!(super::USAGE.contains("dory pane wait-output"));
         assert!(super::USAGE.contains("dory pane"));
+        assert!(super::USAGE.contains("dory pane close"));
+        assert!(super::USAGE.contains("dory workspace close"));
+        assert!(super::USAGE.contains("workspace picker"));
+        assert!(super::USAGE.contains("Ctrl-b"));
+        assert!(super::USAGE.contains("n/p still walk panes"));
         assert!(super::USAGE.contains("dory flow --"));
         assert!(super::USAGE.contains("dory agent start"));
         assert!(

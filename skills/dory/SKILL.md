@@ -35,10 +35,11 @@ A group with no subcommand prints usage and exits 2. That is discovery. Do not i
 
 Live `--help` ships:
 
-- `workspace create` / `list` / `get <id>`
+- `workspace create` / `list` / `get <id>` / `close <id>`
 - `tab create --workspace <id>` / `list --workspace <id>` / `close <id>`
 - `pane list --workspace <id>`
 - `pane get [--current | --pane <id>]`
+- `pane close [--current | --pane <id>]`
 - `pane split|run|read|wait-output`
 - `agent start|prompt|wait|get|read|focus|send-keys|report`
 - `agent report [--current | --pane <id>] --state working|blocked|idle`
@@ -98,9 +99,11 @@ Replace `right` with `down` when appropriate. Read the new pane from `.result.pa
 ```bash
 dory tab create --workspace "$DORY_WORKSPACE_ID"
 dory tab close <id-from-create>
+dory pane close --pane <id>
+dory workspace close <id>
 ```
 
-Do not close tabs you did not create unless the user asked.
+Do not close tabs, panes, or workspaces you did not create unless the user asked. Closing the last live pane is refused. Occupants use these CLI verbs; do not sit the human desk.
 
 ## Run a command in another pane
 

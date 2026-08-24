@@ -125,6 +125,37 @@ pub fn split_leaf(layout: &mut Layout, pane: &str, dir: SplitDir, new_id: &str) 
     }
 }
 
+/// Collapse the split that holds `pane` into the sibling. Last remaining leaf
+/// becomes empty — callers must `tab.close` instead.
+pub fn remove_leaf(layout: &mut Layout, pane: &str) -> bool {
+    match layout {
+        Layout::Leaf { pane: id } if id == pane => {
+            *layout = Layout::Leaf {
+                pane: String::new(),
+            };
+            true
+        }
+        Layout::Split { a, b, .. } => {
+            match a.as_ref() {
+                Layout::Leaf { pane: id } if id == pane => {
+                    *layout = (**b).clone();
+                    return true;
+                }
+                _ => {}
+            }
+            match b.as_ref() {
+                Layout::Leaf { pane: id } if id == pane => {
+                    *layout = (**a).clone();
+                    return true;
+                }
+                _ => {}
+            }
+            remove_leaf(a, pane) || remove_leaf(b, pane)
+        }
+        _ => false,
+    }
+}
+
 pub fn set_ratio(layout: &mut Layout, a_id: &str, b_id: &str, ratio: f32) -> bool {
     set_ratio_inner(layout, a_id, b_id, clamp_ratio(ratio))
 }
@@ -412,6 +443,21 @@ mod tests {
         assert_eq!(h, 10);
         let r = inset(&cells, "w1:p2").unwrap();
         assert_eq!(r.2, cells[1].w);
+    }
+
+    #[test]
+    fn remove_leaf_keeps_sibling_and_ratio() {
+        let mut l = synthesize(&ids(&["w1:p1"]));
+        split_leaf(&mut l, "w1:p1", SplitDir::Right, "w1:p2");
+        assert!(set_ratio(&mut l, "w1:p1", "w1:p2", 0.25));
+        let before = tiles(&l, 0, 0, 80, 10);
+        assert!(remove_leaf(&mut l, "w1:p1"));
+        assert_eq!(leaves(&l), vec!["w1:p2".to_string()]);
+        let after = tiles(&l, 0, 0, 80, 10);
+        assert_eq!(after.len(), 1);
+        assert_eq!(after[0].id, "w1:p2");
+        assert_eq!(after[0].w, 80);
+        assert!(before[0].w < 40);
     }
 
     #[test]
