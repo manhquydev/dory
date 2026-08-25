@@ -12,55 +12,136 @@ use crossterm::style::{
     Attribute, Color, Print, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor,
 };
 use crossterm::terminal::{
-    DisableLineWrap, EnableLineWrap, EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode,
-    enable_raw_mode,
+    BeginSynchronizedUpdate, DisableLineWrap, EnableLineWrap, EndSynchronizedUpdate,
+    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
 use crossterm::{execute, queue};
 use std::env;
+use std::fs::{self, OpenOptions};
 use std::io::{self, BufRead, BufReader, Read, Write};
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::os::unix::net::UnixStream;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-const SIDEBAR: u16 = 22;
+const SIDEBAR: u16 = 26;
 const SIDEBAR_DOTS: u16 = 4;
+const AGENT_REGION: u16 = 6;
+const AGENT_REGION_DOTS: u16 = 4;
 const TAB_ROW: u16 = 1;
+const CONFIRM_CARD_ROWS: u16 = 3;
+const TAB_CHIP_MAX: usize = 16;
 const CTRL_B: u8 = 0x02;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Mode {
     Terminal,
     Prefix,
     Picker,
     Confirm,
     Help,
+    Menu,
+    Onboard,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum ConfirmKind {
     Pane,
     Tab,
     Workspace,
 }
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum MenuKind {
+    Pane,
+    Tab,
+    Workspace,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum MenuVerb {
+    SplitRight,
+    SplitDown,
+    Zoom,
+    ClosePane,
+    NewTab,
+    CloseTab,
+    Picker,
+    NewWs,
+    CloseWs,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum MenuPick {
+    Cancel,
+    Run(MenuVerb),
+    Ignore,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum ConfirmPick {
+    Yes,
+    No,
+    Ignore,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum OnboardKey {
+    Persist,
+    Dismiss,
+    Prefix,
+    Eat,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum OnboardMouse {
+    Release,
+    Eat,
+}
+
+#[derive(Clone, Debug)]
+struct MenuTarget {
+    kind: MenuKind,
+    focus: String,
+    tab: String,
+    workspace: String,
+}
+
+#[derive(Clone, Debug)]
+struct Confirm {
+    kind: ConfirmKind,
+    pane: String,
+    tab: String,
+    workspace: String,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SideKind {
+    Chrome,
+    Workspace,
+    Agent,
+    Rule,
+}
 const TITLE_BG: Color = Color::Rgb {
-    r: 24,
-    g: 36,
-    b: 52,
+    r: 16,
+    g: 22,
+    b: 32,
 };
 const SIDE_BG: Color = Color::Rgb {
-    r: 14,
-    g: 18,
-    b: 26,
+    r: 10,
+    g: 14,
+    b: 20,
 };
 const PANE_BG: Color = Color::Rgb { r: 8, g: 10, b: 14 };
 const ACCENT: Color = Color::Rgb {
-    r: 80,
-    g: 196,
-    b: 214,
+    r: 72,
+    g: 180,
+    b: 196,
 };
 const MUTED: Color = Color::Rgb {
-    r: 120,
-    g: 132,
-    b: 148,
+    r: 108,
+    g: 120,
+    b: 136,
 };
 const TEXT: Color = Color::Rgb {
     r: 220,
@@ -71,6 +152,11 @@ const FOCUSED_FG: Color = Color::Rgb {
     r: 255,
     g: 214,
     b: 102,
+};
+const BLOCKED_FG: Color = Color::Rgb {
+    r: 232,
+    g: 96,
+    b: 88,
 };
 
 pub fn run() -> i32 {
@@ -128,6 +214,7 @@ impl Drop for TermGuard {
     }
 }
 
+#[derive(Clone)]
 struct Row {
     kind: char,
     id: String,
@@ -135,6 +222,7 @@ struct Row {
     focus_pane: String,
     occ: String,
     st: String,
+    cwd: String,
 }
 
 struct Tile {
@@ -178,9 +266,15 @@ struct Desk {
     drag: Option<Drag>,
     zoomed: bool,
     picker_idx: usize,
-    confirm: Option<ConfirmKind>,
+    confirm: Option<Confirm>,
+    menu: Option<MenuKind>,
+    menu_target: Option<MenuTarget>,
+    menu_anchor: Option<(u16, u16)>,
     sel_from: Option<(u16, u16)>,
     sel_to: Option<(u16, u16)>,
+    retired_ws: Vec<String>,
+    retired_tab: Vec<String>,
+    retired_pane: Vec<String>,
 }
 
 impl Desk {
@@ -210,10 +304,24 @@ impl Desk {
             zoomed: false,
             picker_idx: 0,
             confirm: None,
+            menu: None,
+            menu_target: None,
+            menu_anchor: None,
             sel_from: None,
             sel_to: None,
+            retired_ws: Vec::new(),
+            retired_tab: Vec::new(),
+            retired_pane: Vec::new(),
         };
         desk.refresh_tree();
+        desk.mode = initial_mode(
+            onboard_state_path().as_deref(),
+            skip_onboard_from_env(),
+        );
+        if desk.mode == Mode::Onboard {
+            desk.chrome_dirty = true;
+            desk.tiles_dirty = true;
+        }
         if let Some(id) = start_pane {
             desk.focused = id.to_string();
             let _ = server::rpc_line_quiet(&format!(r#"{{"op":"pane.focus","pane":"{id}"}}"#));
@@ -240,7 +348,9 @@ impl Desk {
             }
             if self.mode == Mode::Prefix && self.prefix_at.elapsed() > Duration::from_secs(2) {
                 self.mode = Mode::Terminal;
+                self.status.clear();
                 self.chrome_dirty = true;
+                self.tiles_dirty = true;
             }
             if event::poll(Duration::from_millis(30))? {
                 match event::read()? {
@@ -280,28 +390,32 @@ impl Desk {
     }
 
     fn tree_sig(&self) -> String {
-        let mut s = self.focused.clone();
-        for row in &self.rows {
-            s.push('|');
-            s.push_str(&row.id);
-            s.push('/');
-            s.push_str(&row.st);
-            s.push('/');
-            s.push_str(&row.occ);
-        }
-        s
+        tree_rows_sig(&self.focused, &self.rows)
     }
 
     fn refresh_tree(&mut self) {
-        self.last_tree = Instant::now();
         let Ok(body) = server::rpc_line_quiet(r#"{"op":"desk.tree"}"#) else {
             return;
         };
         if !body.contains("\"ok\":true") {
             return;
         }
+        self.last_tree = Instant::now();
+        let before = self.tree_sig();
         let (rows, focused, workspace, tab) = parse_tree(&body);
+        sweep_retired(
+            &rows,
+            &mut self.retired_ws,
+            &mut self.retired_tab,
+            &mut self.retired_pane,
+        );
         self.rows = rows;
+        apply_retired(
+            &mut self.rows,
+            &self.retired_ws,
+            &self.retired_tab,
+            &self.retired_pane,
+        );
         if self.focused.is_empty() {
             self.focused = focused;
         } else if !self
@@ -313,25 +427,56 @@ impl Desk {
         }
         self.workspace = workspace;
         self.tab = tab;
-        if self.workspace.is_empty() {
-            if let Some(w) = workspace_of(&self.rows, &self.focused) {
-                self.workspace = w;
-            }
+        self.repair_location();
+        if self.tree_sig() != before {
+            self.chrome_dirty = true;
+            self.tiles_dirty = true;
         }
-        if self.tab.is_empty() {
-            if let Some(t) = tab_of(&self.rows, &self.focused) {
-                self.tab = t;
-            }
+    }
+
+    fn repair_location(&mut self) {
+        if self.focused.is_empty()
+            || !self
+                .rows
+                .iter()
+                .any(|r| r.kind == 'p' && r.id == self.focused)
+        {
+            self.focused = first_live_pane(&self.rows).unwrap_or_default();
         }
+        if let Some(w) = workspace_of(&self.rows, &self.focused) {
+            self.workspace = w;
+        } else if !self
+            .rows
+            .iter()
+            .any(|r| r.kind == 'w' && r.id == self.workspace)
+        {
+            self.workspace.clear();
+        }
+        if let Some(t) = tab_of(&self.rows, &self.focused) {
+            self.tab = t;
+        } else if !self.rows.iter().any(|r| r.kind == 't' && r.id == self.tab) {
+            self.tab.clear();
+        }
+    }
+
+    fn pane_painted(&self, id: &str) -> bool {
+        self.tiles.iter().any(|t| t.id == id)
     }
 
     fn focus_tile(&mut self, id: &str) {
         if id.is_empty() {
             return;
         }
-        let _ = server::rpc_line_quiet(&format!(r#"{{"op":"pane.focus","pane":"{id}"}}"#));
-        self.focused = id.to_string();
+        let accepted = server::rpc_line_quiet(&format!(r#"{{"op":"pane.focus","pane":"{id}"}}"#))
+            .map(|body| body.contains("\"ok\":true"))
+            .unwrap_or(false);
+        if accepted {
+            self.focused = id.to_string();
+        }
         self.refresh_tree();
+        if !accepted && self.focused == id {
+            self.repair_location();
+        }
         self.chrome_dirty = true;
         self.tiles_dirty = true;
     }
@@ -455,6 +600,31 @@ impl Desk {
 
     fn handle_key(&mut self, key: KeyEvent) -> bool {
         match self.mode {
+            Mode::Onboard => {
+                match onboard_key(key) {
+                    OnboardKey::Prefix => {
+                        self.dismiss_onboard();
+                        self.mode = Mode::Prefix;
+                        self.prefix_at = Instant::now();
+                        self.status = PREFIX_FOOTER.to_string();
+                        self.chrome_dirty = true;
+                        self.tiles_dirty = true;
+                        false
+                    }
+                    OnboardKey::Persist => {
+                        self.complete_onboard();
+                        false
+                    }
+                    OnboardKey::Dismiss => {
+                        self.dismiss_onboard();
+                        false
+                    }
+                    OnboardKey::Eat => {
+                        self.dismiss_onboard();
+                        self.handle_key(key)
+                    }
+                }
+            }
             Mode::Help => {
                 if matches!(key.code, KeyCode::Esc | KeyCode::Char('q' | 'Q' | '?')) {
                     self.mode = Mode::Terminal;
@@ -468,6 +638,10 @@ impl Desk {
                 self.handle_picker(key);
                 false
             }
+            Mode::Menu => {
+                self.handle_menu_key(key);
+                false
+            }
             Mode::Prefix => {
                 self.mode = Mode::Terminal;
                 self.prefix_cmd(key)
@@ -476,9 +650,7 @@ impl Desk {
                 if is_ctrl_b(&key) {
                     self.mode = Mode::Prefix;
                     self.prefix_at = Instant::now();
-                    self.status =
-                        "Ctrl-b — q detach  c tab  n/p tabs  w pick  Shift-n ws  x close"
-                            .to_string();
+                    self.status = PREFIX_FOOTER.to_string();
                     self.chrome_dirty = true;
                     return false;
                 }
@@ -493,23 +665,49 @@ impl Desk {
 
     fn handle_confirm(&mut self, key: KeyEvent) -> bool {
         match key.code {
-            KeyCode::Char('y' | 'Y') => {
-                let kind = self.confirm.take();
-                self.mode = Mode::Terminal;
-                if let Some(kind) = kind {
-                    self.run_close(kind);
-                }
-                self.chrome_dirty = true;
-            }
-            KeyCode::Char('n' | 'N') | KeyCode::Esc => {
-                self.confirm = None;
-                self.mode = Mode::Terminal;
-                self.status.clear();
-                self.chrome_dirty = true;
-            }
+            KeyCode::Char('y' | 'Y' | '1') | KeyCode::Enter => self.confirm_yes(),
+            KeyCode::Char('n' | 'N' | '2') | KeyCode::Esc => self.confirm_no(),
             _ => {}
         }
         false
+    }
+
+    fn confirm_yes(&mut self) {
+        let confirm = self.confirm.take();
+        self.mode = Mode::Terminal;
+        if let Some(confirm) = confirm {
+            self.run_close(confirm);
+        }
+        self.chrome_dirty = true;
+        self.tiles_dirty = true;
+    }
+
+    fn confirm_no(&mut self) {
+        self.confirm = None;
+        self.mode = Mode::Terminal;
+        self.status.clear();
+        self.chrome_dirty = true;
+        self.tiles_dirty = true;
+    }
+
+    fn complete_onboard(&mut self) {
+        match onboard_state_path() {
+            Some(path) => match mark_onboarded(&path) {
+                Ok(()) => self.status.clear(),
+                Err(_) => self.status = "không ghi nhớ".to_string(),
+            },
+            None => self.status.clear(),
+        }
+        self.mode = Mode::Terminal;
+        self.chrome_dirty = true;
+        self.tiles_dirty = true;
+    }
+
+    fn dismiss_onboard(&mut self) {
+        self.mode = Mode::Terminal;
+        self.status.clear();
+        self.chrome_dirty = true;
+        self.tiles_dirty = true;
     }
 
     fn handle_picker(&mut self, key: KeyEvent) {
@@ -535,14 +733,10 @@ impl Desk {
                         self.reconcile_tiles();
                     }
                 }
-                self.mode = Mode::Terminal;
-                self.status.clear();
-                self.chrome_dirty = true;
+                self.close_picker();
             }
             KeyCode::Esc => {
-                self.mode = Mode::Terminal;
-                self.status.clear();
-                self.chrome_dirty = true;
+                self.close_picker();
             }
             _ => {}
         }
@@ -579,7 +773,8 @@ impl Desk {
             KeyCode::Char('b') if !is_ctrl_b(&key) => self.toggle_sidebar(),
             KeyCode::Char('?') => {
                 self.mode = Mode::Help;
-                self.status = help_text().to_string();
+                self.status.clear();
+                self.chrome_dirty = true;
             }
             KeyCode::Char(c @ '1'..='9') => {
                 let n = (c as u8 - b'1') as usize;
@@ -597,6 +792,24 @@ impl Desk {
     }
 
     fn handle_mouse(&mut self, mouse: MouseEvent) -> bool {
+        if self.mode == Mode::Onboard {
+            match onboard_mouse(mouse.kind) {
+                OnboardMouse::Release => self.dismiss_onboard(),
+                OnboardMouse::Eat => return false,
+            }
+        }
+        if self.mode == Mode::Help {
+            return false;
+        }
+        if self.mode == Mode::Picker {
+            return self.handle_picker_mouse(mouse);
+        }
+        if self.mode == Mode::Confirm {
+            return self.handle_confirm_mouse(mouse);
+        }
+        if self.mode == Mode::Menu {
+            return self.handle_menu_mouse(mouse);
+        }
         let side = self.sidebar_cols;
         let top = self.top_rows;
         let (origin_x, origin_y) = content_origin(side, top);
@@ -628,7 +841,7 @@ impl Desk {
                         &self.workspace,
                         side,
                     ) {
-                        if id != self.focused {
+                        if id != self.focused || !self.pane_painted(&id) {
                             self.zoomed = false;
                             self.focus_tile(&id);
                             self.reconcile_tiles();
@@ -708,7 +921,7 @@ impl Desk {
                     if cell_drag_span(a, b) >= 2 {
                         if let Some(text) = selection_text(&self.tiles, &self.focused, a, b) {
                             if emit_osc52(&text).is_ok() {
-                                self.status = "copied".to_string();
+                                self.status = "đã chép".to_string();
                                 self.chrome_dirty = true;
                             }
                         }
@@ -735,9 +948,289 @@ impl Desk {
             MouseEventKind::ScrollDown if mouse.column >= side && self.mode == Mode::Terminal => {
                 self.write_pty(b"\x1b[B");
             }
+            MouseEventKind::Down(MouseButton::Right) => {
+                self.sel_from = None;
+                self.sel_to = None;
+                self.drag = None;
+                if self.mode == Mode::Prefix {
+                    self.mode = Mode::Terminal;
+                }
+                if let Some(target) = menu_hit(
+                    &self.rows,
+                    &self.cells,
+                    mouse.column,
+                    mouse.row,
+                    self.rows_n,
+                    side,
+                    top,
+                    self.zoomed,
+                    &self.focused,
+                    &self.workspace,
+                ) {
+                    self.focus_then_open_menu(target, Some((mouse.column, mouse.row)));
+                }
+            }
+            MouseEventKind::Drag(MouseButton::Right) | MouseEventKind::Up(MouseButton::Right) => {}
             _ => {}
         }
         false
+    }
+
+    fn handle_menu_key(&mut self, key: KeyEvent) {
+        let Some(kind) = self.menu else {
+            self.close_menu();
+            return;
+        };
+        match menu_pick(kind, key.code) {
+            MenuPick::Cancel => self.close_menu(),
+            MenuPick::Run(verb) => self.run_menu_verb(verb),
+            MenuPick::Ignore => {}
+        }
+    }
+
+    fn handle_confirm_mouse(&mut self, mouse: MouseEvent) -> bool {
+        match mouse.kind {
+            MouseEventKind::Down(btn) => {
+                let side = self.sidebar_cols;
+                let top = self.top_rows;
+                let (origin_x, origin_y) = content_origin(side, top);
+                if mouse.row + 1 >= self.rows_n {
+                    match confirm_yn_token(&format!(" {}", self.status), mouse.column) {
+                        Some(ConfirmPick::Yes) => self.confirm_yes(),
+                        Some(ConfirmPick::No) => self.confirm_no(),
+                        Some(ConfirmPick::Ignore) | None => {}
+                    }
+                    return false;
+                }
+                let in_card = mouse.column >= origin_x
+                    && mouse.row >= origin_y
+                    && mouse.row.saturating_sub(origin_y) < CONFIRM_CARD_ROWS;
+                if in_card {
+                    let overlay_row = mouse.row.saturating_sub(origin_y);
+                    let pick = confirm_overlay_pick(overlay_row);
+                    let pick = if pick == ConfirmPick::Ignore {
+                        let ask = self
+                            .confirm
+                            .as_ref()
+                            .map(|c| confirm_lines(c.kind))
+                            .and_then(|lines| lines.into_iter().next())
+                            .unwrap_or_default();
+                        confirm_yn_token(&ask, mouse.column.saturating_sub(origin_x))
+                            .unwrap_or(ConfirmPick::Ignore)
+                    } else {
+                        pick
+                    };
+                    match pick {
+                        ConfirmPick::Yes => self.confirm_yes(),
+                        ConfirmPick::No => self.confirm_no(),
+                        ConfirmPick::Ignore => {}
+                    }
+                    return false;
+                }
+                self.confirm_no();
+                if btn == MouseButton::Right {
+                    if let Some(target) = menu_hit(
+                        &self.rows,
+                        &self.cells,
+                        mouse.column,
+                        mouse.row,
+                        self.rows_n,
+                        side,
+                        top,
+                        self.zoomed,
+                        &self.focused,
+                        &self.workspace,
+                    ) {
+                        self.focus_then_open_menu(target, Some((mouse.column, mouse.row)));
+                    }
+                }
+            }
+            _ => {}
+        }
+        false
+    }
+
+    fn close_picker(&mut self) {
+        self.mode = Mode::Terminal;
+        self.status.clear();
+        self.chrome_dirty = true;
+        self.tiles_dirty = true;
+    }
+
+    fn handle_picker_mouse(&mut self, mouse: MouseEvent) -> bool {
+        match mouse.kind {
+            MouseEventKind::Down(btn) => {
+                let side = self.sidebar_cols;
+                let top = self.top_rows;
+                let (origin_x, origin_y) = content_origin(side, top);
+                let card_h = overlay_paint_rows(
+                    Mode::Picker,
+                    picker_lines(&self.rows, self.picker_idx).len(),
+                    self.rows_n.saturating_sub(self.top_rows + 1),
+                );
+                let in_card = mouse.column >= origin_x
+                    && mouse.row >= origin_y
+                    && mouse.row.saturating_sub(origin_y) < card_h
+                    && mouse.row + 1 < self.rows_n;
+                if in_card {
+                    return false;
+                }
+                self.close_picker();
+                if btn == MouseButton::Right {
+                    if let Some(target) = menu_hit(
+                        &self.rows,
+                        &self.cells,
+                        mouse.column,
+                        mouse.row,
+                        self.rows_n,
+                        side,
+                        top,
+                        self.zoomed,
+                        &self.focused,
+                        &self.workspace,
+                    ) {
+                        self.focus_then_open_menu(target, Some((mouse.column, mouse.row)));
+                    }
+                }
+            }
+            _ => {}
+        }
+        false
+    }
+
+    fn handle_menu_mouse(&mut self, mouse: MouseEvent) -> bool {
+        match mouse.kind {
+            MouseEventKind::Down(btn) => {
+                let side = self.sidebar_cols;
+                let top = self.top_rows;
+                let lines = self.menu.map(menu_lines).unwrap_or_default();
+                let max_line_w = lines.iter().map(|l| display_width(l)).max().unwrap_or(0);
+                let card = overlay_box(
+                    Mode::Menu,
+                    lines.len(),
+                    max_line_w,
+                    self.cols,
+                    self.rows_n,
+                    side,
+                    top,
+                    self.menu_anchor,
+                );
+                if overlay_contains(card, mouse.column, mouse.row, self.rows_n) {
+                    let overlay_row = mouse.row.saturating_sub(card.y);
+                    let items = self.menu.map(menu_items).unwrap_or(&[]);
+                    if overlay_row >= 1 {
+                        let idx = (overlay_row - 1) as usize;
+                        if let Some((_, verb)) = items.get(idx) {
+                            self.run_menu_verb(*verb);
+                            return false;
+                        }
+                    }
+                    self.close_menu();
+                    return false;
+                }
+                self.close_menu();
+                if btn == MouseButton::Right {
+                    if let Some(target) = menu_hit(
+                        &self.rows,
+                        &self.cells,
+                        mouse.column,
+                        mouse.row,
+                        self.rows_n,
+                        side,
+                        top,
+                        self.zoomed,
+                        &self.focused,
+                        &self.workspace,
+                    ) {
+                        self.focus_then_open_menu(target, Some((mouse.column, mouse.row)));
+                    }
+                }
+            }
+            _ => {}
+        }
+        false
+    }
+
+    fn focus_then_open_menu(&mut self, target: MenuTarget, at: Option<(u16, u16)>) {
+        if !target.workspace.is_empty() {
+            self.workspace = target.workspace.clone();
+        }
+        if !target.tab.is_empty() {
+            self.tab = target.tab.clone();
+        }
+        if !target.focus.is_empty() && target.focus != self.focused {
+            self.zoomed = false;
+            self.focus_tile(&target.focus);
+            self.reconcile_tiles();
+        }
+        self.menu_target = Some(target.clone());
+        self.menu_anchor = at;
+        self.open_menu(target.kind);
+    }
+
+    fn open_menu(&mut self, kind: MenuKind) {
+        self.menu = Some(kind);
+        self.mode = Mode::Menu;
+        self.status.clear();
+        self.chrome_dirty = true;
+        self.tiles_dirty = true;
+    }
+
+    fn close_menu(&mut self) {
+        self.menu = None;
+        self.menu_target = None;
+        self.menu_anchor = None;
+        self.mode = Mode::Terminal;
+        self.status.clear();
+        self.chrome_dirty = true;
+        self.tiles_dirty = true;
+    }
+
+    fn run_menu_verb(&mut self, verb: MenuVerb) {
+        self.menu = None;
+        self.menu_anchor = None;
+        let target = self.menu_target.take();
+        match verb {
+            MenuVerb::SplitRight => {
+                self.mode = Mode::Terminal;
+                self.status.clear();
+                self.split("right");
+            }
+            MenuVerb::SplitDown => {
+                self.mode = Mode::Terminal;
+                self.status.clear();
+                self.split("down");
+            }
+            MenuVerb::Zoom => {
+                self.mode = Mode::Terminal;
+                self.status.clear();
+                self.zoomed = !self.zoomed;
+                self.drag = None;
+                self.reconcile_tiles();
+            }
+            MenuVerb::ClosePane => {
+                self.mode = Mode::Terminal;
+                self.status.clear();
+                self.close_pane_or_confirm();
+            }
+            MenuVerb::NewTab => {
+                self.mode = Mode::Terminal;
+                self.status.clear();
+                self.new_tab();
+            }
+            MenuVerb::CloseTab => self.ask_confirm_target(self.confirm_for(ConfirmKind::Tab, target.as_ref())),
+            MenuVerb::Picker => self.open_picker(),
+            MenuVerb::NewWs => {
+                self.mode = Mode::Terminal;
+                self.status.clear();
+                self.new_workspace();
+            }
+            MenuVerb::CloseWs => {
+                self.ask_confirm_target(self.confirm_for(ConfirmKind::Workspace, target.as_ref()))
+            }
+        }
+        self.chrome_dirty = true;
+        self.tiles_dirty = true;
     }
 
     fn new_tab(&mut self) {
@@ -745,7 +1238,7 @@ impl Desk {
             self.refresh_tree();
         }
         if self.workspace.is_empty() {
-            self.status = "no workspace".to_string();
+            self.status = "không có cửa sổ".to_string();
             return;
         }
         let body = match server::rpc_line_quiet(&format!(
@@ -754,7 +1247,7 @@ impl Desk {
         )) {
             Ok(b) => b,
             Err(_) => {
-                self.status = "tab.create failed".to_string();
+                self.status = "thẻ lỗi".to_string();
                 return;
             }
         };
@@ -765,7 +1258,7 @@ impl Desk {
             self.tiles.clear();
             self.reconcile_tiles();
         } else {
-            self.status = "tab.create: no pane".to_string();
+            self.status = "thẻ: không có ô".to_string();
             self.refresh_tree();
             self.reconcile_tiles();
         }
@@ -783,7 +1276,7 @@ impl Desk {
         let body = match server::rpc_line_quiet(&line) {
             Ok(b) => b,
             Err(_) => {
-                self.status = "workspace.create failed".to_string();
+                self.status = "cửa sổ lỗi".to_string();
                 return;
             }
         };
@@ -794,7 +1287,7 @@ impl Desk {
             self.tiles.clear();
             self.reconcile_tiles();
         } else {
-            self.status = "workspace.create: no pane".to_string();
+            self.status = "cửa sổ: không có ô".to_string();
             self.refresh_tree();
             self.reconcile_tiles();
         }
@@ -802,7 +1295,7 @@ impl Desk {
 
     fn split(&mut self, direction: &str) {
         if self.focused.is_empty() {
-            self.status = "no pane".to_string();
+            self.status = "không có ô".to_string();
             return;
         }
         let body = match server::rpc_line_quiet(&format!(
@@ -811,7 +1304,7 @@ impl Desk {
         )) {
             Ok(b) => b,
             Err(_) => {
-                self.status = "split failed".to_string();
+                self.status = "tách lỗi".to_string();
                 return;
             }
         };
@@ -821,7 +1314,7 @@ impl Desk {
             self.focus_tile(&id);
             self.reconcile_tiles();
         } else {
-            self.status = "split: no pane".to_string();
+            self.status = "tách: không có ô".to_string();
             self.refresh_tree();
             self.reconcile_tiles();
         }
@@ -834,8 +1327,9 @@ impl Desk {
             .position(|w| w == &self.workspace)
             .unwrap_or(0);
         self.mode = Mode::Picker;
-        self.status = "workspace picker  j/k  enter  esc".to_string();
+        self.status.clear();
         self.chrome_dirty = true;
+        self.tiles_dirty = true;
     }
 
     fn toggle_sidebar(&mut self) {
@@ -878,15 +1372,29 @@ impl Desk {
         }
     }
 
+    fn confirm_here(&self, kind: ConfirmKind) -> Confirm {
+        Confirm {
+            kind,
+            pane: self.focused.clone(),
+            tab: self.tab.clone(),
+            workspace: self.workspace.clone(),
+        }
+    }
+
+    fn confirm_for(&self, kind: ConfirmKind, target: Option<&MenuTarget>) -> Confirm {
+        confirm_from_target(self.confirm_here(kind), target)
+    }
+
     fn ask_confirm(&mut self, kind: ConfirmKind) {
-        self.confirm = Some(kind);
+        self.ask_confirm_target(self.confirm_here(kind));
+    }
+
+    fn ask_confirm_target(&mut self, confirm: Confirm) {
+        self.status = confirm_ask(confirm.kind).to_string();
+        self.confirm = Some(confirm);
         self.mode = Mode::Confirm;
-        self.status = match kind {
-            ConfirmKind::Pane => "close pane? y/n".to_string(),
-            ConfirmKind::Tab => "close tab? y/n".to_string(),
-            ConfirmKind::Workspace => "close workspace? y/n".to_string(),
-        };
         self.chrome_dirty = true;
+        self.tiles_dirty = true;
     }
 
     fn close_pane_or_confirm(&mut self) {
@@ -900,34 +1408,72 @@ impl Desk {
             }
             return;
         }
-        self.run_close(ConfirmKind::Pane);
+        self.run_close(self.confirm_here(ConfirmKind::Pane));
     }
 
-    fn run_close(&mut self, kind: ConfirmKind) {
-        let line = match kind {
-            ConfirmKind::Pane => format!(r#"{{"op":"pane.close","pane":"{}"}}"#, self.focused),
-            ConfirmKind::Tab => format!(r#"{{"op":"tab.close","tab":"{}"}}"#, self.tab),
-            ConfirmKind::Workspace => {
-                format!(r#"{{"op":"workspace.close","workspace":"{}"}}"#, self.workspace)
-            }
+    fn run_close(&mut self, confirm: Confirm) {
+        let Confirm {
+            kind,
+            pane,
+            tab,
+            workspace,
+        } = confirm;
+        let empty = match kind {
+            ConfirmKind::Pane => pane.is_empty(),
+            ConfirmKind::Tab => tab.is_empty(),
+            ConfirmKind::Workspace => workspace.is_empty(),
         };
+        if empty {
+            self.status = "không đóng".to_string();
+            self.chrome_dirty = true;
+            self.tiles_dirty = true;
+            return;
+        }
+        let line = close_rpc_line(kind, &pane, &tab, &workspace);
         match server::rpc_line_quiet(&line) {
             Ok(body) if body.contains("\"ok\":true") => {
-                self.zoomed = false;
-                self.drag = None;
-                self.refresh_tree();
-                self.reconcile_tiles();
+                self.retire_ids(kind, &pane, &tab, &workspace);
+                self.forget_closed(kind, &pane, &tab, &workspace);
+                self.status.clear();
+            }
+            Ok(body)
+                if body.contains("unknown workspace")
+                    || body.contains("unknown tab")
+                    || body.contains("unknown pane") =>
+            {
+                self.retire_ids(kind, &pane, &tab, &workspace);
+                self.forget_closed(kind, &pane, &tab, &workspace);
                 self.status.clear();
             }
             Ok(body) => {
                 self.status = if body.contains("last live pane") {
-                    "last pane stays".to_string()
+                    "ô cuối giữ".to_string()
                 } else {
-                    "close refused".to_string()
+                    "không đóng".to_string()
                 };
             }
-            Err(_) => self.status = "close failed".to_string(),
+            Err(_) => self.status = "đóng lỗi".to_string(),
         }
+        self.chrome_dirty = true;
+        self.tiles_dirty = true;
+    }
+
+    fn retire_ids(&mut self, kind: ConfirmKind, pane: &str, tab: &str, workspace: &str) {
+        match kind {
+            ConfirmKind::Workspace => retire_id(&mut self.retired_ws, workspace),
+            ConfirmKind::Tab => retire_id(&mut self.retired_tab, tab),
+            ConfirmKind::Pane => retire_id(&mut self.retired_pane, pane),
+        }
+    }
+
+    fn forget_closed(&mut self, kind: ConfirmKind, pane: &str, tab: &str, workspace: &str) {
+        self.zoomed = false;
+        self.drag = None;
+        self.focused.clear();
+        self.refresh_tree();
+        drop_closed_from_rows(&mut self.rows, kind, pane, tab, workspace);
+        self.repair_location();
+        self.reconcile_tiles();
         self.chrome_dirty = true;
         self.tiles_dirty = true;
     }
@@ -960,7 +1506,7 @@ impl Desk {
     fn draw(&mut self, out: &mut io::Stdout) -> io::Result<()> {
         let cols = self.cols.max(1);
         let rows = self.rows_n.max(3);
-        queue!(out, Hide, ResetColor)?;
+        queue!(out, Hide, ResetColor, BeginSynchronizedUpdate)?;
         if self.chrome_dirty {
             self.draw_title(out, cols)?;
             self.draw_tab_bar(out, cols)?;
@@ -970,22 +1516,19 @@ impl Desk {
         if self.tiles_dirty {
             self.draw_tiles(out, cols, rows)?;
         }
-        if matches!(self.mode, Mode::Help | Mode::Picker) {
+        if overlay_paints(self.mode) {
             self.draw_overlay(out, cols, rows)?;
         }
         self.place_cursor(out)?;
+        queue!(out, EndSynchronizedUpdate)?;
         out.flush()
     }
 
     fn draw_title(&self, out: &mut io::Stdout, cols: u16) -> io::Result<()> {
-        let loc = format!(
-            "  {} · {} · {}",
-            empty_dash(&self.workspace),
-            empty_dash(&self.tab),
-            empty_dash(&self.focused)
-        );
+        let loc = title_loc(&self.rows, &self.workspace, &self.tab, &self.focused);
+        let chips = title_chips(self.mode, self.zoomed);
         let left = " dory";
-        let line = bar_line(&format!("{left}{loc}"), cols);
+        let line = bar_line(&format!("{left}{loc}{chips}"), cols);
         queue!(
             out,
             MoveTo(0, 0),
@@ -1009,15 +1552,7 @@ impl Desk {
             line.push('│');
         }
         for (id, _) in tabs_of(&self.rows, &self.workspace) {
-            let short = id.rsplit(':').next().unwrap_or(&id);
-            if id == self.tab {
-                line.push_str(&format!("[{short}]"));
-            } else {
-                line.push_str(&format!(" {short} "));
-            }
-        }
-        if self.mode == Mode::Picker {
-            line.push_str("  pick");
+            line.push_str(&tab_chip_text(&self.rows, &self.workspace, &id, &self.tab));
         }
         let painted = bar_line(&line, cols);
         queue!(
@@ -1036,17 +1571,44 @@ impl Desk {
             return Ok(());
         }
         let height = rows.saturating_sub(3);
-        let lines = sidebar_lines(&self.rows, &self.workspace, &self.focused, side);
+        let hits = sidebar_model(&self.rows, &self.workspace, side, height);
+        let ah = agent_region_rows(side, height, agents_from(&self.rows).len());
         for y in 0..height {
             let screen_y = y + self.top_rows;
-            queue!(out, MoveTo(0, screen_y), SetBackgroundColor(SIDE_BG))?;
-            let text = lines.get(y as usize).cloned().unwrap_or_else(|| " ".repeat(side as usize));
-            let mut padded = text;
-            clip_to(&mut padded, side as usize);
-            while display_width(&padded) < side as usize {
-                padded.push(' ');
+            queue!(
+                out,
+                MoveTo(0, screen_y),
+                SetBackgroundColor(sidebar_row_bg(y, height, ah))
+            )?;
+            match hits.get(y as usize) {
+                Some(h) if matches!(h.kind, SideKind::Workspace | SideKind::Agent) => {
+                    let (lead, lead_fg, mid, mid_fg, rest, rest_fg) =
+                        sidebar_row_spans(h, side as usize, &self.workspace);
+                    queue!(out, SetForegroundColor(lead_fg), Print(lead))?;
+                    if !mid.is_empty() {
+                        queue!(out, SetForegroundColor(mid_fg), Print(mid))?;
+                    }
+                    queue!(out, SetForegroundColor(rest_fg), Print(rest))?;
+                }
+                Some(h) => {
+                    let fg = match h.kind {
+                        SideKind::Chrome | SideKind::Rule => MUTED,
+                        _ => TEXT,
+                    };
+                    queue!(
+                        out,
+                        SetForegroundColor(fg),
+                        Print(sidebar_paint_text(h.kind, &h.text, side as usize))
+                    )?;
+                }
+                None => {
+                    queue!(
+                        out,
+                        SetForegroundColor(TEXT),
+                        Print(pad_cols(String::new(), side as usize))
+                    )?;
+                }
             }
-            queue!(out, SetForegroundColor(TEXT), Print(padded))?;
             queue!(
                 out,
                 SetBackgroundColor(TITLE_BG),
@@ -1067,21 +1629,26 @@ impl Desk {
         }
         // Leave the last terminal column empty so a wrap-on-last-cell host
         // cannot scroll the alternate screen (one keystroke used to jump).
+        // Wipe only on chrome/layout. A working occupant's PTY dirties tiles
+        // every pump; blanking first flashes the sit, then the cell loop
+        // reprints. Idle has no bytes → no draw → the sit looks still.
         let fill = width
             .min(cols.saturating_sub(origin_x).saturating_sub(1))
             .max(1);
-        for y in 0..height {
-            queue!(
-                out,
-                MoveTo(origin_x, y + origin_y),
-                SetBackgroundColor(PANE_BG),
-                SetForegroundColor(PANE_BG),
-                Print(" ".repeat(fill as usize))
-            )?;
+        if pane_wipe_on_tile_draw(self.chrome_dirty) {
+            for y in 0..height {
+                queue!(
+                    out,
+                    MoveTo(origin_x, y + origin_y),
+                    SetBackgroundColor(PANE_BG),
+                    SetForegroundColor(PANE_BG),
+                    Print(" ".repeat(fill as usize))
+                )?;
+            }
         }
         if self.tiles.is_empty() {
             let msg = if self.status.is_empty() {
-                " no live pane "
+                " ô trống  Ctrl-b c thẻ · v/- tách"
             } else {
                 self.status.as_str()
             };
@@ -1144,22 +1711,54 @@ impl Desk {
                 if let Some((x, y, w, h)) = crate::layout::inset(&self.cells, &cell.id) {
                     if w < cell.w && x + w < width {
                         for row in y..y.saturating_add(h).min(height) {
+                            if origin_x + x + w + 1 >= cols {
+                                break;
+                            }
+                            let fg = if divider_touches_focus(
+                                &self.cells,
+                                x + w,
+                                row,
+                                &self.focused,
+                            ) {
+                                ACCENT
+                            } else {
+                                MUTED
+                            };
                             queue!(
                                 out,
                                 MoveTo(origin_x + x + w, origin_y + row),
                                 SetBackgroundColor(TITLE_BG),
-                                SetForegroundColor(MUTED),
+                                SetForegroundColor(fg),
                                 Print("│")
                             )?;
                         }
                     }
-                    if h < cell.h && y + h < height {
+                    if h < cell.h && y + h < height && origin_x + x + 1 < cols {
+                        let bar_w = w.min(width.saturating_sub(x));
+                        let bar_w = if origin_x + x + bar_w >= cols {
+                            cols.saturating_sub(origin_x + x + 1)
+                        } else {
+                            bar_w
+                        };
+                        if bar_w == 0 {
+                            continue;
+                        }
+                        let fg = if divider_touches_focus(
+                            &self.cells,
+                            x,
+                            y + h,
+                            &self.focused,
+                        ) {
+                            ACCENT
+                        } else {
+                            MUTED
+                        };
                         queue!(
                             out,
                             MoveTo(origin_x + x, origin_y + y + h),
                             SetBackgroundColor(TITLE_BG),
-                            SetForegroundColor(MUTED),
-                            Print("─".repeat(w.min(width.saturating_sub(x)) as usize))
+                            SetForegroundColor(fg),
+                            Print("─".repeat(bar_w as usize))
                         )?;
                     }
                 }
@@ -1170,48 +1769,61 @@ impl Desk {
     }
 
     fn draw_footer(&self, out: &mut io::Stdout, cols: u16, rows: u16) -> io::Result<()> {
-        let hint = if self.mode == Mode::Prefix {
-            " ^B — q detach  c tab  n/p tabs  w pick  Shift-n ws  x close  ? help"
-        } else if !self.status.is_empty() {
-            self.status.as_str()
-        } else {
-            " ^B q detach  w pick  n/p tabs  hjkl  z  x close  drag≥2 copy"
-        };
+        let hint = footer_hint(self.mode, &self.status);
         let line = bar_line(&format!(" {hint}"), cols);
         queue!(
             out,
             MoveTo(0, rows.saturating_sub(1)),
             SetBackgroundColor(TITLE_BG),
-            SetForegroundColor(MUTED),
+            SetForegroundColor(TEXT),
             Print(line),
             ResetColor
         )
     }
 
     fn draw_overlay(&self, out: &mut io::Stdout, cols: u16, rows: u16) -> io::Result<()> {
-        let (origin_x, origin_y) = content_origin(self.sidebar_cols, self.top_rows);
-        let width = cols.saturating_sub(origin_x).saturating_sub(1);
-        let height = rows.saturating_sub(self.top_rows + 1);
-        if width == 0 || height == 0 {
-            return Ok(());
-        }
         let lines: Vec<String> = match self.mode {
             Mode::Help => help_text().lines().map(|s| s.to_string()).collect(),
             Mode::Picker => picker_lines(&self.rows, self.picker_idx),
-            _ => return Ok(()),
+            Mode::Menu => self.menu.map(menu_lines).unwrap_or_default(),
+            Mode::Confirm => self
+                .confirm
+                .as_ref()
+                .map(|c| confirm_lines(c.kind))
+                .unwrap_or_default(),
+            Mode::Onboard => onboard_lines(),
+            Mode::Terminal | Mode::Prefix => return Ok(()),
         };
-        for y in 0..height {
+        let max_line_w = lines.iter().map(|l| display_width(l)).max().unwrap_or(0);
+        let card = overlay_box(
+            self.mode,
+            lines.len(),
+            max_line_w,
+            cols,
+            rows,
+            self.sidebar_cols,
+            self.top_rows,
+            if matches!(self.mode, Mode::Menu) {
+                self.menu_anchor
+            } else {
+                None
+            },
+        );
+        if card.w == 0 || card.h == 0 {
+            return Ok(());
+        }
+        for y in 0..card.h {
             let mut text = lines
                 .get(y as usize)
                 .cloned()
                 .unwrap_or_else(|| String::new());
-            clip_to(&mut text, width as usize);
-            while display_width(&text) < width as usize {
+            clip_to(&mut text, card.w as usize);
+            while display_width(&text) < card.w as usize {
                 text.push(' ');
             }
             queue!(
                 out,
-                MoveTo(origin_x, origin_y + y),
+                MoveTo(card.x, card.y + y),
                 SetBackgroundColor(SIDE_BG),
                 SetForegroundColor(if y == 0 { FOCUSED_FG } else { TEXT }),
                 Print(text),
@@ -1349,6 +1961,7 @@ fn parse_tree(body: &str) -> (Vec<Row>, String, String, String) {
             focus_pane,
             occ: item.occ.clone(),
             st: item.st.clone(),
+            cwd: item.cwd.clone(),
         });
     }
     let workspace = workspace_of(&rows, &focused).unwrap_or_default();
@@ -1361,6 +1974,7 @@ struct Item {
     id: String,
     occ: String,
     st: String,
+    cwd: String,
 }
 
 fn parse_items(body: &str) -> Vec<Item> {
@@ -1432,6 +2046,7 @@ fn parse_item(obj: &str) -> Option<Item> {
         id,
         occ: attach::json_string_field(obj, "occ").unwrap_or_default(),
         st: attach::json_string_field(obj, "st").unwrap_or_default(),
+        cwd: attach::json_string_field(obj, "cwd").unwrap_or_default(),
     })
 }
 
@@ -1445,7 +2060,7 @@ fn workspace_of(rows: &[Row], focused: &str) -> Option<String> {
             return ws;
         }
     }
-    ws
+    None
 }
 
 fn tab_of(rows: &[Row], focused: &str) -> Option<String> {
@@ -1458,7 +2073,125 @@ fn tab_of(rows: &[Row], focused: &str) -> Option<String> {
             return tab;
         }
     }
-    tab
+    None
+}
+
+fn first_live_pane(rows: &[Row]) -> Option<String> {
+    rows.iter().find(|r| r.kind == 'p').map(|r| r.id.clone())
+}
+
+#[cfg(test)]
+fn closed_still_listed(
+    rows: &[Row],
+    kind: ConfirmKind,
+    pane: &str,
+    tab: &str,
+    workspace: &str,
+) -> bool {
+    match kind {
+        ConfirmKind::Pane => rows.iter().any(|r| r.kind == 'p' && r.id == pane),
+        ConfirmKind::Tab => rows.iter().any(|r| r.kind == 't' && r.id == tab),
+        ConfirmKind::Workspace => rows.iter().any(|r| r.kind == 'w' && r.id == workspace),
+    }
+}
+
+fn drop_closed_from_rows(
+    rows: &mut Vec<Row>,
+    kind: ConfirmKind,
+    pane: &str,
+    tab: &str,
+    workspace: &str,
+) {
+    match kind {
+        ConfirmKind::Pane => rows.retain(|r| !(r.kind == 'p' && r.id == pane)),
+        ConfirmKind::Tab => {
+            let mut in_tab = false;
+            rows.retain(|r| {
+                if r.kind == 'w' {
+                    in_tab = false;
+                    return true;
+                }
+                if r.kind == 't' {
+                    in_tab = r.id == tab;
+                    return !in_tab;
+                }
+                !in_tab
+            });
+        }
+        ConfirmKind::Workspace => {
+            let mut in_ws = false;
+            rows.retain(|r| {
+                if r.kind == 'w' {
+                    in_ws = r.id == workspace;
+                    return !in_ws;
+                }
+                !in_ws
+            });
+        }
+    }
+    prune_empty_rooms(rows);
+}
+
+fn prune_empty_rooms(rows: &mut Vec<Row>) {
+    let mut live_ws: Vec<String> = Vec::new();
+    let mut live_tab: Vec<String> = Vec::new();
+    let mut ws = String::new();
+    let mut tab = String::new();
+    for row in rows.iter() {
+        match row.kind {
+            'w' => ws = row.id.clone(),
+            't' => tab = row.id.clone(),
+            'p' => {
+                if !ws.is_empty() && !live_ws.iter().any(|id| id == &ws) {
+                    live_ws.push(ws.clone());
+                }
+                if !tab.is_empty() && !live_tab.iter().any(|id| id == &tab) {
+                    live_tab.push(tab.clone());
+                }
+            }
+            _ => {}
+        }
+    }
+    rows.retain(|row| match row.kind {
+        'w' => live_ws.iter().any(|id| id == &row.id),
+        't' => live_tab.iter().any(|id| id == &row.id),
+        _ => true,
+    });
+}
+
+fn retire_id(list: &mut Vec<String>, id: &str) {
+    if id.is_empty() || list.iter().any(|have| have == id) {
+        return;
+    }
+    list.push(id.to_string());
+}
+
+fn sweep_retired(
+    rows: &[Row],
+    retired_ws: &mut Vec<String>,
+    retired_tab: &mut Vec<String>,
+    retired_pane: &mut Vec<String>,
+) {
+    retired_ws.retain(|id| rows.iter().any(|r| r.kind == 'w' && r.id == *id));
+    retired_tab.retain(|id| rows.iter().any(|r| r.kind == 't' && r.id == *id));
+    retired_pane.retain(|id| rows.iter().any(|r| r.kind == 'p' && r.id == *id));
+}
+
+fn apply_retired(
+    rows: &mut Vec<Row>,
+    retired_ws: &[String],
+    retired_tab: &[String],
+    retired_pane: &[String],
+) {
+    for ws in retired_ws {
+        drop_closed_from_rows(rows, ConfirmKind::Workspace, "", "", ws);
+    }
+    for tab in retired_tab {
+        drop_closed_from_rows(rows, ConfirmKind::Tab, "", tab, "");
+    }
+    for pane in retired_pane {
+        drop_closed_from_rows(rows, ConfirmKind::Pane, pane, "", "");
+    }
 }
 
 fn pane_id_from(body: &str) -> Option<String> {
@@ -1483,6 +2216,59 @@ fn pane_id_from(body: &str) -> Option<String> {
 fn content_origin(sidebar: u16, top: u16) -> (u16, u16) {
     let x = if sidebar == 0 { 0 } else { sidebar + 1 };
     (x, top)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct OverlayBox {
+    x: u16,
+    y: u16,
+    w: u16,
+    h: u16,
+}
+
+fn overlay_box(
+    mode: Mode,
+    line_count: usize,
+    max_line_w: usize,
+    cols: u16,
+    rows: u16,
+    sidebar: u16,
+    top: u16,
+    menu_anchor: Option<(u16, u16)>,
+) -> OverlayBox {
+    let height = rows.saturating_sub(top + 1);
+    let h = overlay_paint_rows(mode, line_count, height);
+    if matches!(mode, Mode::Menu) {
+        if let Some((ax, ay)) = menu_anchor {
+            let max_w = cols.saturating_sub(1);
+            let w = (max_line_w as u16).max(8).min(max_w);
+            let max_x = cols.saturating_sub(w.saturating_add(1));
+            let max_y = rows.saturating_sub(h.saturating_add(1));
+            return OverlayBox {
+                x: ax.min(max_x),
+                y: ay.min(max_y),
+                w,
+                h,
+            };
+        }
+    }
+    let (x, y) = content_origin(sidebar, top);
+    let w = cols.saturating_sub(x).saturating_sub(1);
+    OverlayBox { x, y, w, h }
+}
+
+fn overlay_contains(card: OverlayBox, column: u16, row: u16, rows_n: u16) -> bool {
+    if row + 1 >= rows_n {
+        return false;
+    }
+    column >= card.x
+        && column < card.x.saturating_add(card.w)
+        && row >= card.y
+        && row < card.y.saturating_add(card.h)
+}
+
+fn pane_wipe_on_tile_draw(chrome_dirty: bool) -> bool {
+    chrome_dirty
 }
 
 fn pane_size(cols: u16, rows: u16, sidebar: u16, top: u16) -> (u16, u16) {
@@ -1533,8 +2319,23 @@ fn normalize_st(st: &str) -> &'static str {
     }
 }
 
+fn tree_rows_sig(focused: &str, rows: &[Row]) -> String {
+    let mut s = focused.to_string();
+    for row in rows {
+        s.push('|');
+        s.push_str(&row.id);
+        s.push('/');
+        s.push_str(&row.st);
+        s.push('/');
+        s.push_str(&row.occ);
+        s.push('/');
+        s.push_str(&row.cwd);
+    }
+    s
+}
+
 fn rollup_of(rows: &[Row], ws: &str) -> &'static str {
-    let mut best = "unknown";
+    let mut best = "";
     let mut best_r = 0u8;
     let mut in_ws = false;
     for row in rows {
@@ -1542,7 +2343,7 @@ fn rollup_of(rows: &[Row], ws: &str) -> &'static str {
             in_ws = row.id == ws;
             continue;
         }
-        if in_ws && row.kind == 'p' {
+        if in_ws && row.kind == 'p' && !row.occ.is_empty() {
             let st = normalize_st(&row.st);
             let rank = rollup_rank(st);
             if rank > best_r {
@@ -1552,6 +2353,109 @@ fn rollup_of(rows: &[Row], ws: &str) -> &'static str {
         }
     }
     best
+}
+
+fn workspace_cwd_name(cwd: &str) -> Option<String> {
+    let name = Path::new(cwd).file_name()?.to_string_lossy();
+    if name.is_empty() {
+        None
+    } else {
+        Some(name.into_owned())
+    }
+}
+
+fn short_id(id: &str) -> &str {
+    id.rsplit(':').next().unwrap_or(id)
+}
+
+fn row_cwd<'a>(rows: &'a [Row], kind: char, id: &str) -> &'a str {
+    rows.iter()
+        .find(|r| r.kind == kind && r.id == id)
+        .map(|r| r.cwd.as_str())
+        .unwrap_or("")
+}
+
+fn folder_label(cwd: &str, id: &str) -> String {
+    workspace_cwd_name(cwd).unwrap_or_else(|| short_id(id).to_string())
+}
+
+fn unique_folder_label(id: &str, labels: &[(String, String)]) -> String {
+    let name = labels
+        .iter()
+        .find(|(i, _)| i == id)
+        .map(|(_, n)| n.as_str())
+        .unwrap_or_else(|| short_id(id));
+    if labels.iter().any(|(i, n)| i != id && n == name) {
+        format!("{name} {}", short_id(id))
+    } else {
+        name.to_string()
+    }
+}
+
+fn workspace_labels(rows: &[Row]) -> Vec<(String, String)> {
+    workspaces_of(rows)
+        .into_iter()
+        .map(|id| {
+            let name = folder_label(row_cwd(rows, 'w', &id), &id);
+            (id, name)
+        })
+        .collect()
+}
+
+fn tab_labels(rows: &[Row], workspace: &str) -> Vec<(String, String)> {
+    tabs_of(rows, workspace)
+        .into_iter()
+        .map(|(id, _)| {
+            let name = folder_label(row_cwd(rows, 't', &id), &id);
+            (id, name)
+        })
+        .collect()
+}
+
+fn workspace_label(rows: &[Row], id: &str) -> String {
+    unique_folder_label(id, &workspace_labels(rows))
+}
+
+fn tab_label(rows: &[Row], workspace: &str, id: &str) -> String {
+    let mut name = unique_folder_label(id, &tab_labels(rows, workspace));
+    clip_to(&mut name, TAB_CHIP_MAX);
+    name
+}
+
+fn tab_chip_text(rows: &[Row], workspace: &str, id: &str, focused: &str) -> String {
+    let label = tab_label(rows, workspace, id);
+    if id == focused {
+        format!("[{label}]")
+    } else {
+        format!(" {label} ")
+    }
+}
+
+fn title_loc(rows: &[Row], workspace: &str, tab: &str, focused: &str) -> String {
+    format!(
+        "  {} · {} · {}",
+        empty_dash(&workspace_label(rows, workspace)),
+        empty_dash(&tab_label(rows, workspace, tab)),
+        empty_dash(short_id(focused))
+    )
+}
+
+fn title_chips(mode: Mode, zoomed: bool) -> String {
+    let mut s = String::new();
+    if mode == Mode::Prefix {
+        s.push_str("  Ctrl-b");
+    }
+    if zoomed {
+        s.push_str("  z");
+    }
+    s
+}
+
+fn divider_touches_focus(cells: &[crate::layout::Cell], x: u16, y: u16, focused: &str) -> bool {
+    match crate::layout::divider_at(cells, x, y) {
+        Some((a, b, _)) => a == focused || b == focused,
+        None => false,
+    }
 }
 
 fn workspaces_of(rows: &[Row]) -> Vec<String> {
@@ -1632,70 +2536,282 @@ fn pad_cols(mut text: String, width: usize) -> String {
     text
 }
 
+fn sidebar_rule(width: usize) -> String {
+    "─".chars().cycle().take(width).collect()
+}
+
+fn sidebar_paint_text(kind: SideKind, text: &str, width: usize) -> String {
+    if kind == SideKind::Rule {
+        sidebar_rule(width)
+    } else {
+        pad_cols(text.to_string(), width)
+    }
+}
+
+fn sidebar_row_bg(y: u16, height: u16, agent_rows: u16) -> Color {
+    if agent_rows > 0 && y >= height.saturating_sub(agent_rows) {
+        TITLE_BG
+    } else {
+        SIDE_BG
+    }
+}
+
+#[derive(Clone)]
 struct SideHit {
     text: String,
     pane: Option<String>,
+    kind: SideKind,
+    tab: String,
+    workspace: String,
+    st: &'static str,
+    lead: String,
+    tail: String,
 }
 
-fn sidebar_model(rows: &[Row], workspace: &str, side: u16) -> Vec<SideHit> {
+fn show_status_word(st: &str) -> bool {
+    !st.is_empty() && st != "idle"
+}
+
+fn status_fg(st: &str) -> Color {
+    match st {
+        "blocked" => BLOCKED_FG,
+        "working" => ACCENT,
+        _ => MUTED,
+    }
+}
+
+fn compact_space_ch(st: &str) -> char {
+    match st {
+        "blocked" => 'B',
+        "working" => 'W',
+        "done" => 'D',
+        "idle" => 'I',
+        "" => '·',
+        _ => 'U',
+    }
+}
+
+fn sidebar_workspace_focused(kind: SideKind, hit_ws: &str, desk_ws: &str) -> bool {
+    kind == SideKind::Workspace && !desk_ws.is_empty() && hit_ws == desk_ws
+}
+
+fn pad_display(s: &mut String, width: usize) {
+    while display_width(s) < width {
+        s.push(' ');
+    }
+    clip_to(s, width);
+}
+
+fn clip_lead(lead: &str, st: &str, tail: &str, width: usize) -> (String, String) {
+    let compact = width <= SIDEBAR_DOTS as usize;
+    let mid = if !compact && show_status_word(st) {
+        format!(" {st}")
+    } else {
+        String::new()
+    };
+    let reserve = display_width(&mid) + display_width(tail);
+    let budget = width.saturating_sub(reserve);
+    let mut lead_c = lead.to_string();
+    clip_to(&mut lead_c, budget);
+    (lead_c, mid)
+}
+
+fn chrome_side_hit(kind: SideKind, raw: &str, width: usize) -> SideHit {
+    SideHit {
+        text: sidebar_paint_text(kind, raw, width),
+        pane: None,
+        kind,
+        tab: String::new(),
+        workspace: String::new(),
+        st: "",
+        lead: String::new(),
+        tail: String::new(),
+    }
+}
+
+fn occup_side_hit(
+    kind: SideKind,
+    pane: Option<String>,
+    tab: &str,
+    ws: &str,
+    st: &'static str,
+    lead: String,
+    tail: String,
+    width: usize,
+) -> SideHit {
+    let (lead_c, mid) = clip_lead(&lead, st, &tail, width);
+    let mut text = format!("{lead_c}{mid}{tail}");
+    pad_display(&mut text, width);
+    SideHit {
+        text,
+        pane,
+        kind,
+        tab: tab.to_string(),
+        workspace: ws.to_string(),
+        st,
+        lead: lead_c,
+        tail,
+    }
+}
+
+fn sidebar_row_spans(
+    hit: &SideHit,
+    side: usize,
+    desk_ws: &str,
+) -> (String, Color, String, Color, String, Color) {
+    let compact = side <= SIDEBAR_DOTS as usize;
+    let mid = if !compact && show_status_word(hit.st) {
+        format!(" {}", hit.st)
+    } else {
+        String::new()
+    };
+    let focused = sidebar_workspace_focused(hit.kind, &hit.workspace, desk_ws);
+    let lead_fg = if compact {
+        status_fg(hit.st)
+    } else if focused {
+        FOCUSED_FG
+    } else {
+        TEXT
+    };
+    let mut rest = hit.tail.clone();
+    let used = display_width(&hit.lead) + display_width(&mid) + display_width(&rest);
+    let pad = side.saturating_sub(used);
+    rest.push_str(&" ".repeat(pad));
+    (
+        hit.lead.clone(),
+        lead_fg,
+        mid,
+        status_fg(hit.st),
+        rest,
+        TEXT,
+    )
+}
+
+fn sidebar_paint_height(rows_n: u16) -> u16 {
+    rows_n.saturating_sub(3)
+}
+
+fn agent_region_rows(width: u16, height: u16, agent_n: usize) -> u16 {
+    if agent_n == 0 || height == 0 {
+        return 0;
+    }
+    let chrome: u16 = if width <= SIDEBAR_DOTS { 1 } else { 2 };
+    let cap = if width <= SIDEBAR_DOTS {
+        AGENT_REGION_DOTS
+    } else {
+        AGENT_REGION
+    };
+    let want = chrome.saturating_add(agent_n as u16).min(cap);
+    let need = chrome.saturating_add(1).min(height);
+    let leave = if height > need {
+        2u16.min(height - need)
+    } else {
+        0
+    };
+    want.min(height.saturating_sub(leave)).min(height)
+}
+
+fn sidebar_blank(width: usize) -> SideHit {
+    chrome_side_hit(SideKind::Chrome, "", width)
+}
+
+fn sidebar_sections(rows: &[Row], workspace: &str, side: u16) -> (Vec<SideHit>, Vec<SideHit>) {
+    let width = side as usize;
+    let mut spaces = Vec::new();
+    let mut agents_hits = Vec::new();
+    if width <= SIDEBAR_DOTS as usize {
+        for ws in workspaces_of(rows) {
+            let st = rollup_of(rows, &ws);
+            spaces.push(occup_side_hit(
+                SideKind::Workspace,
+                first_pane_of(rows, &ws),
+                &first_tab_of(rows, &ws),
+                &ws,
+                st,
+                format!(" {}", compact_space_ch(st)),
+                String::new(),
+                width,
+            ));
+        }
+        let agents = agents_from(rows);
+        if !agents.is_empty() {
+            agents_hits.push(chrome_side_hit(SideKind::Rule, "", width));
+            for pane in agents {
+                let st = normalize_st(&pane.st);
+                let ch = pane.occ.chars().next().unwrap_or('·');
+                agents_hits.push(occup_side_hit(
+                    SideKind::Agent,
+                    Some(pane.id.clone()),
+                    "",
+                    "",
+                    st,
+                    format!(" {ch}"),
+                    String::new(),
+                    width,
+                ));
+            }
+        }
+        return (spaces, agents_hits);
+    }
+    spaces.push(chrome_side_hit(SideKind::Chrome, " Spaces", width));
+    for ws in workspaces_of(rows) {
+        let st = rollup_of(rows, &ws);
+        let mark = if ws == workspace { "●" } else { "○" };
+        let label = workspace_label(rows, &ws);
+        spaces.push(occup_side_hit(
+            SideKind::Workspace,
+            first_pane_of(rows, &ws),
+            &first_tab_of(rows, &ws),
+            &ws,
+            st,
+            format!(" {mark} {label}"),
+            String::new(),
+            width,
+        ));
+    }
+    let agents = agents_from(rows);
+    if !agents.is_empty() {
+        agents_hits.push(chrome_side_hit(SideKind::Rule, "", width));
+        agents_hits.push(chrome_side_hit(SideKind::Chrome, " Agents", width));
+        for pane in agents {
+            let st = normalize_st(&pane.st);
+            let short = pane.id.rsplit(':').next().unwrap_or(&pane.id);
+            agents_hits.push(occup_side_hit(
+                SideKind::Agent,
+                Some(pane.id.clone()),
+                "",
+                "",
+                st,
+                format!(" {}", pane.occ),
+                format!(" {short}"),
+                width,
+            ));
+        }
+    }
+    (spaces, agents_hits)
+}
+
+fn sidebar_model(rows: &[Row], workspace: &str, side: u16, height: u16) -> Vec<SideHit> {
     let width = side as usize;
     if width == 0 {
         return Vec::new();
     }
-    let mut out = Vec::new();
-    let push = |out: &mut Vec<SideHit>, text: String, pane: Option<String>| {
-        out.push(SideHit {
-            text: pad_cols(text, width),
-            pane,
-        });
-    };
-    if width <= SIDEBAR_DOTS as usize {
-        for ws in workspaces_of(rows) {
-            let ch = match rollup_of(rows, &ws) {
-                "blocked" => 'B',
-                "working" => 'W',
-                "done" => 'D',
-                "idle" => 'I',
-                _ => 'U',
-            };
-            push(&mut out, format!(" {ch}"), first_pane_of(rows, &ws));
-        }
-        push(&mut out, "──".into(), None);
-        for pane in agents_from(rows) {
-            let ch = pane.occ.chars().next().unwrap_or('·');
-            push(&mut out, format!(" {ch}"), Some(pane.id.clone()));
-        }
+    let (spaces, agents) = sidebar_sections(rows, workspace, side);
+    if height == 0 {
+        let mut out = spaces;
+        out.extend(agents);
         return out;
     }
-    push(&mut out, " Spaces".into(), None);
-    for ws in workspaces_of(rows) {
-        let st = rollup_of(rows, &ws);
-        let mark = if ws == workspace { "●" } else { "○" };
-        push(
-            &mut out,
-            format!(" {mark} {ws} {st}"),
-            first_pane_of(rows, &ws),
-        );
+    let ah = agent_region_rows(side, height, agents_from(rows).len());
+    let sh = height.saturating_sub(ah);
+    let mut out = Vec::with_capacity(height as usize);
+    for i in 0..sh as usize {
+        out.push(spaces.get(i).cloned().unwrap_or_else(|| sidebar_blank(width)));
     }
-    push(&mut out, " ─".into(), None);
-    push(&mut out, " Agents".into(), None);
-    for pane in agents_from(rows) {
-        let st = normalize_st(&pane.st);
-        let short = pane.id.rsplit(':').next().unwrap_or(&pane.id);
-        push(
-            &mut out,
-            format!(" {} {st} {short}", pane.occ),
-            Some(pane.id.clone()),
-        );
+    for i in 0..ah as usize {
+        out.push(agents.get(i).cloned().unwrap_or_else(|| sidebar_blank(width)));
     }
     out
-}
-
-fn sidebar_lines(rows: &[Row], workspace: &str, _focused: &str, side: u16) -> Vec<String> {
-    sidebar_model(rows, workspace, side)
-        .into_iter()
-        .map(|h| h.text)
-        .collect()
 }
 
 fn sidebar_focus_at(
@@ -1709,50 +2825,426 @@ fn sidebar_focus_at(
         return None;
     }
     let idx = (mouse_row - 2) as usize;
-    sidebar_model(rows, workspace, side)
+    sidebar_model(rows, workspace, side, sidebar_paint_height(rows_n))
         .get(idx)
         .and_then(|h| h.pane.clone())
 }
 
+fn first_tab_of(rows: &[Row], ws: &str) -> String {
+    tabs_of(rows, ws)
+        .into_iter()
+        .next()
+        .map(|(id, _)| id)
+        .unwrap_or_default()
+}
+
 fn tab_chip_at(rows: &[Row], workspace: &str, column: u16, side: u16) -> Option<String> {
+    tab_chip_hit(rows, workspace, column, side).map(|(_, pane)| pane)
+}
+
+fn tab_chip_hit(rows: &[Row], workspace: &str, column: u16, side: u16) -> Option<(String, String)> {
     let mut x = if side == 0 { 0 } else { side + 1 };
     for (id, pane) in tabs_of(rows, workspace) {
-        let short = id.rsplit(':').next().unwrap_or(&id);
-        let width = (short.len() + 2) as u16;
+        let width = display_width(&tab_chip_text(rows, workspace, &id, &id)) as u16;
         if column >= x && column < x + width {
-            return Some(pane);
+            return Some((id, pane));
         }
         x = x.saturating_add(width);
     }
     None
 }
 
+fn menu_items(kind: MenuKind) -> &'static [(&'static str, MenuVerb)] {
+    match kind {
+        MenuKind::Pane => &[
+            ("Tách phải", MenuVerb::SplitRight),
+            ("Tách dưới", MenuVerb::SplitDown),
+            ("Phóng", MenuVerb::Zoom),
+            ("Đóng ô", MenuVerb::ClosePane),
+        ],
+        MenuKind::Tab => &[
+            ("Thẻ mới", MenuVerb::NewTab),
+            ("Đóng thẻ", MenuVerb::CloseTab),
+        ],
+        MenuKind::Workspace => &[
+            ("Chọn cửa sổ", MenuVerb::Picker),
+            ("Cửa sổ mới", MenuVerb::NewWs),
+            ("Đóng cửa sổ", MenuVerb::CloseWs),
+        ],
+    }
+}
+
+fn menu_pick(kind: MenuKind, code: KeyCode) -> MenuPick {
+    match code {
+        KeyCode::Esc => MenuPick::Cancel,
+        KeyCode::Char(c @ '1'..='9') => {
+            let i = (c as u8 - b'1') as usize;
+            match menu_items(kind).get(i) {
+                Some((_, verb)) => MenuPick::Run(*verb),
+                None => MenuPick::Ignore,
+            }
+        }
+        _ => MenuPick::Ignore,
+    }
+}
+
+fn overlay_paint_rows(mode: Mode, line_count: usize, height: u16) -> u16 {
+    if matches!(mode, Mode::Help) {
+        height
+    } else {
+        (line_count as u16).min(height)
+    }
+}
+
+fn menu_lines(kind: MenuKind) -> Vec<String> {
+    let mut lines = vec![" chọn  1..  esc".to_string()];
+    for (i, (label, _)) in menu_items(kind).iter().enumerate() {
+        lines.push(format!("{} {label}", i + 1));
+    }
+    lines
+}
+
+fn confirm_ask(kind: ConfirmKind) -> &'static str {
+    match kind {
+        ConfirmKind::Pane => "đóng ô?  y/n  esc",
+        ConfirmKind::Tab => "đóng thẻ?  y/n  esc",
+        ConfirmKind::Workspace => "đóng cửa sổ?  y/n  esc",
+    }
+}
+
+fn confirm_lines(kind: ConfirmKind) -> Vec<String> {
+    vec![
+        format!(" {}", confirm_ask(kind)),
+        " 1 có".to_string(),
+        " 2 không".to_string(),
+    ]
+}
+
+fn confirm_overlay_pick(overlay_row: u16) -> ConfirmPick {
+    match overlay_row {
+        1 => ConfirmPick::Yes,
+        2 => ConfirmPick::No,
+        _ => ConfirmPick::Ignore,
+    }
+}
+
+fn term_cells(c: char) -> u16 {
+    // Crossterm mouse.column is terminal cells. Vietnamese NFC letters are
+    // one cell. Do not use UTF-8 byte index or display_width (non-ASCII=2).
+    if c.is_ascii() || !c.is_control() {
+        1
+    } else {
+        0
+    }
+}
+
+fn confirm_yn_token(text: &str, col: u16) -> Option<ConfirmPick> {
+    let chars: Vec<char> = text.chars().collect();
+    let mut cells = 0u16;
+    let mut i = 0;
+    while i + 2 < chars.len() {
+        if chars[i].eq_ignore_ascii_case(&'y')
+            && chars[i + 1] == '/'
+            && chars[i + 2].eq_ignore_ascii_case(&'n')
+        {
+            if col == cells {
+                return Some(ConfirmPick::Yes);
+            }
+            if col == cells + 2 {
+                return Some(ConfirmPick::No);
+            }
+            return None;
+        }
+        cells = cells.saturating_add(term_cells(chars[i]));
+        i += 1;
+    }
+    None
+}
+
+fn menu_hit(
+    rows: &[Row],
+    cells: &[crate::layout::Cell],
+    column: u16,
+    row: u16,
+    rows_n: u16,
+    side: u16,
+    top: u16,
+    zoomed: bool,
+    focused: &str,
+    workspace: &str,
+) -> Option<MenuTarget> {
+    if row == 0 || row + 1 >= rows_n {
+        return None;
+    }
+    if row == TAB_ROW {
+        return tab_chip_hit(rows, workspace, column, side).map(|(tab, focus)| MenuTarget {
+            kind: MenuKind::Tab,
+            focus,
+            tab,
+            workspace: workspace.to_string(),
+        });
+    }
+    if side > 0 && column < side {
+        if row < 2 || row + 1 >= rows_n {
+            return None;
+        }
+        let idx = (row - 2) as usize;
+        return sidebar_model(rows, workspace, side, sidebar_paint_height(rows_n)).get(idx).and_then(|h| {
+            if h.kind != SideKind::Workspace {
+                return None;
+            }
+            if h.workspace.is_empty() && h.pane.is_none() {
+                return None;
+            }
+            Some(MenuTarget {
+                kind: MenuKind::Workspace,
+                focus: h.pane.clone().unwrap_or_default(),
+                tab: h.tab.clone(),
+                workspace: h.workspace.clone(),
+            })
+        });
+    }
+    let (origin_x, origin_y) = content_origin(side, top);
+    if column < origin_x || row < origin_y {
+        return None;
+    }
+    let content_x = column.saturating_sub(origin_x);
+    let content_y = row.saturating_sub(origin_y);
+    if zoomed {
+        if focused.is_empty() {
+            return None;
+        }
+        return Some(target_from_pane(MenuKind::Pane, focused, rows, workspace));
+    }
+    if crate::layout::divider_at(cells, content_x, content_y).is_some() {
+        return None;
+    }
+    crate::layout::cell_at(cells, content_x, content_y)
+        .map(|cell| target_from_pane(MenuKind::Pane, &cell.id, rows, workspace))
+}
+
+fn target_from_pane(kind: MenuKind, focus: &str, rows: &[Row], fallback_ws: &str) -> MenuTarget {
+    MenuTarget {
+        kind,
+        focus: focus.to_string(),
+        tab: tab_of(rows, focus).unwrap_or_default(),
+        workspace: workspace_of(rows, focus).unwrap_or_else(|| fallback_ws.to_string()),
+    }
+}
+
+fn confirm_from_target(mut confirm: Confirm, target: Option<&MenuTarget>) -> Confirm {
+    if let Some(target) = target {
+        if !target.focus.is_empty() {
+            confirm.pane = target.focus.clone();
+        }
+        if !target.tab.is_empty() {
+            confirm.tab = target.tab.clone();
+        }
+        if !target.workspace.is_empty() {
+            confirm.workspace = target.workspace.clone();
+        }
+    }
+    confirm
+}
+
+fn close_rpc_line(kind: ConfirmKind, pane: &str, tab: &str, workspace: &str) -> String {
+    match kind {
+        ConfirmKind::Pane => format!(r#"{{"op":"pane.close","pane":"{pane}"}}"#),
+        ConfirmKind::Tab => format!(r#"{{"op":"tab.close","tab":"{tab}"}}"#),
+        ConfirmKind::Workspace => {
+            format!(r#"{{"op":"workspace.close","workspace":"{workspace}"}}"#)
+        }
+    }
+}
+
+const PREFIX_FOOTER: &str =
+    " Ctrl-b — q rời  c thẻ  n/p thẻ  w chọn  Shift-n cửa sổ  x đóng  ? bảng";
+
+fn footer_hint(mode: Mode, status: &str) -> &str {
+    match mode {
+        Mode::Prefix => PREFIX_FOOTER,
+        Mode::Onboard => " enter nhớ  esc bỏ  Ctrl-b q rời",
+        Mode::Help => " esc đóng bảng",
+        Mode::Menu => " 1.. chạy  esc hủy",
+        Mode::Picker => " j/k chọn  enter  esc",
+        _ if !status.is_empty() => status,
+        _ => " chuột phải menu  kéo≥2 copy  Ctrl-b prefix",
+    }
+}
+
+fn overlay_paints(mode: Mode) -> bool {
+    matches!(
+        mode,
+        Mode::Help | Mode::Picker | Mode::Menu | Mode::Confirm | Mode::Onboard
+    )
+}
+
+fn skip_onboard_from_env() -> bool {
+    env::var("DORY_SKIP_ONBOARD")
+        .map(|v| matches!(v.to_ascii_lowercase().as_str(), "1" | "true"))
+        .unwrap_or(false)
+}
+
+fn onboard_state_path() -> Option<PathBuf> {
+    if let Ok(dir) = env::var("XDG_STATE_HOME") {
+        if !dir.is_empty() {
+            return Some(PathBuf::from(dir).join("dory").join("onboarded"));
+        }
+    }
+    let home = env::var("HOME").ok().filter(|h| !h.is_empty())?;
+    Some(
+        PathBuf::from(home)
+            .join(".local")
+            .join("state")
+            .join("dory")
+            .join("onboarded"),
+    )
+}
+
+fn onboard_meta(path: &Path) -> io::Result<fs::Metadata> {
+    fs::symlink_metadata(path)
+}
+
+fn is_regular_file(meta: &fs::Metadata) -> bool {
+    meta.file_type().is_file()
+}
+
+fn onboarded_file_done(path: &Path) -> bool {
+    match onboard_meta(path) {
+        Ok(meta) if is_regular_file(&meta) => fs::read(path).map(|b| !b.is_empty()).unwrap_or(false),
+        _ => false,
+    }
+}
+
+fn should_show_onboard(path: Option<&Path>, skip: bool) -> bool {
+    if skip {
+        return false;
+    }
+    let Some(path) = path else {
+        return false;
+    };
+    match onboard_meta(path) {
+        Ok(meta) if !is_regular_file(&meta) => false,
+        Ok(meta) if is_regular_file(&meta) => !onboarded_file_done(path),
+        _ => true,
+    }
+}
+
+fn initial_mode(path: Option<&Path>, skip: bool) -> Mode {
+    if should_show_onboard(path, skip) {
+        Mode::Onboard
+    } else {
+        Mode::Terminal
+    }
+}
+
+fn mark_onboarded(path: &Path) -> io::Result<()> {
+    if let Ok(meta) = onboard_meta(path) {
+        if !is_regular_file(&meta) {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "onboard path is not a file",
+            ));
+        }
+    }
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)?;
+            let _ = fs::set_permissions(parent, fs::Permissions::from_mode(0o700));
+        }
+    }
+    let tmp = path.with_file_name(format!(
+        "{}.tmp",
+        path.file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("onboarded")
+    ));
+    let write = (|| {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&tmp)?;
+        file.write_all(b"1\n")?;
+        file.sync_all()?;
+        fs::rename(&tmp, path)
+    })();
+    if write.is_err() {
+        let _ = fs::remove_file(&tmp);
+        if path.is_file() {
+            if let Ok(bytes) = fs::read(path) {
+                if bytes.is_empty() {
+                    let _ = fs::remove_file(path);
+                }
+            }
+        }
+    }
+    write
+}
+
+fn onboard_lines() -> Vec<String> {
+    vec![
+        "dory".to_string(),
+        "chỗ ngồi — chuột trước, prefix sau".to_string(),
+        String::new(),
+        "chuột phải ô / chip thẻ / card cửa sổ = menu".to_string(),
+        "kéo ≥2 ô = copy".to_string(),
+        "Ctrl-b = prefix (q rời, ? bảng phím)".to_string(),
+        String::new(),
+        "[enter] nhớ lần sau    chuột / Ctrl-b dùng, không ghi nhớ    esc bỏ".to_string(),
+    ]
+}
+
+fn onboard_key(key: KeyEvent) -> OnboardKey {
+    if is_ctrl_b(&key) {
+        return OnboardKey::Prefix;
+    }
+    match key.code {
+        KeyCode::Enter | KeyCode::Char(' ') => OnboardKey::Persist,
+        KeyCode::Esc => OnboardKey::Dismiss,
+        _ => OnboardKey::Eat,
+    }
+}
+
+fn onboard_mouse(kind: MouseEventKind) -> OnboardMouse {
+    match kind {
+        MouseEventKind::Down(_)
+        | MouseEventKind::ScrollUp
+        | MouseEventKind::ScrollDown => OnboardMouse::Release,
+        _ => OnboardMouse::Eat,
+    }
+}
+
 fn help_text() -> &'static str {
     "Ctrl-b prefix\n\
-     q / d       detach (PTY stays)\n\
-     Shift-d     close workspace\n\
-     c           new tab\n\
-     v / -       split right / down\n\
-     n / p       next / prev tab (this workspace)\n\
-     1-9         tab\n\
-     hjkl        pane\n\
-     w           workspace picker (not create)\n\
-     Shift-n     new workspace\n\
-     x           close pane\n\
-     Shift-x     close tab\n\
-     z           zoom (streams stay)\n\
-     b           collapse sidebar\n\
-     Ctrl-b      send C-b to pane\n\
-     ?           this help\n\
-     drag >=2    copy (OSC 52)\n\
-     Esc / q / ? leave help"
+     q / d       rời (PTY sống)\n\
+     Shift-d     đóng cửa sổ\n\
+     c           thẻ mới\n\
+     v / -       tách phải / dưới\n\
+     n / p       thẻ kế / trước (cửa sổ này)\n\
+     1-9         thẻ\n\
+     hjkl        ô\n\
+     w           chọn cửa sổ (không tạo)\n\
+     Shift-n     cửa sổ mới\n\
+     x           đóng ô\n\
+     Shift-x     đóng thẻ\n\
+     z           phóng (stream anh em sống)\n\
+     b           thu sidebar\n\
+     Ctrl-b      gửi C-b vào ô\n\
+     ?           bảng này\n\
+     kéo ≥2      copy (OSC 52)\n\
+     chuột phải  menu tại pointer (esc)\n\
+     đóng xác nhận y/n (chuột phải hủy)\n\
+     lần đầu     banner; chuột/Ctrl-b vẫn tách ô · thẻ · cửa sổ; enter nhớ\n\
+     Esc / q / ? đóng bảng"
 }
 
 fn picker_lines(rows: &[Row], idx: usize) -> Vec<String> {
-    let mut lines = vec![" workspace picker  j/k  enter  esc".to_string()];
+    let mut lines = vec![" chọn cửa sổ  j/k  enter  esc".to_string()];
     for (i, ws) in workspaces_of(rows).into_iter().enumerate() {
         let mark = if i == idx { '>' } else { ' ' };
-        lines.push(format!("{mark} {ws}"));
+        lines.push(format!("{mark} {}", workspace_label(rows, &ws)));
     }
     lines
 }
@@ -2023,6 +3515,7 @@ mod tests {
                 focus_pane: "w1:p1".into(),
                 occ: String::new(),
                 st: String::new(),
+                cwd: String::new(),
             },
             Row {
                 kind: 't',
@@ -2030,6 +3523,7 @@ mod tests {
                 focus_pane: "w1:p1".into(),
                 occ: String::new(),
                 st: String::new(),
+                cwd: String::new(),
             },
             Row {
                 kind: 'p',
@@ -2037,6 +3531,7 @@ mod tests {
                 focus_pane: "w1:p1".into(),
                 occ: String::new(),
                 st: "working".into(),
+                cwd: String::new(),
             },
             Row {
                 kind: 'p',
@@ -2044,6 +3539,7 @@ mod tests {
                 focus_pane: "w1:p2".into(),
                 occ: "coder".into(),
                 st: "blocked".into(),
+                cwd: String::new(),
             },
             Row {
                 kind: 'w',
@@ -2051,6 +3547,7 @@ mod tests {
                 focus_pane: "w2:p1".into(),
                 occ: String::new(),
                 st: String::new(),
+                cwd: String::new(),
             },
             Row {
                 kind: 't',
@@ -2058,6 +3555,7 @@ mod tests {
                 focus_pane: "w2:p1".into(),
                 occ: String::new(),
                 st: String::new(),
+                cwd: String::new(),
             },
             Row {
                 kind: 'p',
@@ -2065,6 +3563,7 @@ mod tests {
                 focus_pane: "w2:p1".into(),
                 occ: "reviewer".into(),
                 st: "unknown".into(),
+                cwd: String::new(),
             },
         ]
     }
@@ -2080,6 +3579,295 @@ mod tests {
         assert_eq!(agents[0].st, "blocked");
     }
 
+    fn empty_shell_rows(cwd: &str) -> Vec<Row> {
+        vec![
+            Row {
+                kind: 'w',
+                id: "w1".into(),
+                focus_pane: "w1:p1".into(),
+                occ: String::new(),
+                st: String::new(),
+                cwd: cwd.into(),
+            },
+            Row {
+                kind: 't',
+                id: "w1:t1".into(),
+                focus_pane: "w1:p1".into(),
+                occ: String::new(),
+                st: String::new(),
+                cwd: cwd.into(),
+            },
+            Row {
+                kind: 'p',
+                id: "w1:p1".into(),
+                focus_pane: "w1:p1".into(),
+                occ: String::new(),
+                st: String::new(),
+                cwd: String::new(),
+            },
+        ]
+    }
+
+    #[test]
+    fn empty_shell_space_card_is_folder_not_unknown() {
+        let rows = empty_shell_rows("/home/manhquy/Downloads/flow");
+        assert_eq!(rollup_of(&rows, "w1"), "");
+        let model = sidebar_model(&rows, "w1", SIDEBAR, 0);
+        let card = model
+            .iter()
+            .find(|h| matches!(h.kind, SideKind::Workspace))
+            .expect("space card");
+        assert!(card.text.contains("flow"), "{}", card.text);
+        assert!(!card.text.contains("unknown"), "{}", card.text);
+        assert!(!card.text.contains("w1"), "{}", card.text);
+        let compact = sidebar_model(&rows, "w1", SIDEBAR_DOTS, 0);
+        assert!(compact[0].text.contains('·'), "{}", compact[0].text);
+        assert!(!compact[0].text.contains('U'), "{}", compact[0].text);
+    }
+
+    #[test]
+    fn tree_sig_changes_when_cwd_changes() {
+        let home = empty_shell_rows("/home/manhquy");
+        let flow = empty_shell_rows("/home/manhquy/Downloads/flow");
+        assert_ne!(
+            tree_rows_sig("w1:p1", &home),
+            tree_rows_sig("w1:p1", &flow)
+        );
+    }
+
+    #[test]
+    fn working_pty_frame_does_not_wipe_pane() {
+        assert!(
+            !pane_wipe_on_tile_draw(false),
+            "PTY-only dirty (agent working) must paint over cells, not blank first"
+        );
+        assert!(
+            pane_wipe_on_tile_draw(true),
+            "chrome/layout dirty still wipes so leftover tiles do not ghost"
+        );
+    }
+
+    #[test]
+    fn sidebar_wide_rule_is_full_width_when_agents_exist() {
+        let rows = glance_rows();
+        let wide = sidebar_model(&rows, "w1", SIDEBAR, 0);
+        let rule = wide
+            .iter()
+            .find(|h| matches!(h.kind, SideKind::Rule))
+            .expect("rule");
+        assert_eq!(rule.text.chars().count(), SIDEBAR as usize);
+        assert!(rule.text.chars().all(|c| c == '─'), "{}", rule.text);
+        let compact = sidebar_model(&rows, "w1", SIDEBAR_DOTS, 0);
+        let compact_rule = compact
+            .iter()
+            .find(|h| matches!(h.kind, SideKind::Rule))
+            .expect("compact rule");
+        assert_eq!(compact_rule.text.chars().count(), SIDEBAR_DOTS as usize);
+        let empty = sidebar_model(
+            &empty_shell_rows("/home/manhquy/Downloads/flow"),
+            "w1",
+            SIDEBAR,
+            0,
+        );
+        assert!(!empty.iter().any(|h| matches!(h.kind, SideKind::Rule)));
+        assert!(!empty.iter().any(|h| h.text.contains("Agents")));
+        assert_eq!(sidebar_row_bg(0, 8, 3), SIDE_BG);
+        assert_eq!(sidebar_row_bg(5, 8, 3), TITLE_BG);
+        assert_eq!(sidebar_row_bg(7, 8, 0), SIDE_BG);
+        let w = SIDEBAR as usize;
+        assert_eq!(
+            pad_cols(sidebar_rule(w), w).chars().count(),
+            13,
+            "pad_cols lies: ─ is 2 in display_width; paint must use sidebar_paint_text"
+        );
+        assert_eq!(sidebar_paint_text(SideKind::Rule, "", w).chars().count(), w);
+        let fitted = sidebar_model(&rows, "w1", SIDEBAR, 12);
+        let fitted_rule = fitted
+            .iter()
+            .find(|h| matches!(h.kind, SideKind::Rule))
+            .expect("fitted rule");
+        assert_eq!(
+            sidebar_paint_text(fitted_rule.kind, &fitted_rule.text, w)
+                .chars()
+                .count(),
+            w
+        );
+    }
+
+    fn working_only_rows() -> Vec<Row> {
+        vec![
+            Row {
+                kind: 'w',
+                id: "w1".into(),
+                focus_pane: "w1:p1".into(),
+                occ: String::new(),
+                st: String::new(),
+                cwd: "/home/u/proj".into(),
+            },
+            Row {
+                kind: 't',
+                id: "w1:t1".into(),
+                focus_pane: "w1:p1".into(),
+                occ: String::new(),
+                st: String::new(),
+                cwd: String::new(),
+            },
+            Row {
+                kind: 'p',
+                id: "w1:p1".into(),
+                focus_pane: "w1:p1".into(),
+                occ: "coder".into(),
+                st: "working".into(),
+                cwd: "/home/u/proj".into(),
+            },
+        ]
+    }
+
+    fn long_working_rows() -> Vec<Row> {
+        vec![
+            Row {
+                kind: 'w',
+                id: "w1".into(),
+                focus_pane: "w1:p1".into(),
+                occ: String::new(),
+                st: String::new(),
+                cwd: "/home/u/very-long-workspace-名称-that-must-clip".into(),
+            },
+            Row {
+                kind: 't',
+                id: "w1:t1".into(),
+                focus_pane: "w1:p1".into(),
+                occ: String::new(),
+                st: String::new(),
+                cwd: String::new(),
+            },
+            Row {
+                kind: 'p',
+                id: "w1:p1".into(),
+                focus_pane: "w1:p1".into(),
+                occ: "coder".into(),
+                st: "working".into(),
+                cwd: "/home/u/very-long-workspace-名称-that-must-clip".into(),
+            },
+        ]
+    }
+
+    #[test]
+    fn status_fg_table() {
+        assert_eq!(status_fg("blocked"), BLOCKED_FG);
+        assert_eq!(status_fg("working"), ACCENT);
+        assert_eq!(status_fg("done"), MUTED);
+        assert_eq!(status_fg("idle"), MUTED);
+        assert_eq!(status_fg(""), MUTED);
+        assert_eq!(status_fg("unknown"), MUTED);
+    }
+
+    #[test]
+    fn sidebar_status_color_focused_wide_working_keeps_gold_dot() {
+        let rows = working_only_rows();
+        let (spaces, _) = sidebar_sections(&rows, "w1", SIDEBAR);
+        let hit = spaces
+            .iter()
+            .find(|h| h.kind == SideKind::Workspace)
+            .expect("space");
+        assert!(hit.lead.contains('●'));
+        assert_eq!(hit.st, "working");
+        let (lead, lead_fg, mid, mid_fg, rest, _) = sidebar_row_spans(hit, SIDEBAR as usize, "w1");
+        assert_eq!(lead_fg, FOCUSED_FG);
+        assert_eq!(mid, " working");
+        assert_eq!(mid_fg, ACCENT);
+        assert_eq!(
+            display_width(&lead) + display_width(&mid) + display_width(&rest),
+            SIDEBAR as usize
+        );
+    }
+
+    #[test]
+    fn sidebar_status_color_compact_working_is_accent_w() {
+        let rows = working_only_rows();
+        let (spaces, _) = sidebar_sections(&rows, "w1", SIDEBAR_DOTS);
+        let hit = spaces
+            .iter()
+            .find(|h| h.kind == SideKind::Workspace)
+            .expect("space");
+        assert_eq!(hit.lead, " W");
+        let (_, lead_fg, mid, _, _, _) = sidebar_row_spans(hit, SIDEBAR_DOTS as usize, "w1");
+        assert_eq!(lead_fg, ACCENT);
+        assert!(mid.is_empty());
+    }
+
+    #[test]
+    fn sidebar_status_color_agent_blocked_colors_word_only() {
+        let rows = glance_rows();
+        let (_, agents) = sidebar_sections(&rows, "w1", SIDEBAR);
+        let hit = agents
+            .iter()
+            .find(|h| h.kind == SideKind::Agent && h.st == "blocked")
+            .expect("blocked agent");
+        assert!(hit.lead.contains("coder"));
+        assert!(hit.tail.contains("p2"));
+        let (lead, lead_fg, mid, mid_fg, rest, _) = sidebar_row_spans(hit, SIDEBAR as usize, "w1");
+        assert_eq!(lead_fg, TEXT);
+        assert_eq!(mid, " blocked");
+        assert_eq!(mid_fg, BLOCKED_FG);
+        assert_eq!(
+            display_width(&lead) + display_width(&mid) + display_width(&rest),
+            SIDEBAR as usize
+        );
+    }
+
+    #[test]
+    fn sidebar_status_color_clips_lead_keeps_status_word() {
+        let rows = long_working_rows();
+        let (spaces, _) = sidebar_sections(&rows, "w1", SIDEBAR);
+        let hit = spaces
+            .iter()
+            .find(|h| h.kind == SideKind::Workspace)
+            .expect("space");
+        assert_eq!(hit.st, "working");
+        assert!(hit.lead.contains('●'));
+        assert!(!hit.lead.contains("must-clip"));
+        assert!(!hit.lead.contains('称'));
+        let (lead, _, mid, mid_fg, rest, _) = sidebar_row_spans(hit, SIDEBAR as usize, "w1");
+        assert_eq!(mid, " working");
+        assert_eq!(mid_fg, ACCENT);
+        assert!(hit.text.contains("working"));
+        assert_eq!(
+            display_width(&lead) + display_width(&mid) + display_width(&rest),
+            SIDEBAR as usize
+        );
+    }
+
+    #[test]
+    fn sidebar_status_color_compact_agent_keeps_occ_initial() {
+        let rows = glance_rows();
+        let (_, agents) = sidebar_sections(&rows, "w1", SIDEBAR_DOTS);
+        let hit = agents
+            .iter()
+            .find(|h| h.kind == SideKind::Agent && h.st == "blocked")
+            .expect("blocked agent");
+        assert_eq!(hit.lead, " c");
+        assert!(!hit.lead.contains('B'));
+        let (_, lead_fg, mid, _, _, _) = sidebar_row_spans(hit, SIDEBAR_DOTS as usize, "w1");
+        assert_eq!(lead_fg, BLOCKED_FG);
+        assert!(mid.is_empty());
+    }
+
+    #[test]
+    fn sidebar_status_color_empty_shell_is_dot_not_unknown() {
+        let rows = empty_shell_rows("/home/manhquy/Downloads/flow");
+        let (spaces, _) = sidebar_sections(&rows, "w1", SIDEBAR_DOTS);
+        let hit = spaces
+            .iter()
+            .find(|h| h.kind == SideKind::Workspace)
+            .expect("space");
+        assert_eq!(hit.st, "");
+        assert_eq!(hit.lead, " ·");
+        let (_, lead_fg, mid, _, _, _) = sidebar_row_spans(hit, SIDEBAR_DOTS as usize, "w1");
+        assert_eq!(lead_fg, MUTED);
+        assert!(mid.is_empty());
+    }
+
     #[test]
     fn sidebar_hit_is_not_tree_row_index() {
         let rows = glance_rows();
@@ -2092,6 +3880,190 @@ mod tests {
         let tabs = tabs_of(&rows, "w1");
         assert_eq!(tabs.len(), 1);
         assert_eq!(tab_chip_at(&rows, "w1", SIDEBAR + 1, SIDEBAR).as_deref(), Some("w1:p1"));
+    }
+
+    #[test]
+    fn sidebar_hides_agents_when_empty() {
+        let rows = vec![
+            Row {
+                kind: 'w',
+                id: "w1".into(),
+                focus_pane: "w1:p1".into(),
+                occ: String::new(),
+                st: String::new(),
+                cwd: String::new(),
+            },
+            Row {
+                kind: 't',
+                id: "w1:t1".into(),
+                focus_pane: "w1:p1".into(),
+                occ: String::new(),
+                st: String::new(),
+                cwd: String::new(),
+            },
+            Row {
+                kind: 'p',
+                id: "w1:p1".into(),
+                focus_pane: "w1:p1".into(),
+                occ: String::new(),
+                st: "idle".into(),
+                cwd: String::new(),
+            },
+        ];
+        let model = sidebar_model(&rows, "w1", SIDEBAR, 0);
+        assert!(!model.iter().any(|h| h.text.contains("Agents")));
+        assert!(!model.iter().any(|h| h.text.contains("idle")));
+        assert!(!model.iter().any(|h| matches!(h.kind, SideKind::Rule)));
+        let compact = sidebar_model(&rows, "w1", SIDEBAR_DOTS, 0);
+        assert_eq!(compact.len(), 1);
+        assert!(matches!(compact[0].kind, SideKind::Workspace));
+        let glance = glance_rows();
+        assert!(!agents_from(&glance).is_empty());
+        assert_eq!(
+            sidebar_focus_at(&glance, 4, 24, "w1", SIDEBAR).as_deref(),
+            Some("w2:p1")
+        );
+        assert_eq!(
+            menu_hit(
+                &glance,
+                &[],
+                1,
+                4,
+                24,
+                SIDEBAR,
+                2,
+                false,
+                "w1:p1",
+                "w1",
+            )
+            .map(|h| h.workspace),
+            Some("w2".into())
+        );
+    }
+
+    #[test]
+    fn agents_stay_at_sidebar_bottom_when_spaces_overflow() {
+        let mut rows = Vec::new();
+        for i in 1..=8 {
+            let w = format!("w{i}");
+            let p = format!("{w}:p1");
+            rows.push(Row {
+                kind: 'w',
+                id: w.clone(),
+                focus_pane: p.clone(),
+                occ: String::new(),
+                st: String::new(),
+                cwd: String::new(),
+            });
+            rows.push(Row {
+                kind: 't',
+                id: format!("{w}:t1"),
+                focus_pane: p.clone(),
+                occ: String::new(),
+                st: String::new(),
+                cwd: String::new(),
+            });
+            rows.push(Row {
+                kind: 'p',
+                id: p.clone(),
+                focus_pane: p,
+                occ: if i == 1 {
+                    String::from("coder")
+                } else {
+                    String::new()
+                },
+                st: String::from("idle"),
+                cwd: String::new(),
+            });
+        }
+        let height = 8;
+        let model = sidebar_model(&rows, "w1", SIDEBAR, height);
+        assert_eq!(model.len(), 8);
+        assert!(model[0].text.contains("Spaces"));
+        assert!(model[6].text.contains("Agents"));
+        assert!(matches!(model[7].kind, SideKind::Agent));
+        assert!(model[7].text.contains("coder"));
+        assert!(!model.iter().any(|h| h.text.contains("w8")));
+        let rows_n = height + 3;
+        assert_eq!(
+            sidebar_focus_at(&rows, 2 + 7, rows_n, "w1", SIDEBAR).as_deref(),
+            Some("w1:p1")
+        );
+        let compact = sidebar_model(&rows, "w1", SIDEBAR_DOTS, 6);
+        assert_eq!(compact.len(), 6);
+        assert!(matches!(compact[5].kind, SideKind::Agent));
+        assert_eq!(agent_region_rows(SIDEBAR, 8, 1), 3);
+        assert_eq!(agent_region_rows(SIDEBAR, 4, 1), 3);
+        assert_eq!(agent_region_rows(SIDEBAR, 8, 0), 0);
+    }
+
+    #[test]
+    fn apply_retired_hides_closed_workspace_card() {
+        let mut rows = glance_rows();
+        apply_retired(&mut rows, &[String::from("w2")], &[], &[]);
+        assert_eq!(workspaces_of(&rows), vec!["w1".to_string()]);
+        let model = sidebar_model(&rows, "w1", SIDEBAR, 0);
+        assert!(!model.iter().any(|h| h.text.contains("w2")));
+        assert_eq!(sidebar_focus_at(&rows, 4, 24, "w1", SIDEBAR), None);
+    }
+
+    #[test]
+    fn close_drops_retired_workspace_from_sidebar() {
+        let mut rows = glance_rows();
+        assert!(workspaces_of(&rows).iter().any(|w| w == "w2"));
+        assert!(closed_still_listed(
+            &rows,
+            ConfirmKind::Workspace,
+            "w2:p1",
+            "w2:t1",
+            "w2"
+        ));
+        drop_closed_from_rows(
+            &mut rows,
+            ConfirmKind::Workspace,
+            "w2:p1",
+            "w2:t1",
+            "w2",
+        );
+        assert_eq!(workspaces_of(&rows), vec!["w1".to_string()]);
+        assert!(workspace_of(&rows, "w2:p1").is_none());
+        assert_eq!(workspace_of(&rows, "w1:p1").as_deref(), Some("w1"));
+        assert_eq!(first_live_pane(&rows).as_deref(), Some("w1:p1"));
+        let model = sidebar_model(&rows, "w1", SIDEBAR, 0);
+        assert!(model.iter().any(|h| h.text.contains("w1")));
+        assert!(!model.iter().any(|h| h.text.contains("w2")));
+        assert_eq!(sidebar_focus_at(&rows, 4, 24, "w1", SIDEBAR), None);
+    }
+
+    #[test]
+    fn close_last_pane_prunes_empty_workspace_card() {
+        let mut rows = glance_rows();
+        drop_closed_from_rows(
+            &mut rows,
+            ConfirmKind::Pane,
+            "w2:p1",
+            "w2:t1",
+            "w2",
+        );
+        assert!(!workspaces_of(&rows).iter().any(|w| w == "w2"));
+        assert!(!closed_still_listed(
+            &rows,
+            ConfirmKind::Workspace,
+            "w2:p1",
+            "w2:t1",
+            "w2"
+        ));
+    }
+
+    #[test]
+    fn parse_tree_missing_focus_does_not_stick_last_workspace() {
+        let body = r#"{"ok":true,"result":{"focused":"w2:p1","items":[{"k":"w","id":"w1"},{"k":"t","id":"w1:t1"},{"k":"p","id":"w1:p1"}]}}"#;
+        let (rows, focused, ws, tab) = parse_tree(body);
+        assert_eq!(focused, "w2:p1");
+        assert!(ws.is_empty());
+        assert!(tab.is_empty());
+        assert_eq!(workspaces_of(&rows), vec!["w1".to_string()]);
+        assert!(workspace_of(&rows, "w2:p1").is_none());
     }
 
     #[test]
@@ -2131,7 +4103,143 @@ mod tests {
         let payload = osc52_payload("hello");
         assert!(payload.starts_with("\x1b]52;c;"));
         assert!(payload.contains("aGVsbG8="));
-        assert!(help_text().contains("workspace picker"));
+        assert!(help_text().contains("chọn cửa sổ"));
+        assert!(help_text().contains("chuột phải"));
+        assert!(help_text().contains("lần đầu"));
+        assert!(!help_text().contains("workspace picker"));
+        assert!(!help_text().contains("detach"));
+    }
+
+    #[test]
+    fn menu_hit_closed_table() {
+        let rows = glance_rows();
+        let body = r#"{"ok":true,"result":{"focused":"w1:p2","cells":[{"id":"w1:p1","x":0,"y":0,"w":40,"h":22},{"id":"w1:p2","x":40,"y":0,"w":40,"h":22}]}}"#;
+        let cells = parse_layout_cells(body);
+        let top = 2;
+        let hit = |col, row, zoomed, focused: &str| {
+            menu_hit(
+                &rows,
+                &cells,
+                col,
+                row,
+                24,
+                SIDEBAR,
+                top,
+                zoomed,
+                focused,
+                "w1",
+            )
+        };
+        let tab = hit(SIDEBAR + 1, TAB_ROW, false, "w1:p1").expect("tab chip");
+        assert_eq!(tab.kind, MenuKind::Tab);
+        assert_eq!(tab.focus, "w1:p1");
+        let w1 = hit(1, 3, false, "w1:p1").expect("w1 card");
+        assert_eq!(w1.kind, MenuKind::Workspace);
+        assert_eq!(w1.focus, "w1:p1");
+        let w2 = hit(1, 4, false, "w1:p1").expect("w2 card");
+        assert_eq!(w2.kind, MenuKind::Workspace);
+        assert_eq!(w2.focus, "w2:p1");
+        assert!(hit(1, 2, false, "w1:p1").is_none());
+        assert!(hit(1, 7, false, "w1:p1").is_none());
+        assert!(hit(1, 0, false, "w1:p1").is_none());
+        assert!(hit(1, 23, false, "w1:p1").is_none());
+        let pane = hit(SIDEBAR + 1 + 10, 3, false, "w1:p1").expect("tile");
+        assert_eq!(pane.kind, MenuKind::Pane);
+        assert_eq!(pane.focus, "w1:p1");
+        assert!(hit(SIDEBAR + 1 + 39, 3, false, "w1:p1").is_none());
+        let zoomed = hit(SIDEBAR + 1 + 40, 3, true, "w1:p1").expect("zoomed ignores sibling");
+        assert_eq!(zoomed.kind, MenuKind::Pane);
+        assert_eq!(zoomed.focus, "w1:p1");
+    }
+
+    #[test]
+    fn workspace_close_uses_hit_card_not_focused_space() {
+        let rows = glance_rows();
+        let body = r#"{"ok":true,"result":{"focused":"w1:p1","cells":[{"id":"w1:p1","x":0,"y":0,"w":80,"h":22}]}}"#;
+        let cells = parse_layout_cells(body);
+        let hit = menu_hit(
+            &rows,
+            &cells,
+            1,
+            4,
+            24,
+            SIDEBAR,
+            2,
+            false,
+            "w1:p1",
+            "w1",
+        )
+        .expect("w2 card");
+        assert_eq!(hit.kind, MenuKind::Workspace);
+        assert_eq!(hit.workspace, "w2");
+        assert_eq!(hit.focus, "w2:p1");
+        assert_eq!(hit.tab, "w2:t1");
+        let current = Confirm {
+            kind: ConfirmKind::Workspace,
+            pane: "w1:p1".into(),
+            tab: "w1:t1".into(),
+            workspace: "w1".into(),
+        };
+        let locked = confirm_from_target(current, Some(&hit));
+        assert_eq!(locked.workspace, "w2");
+        assert_eq!(locked.pane, "w2:p1");
+        assert_eq!(
+            close_rpc_line(locked.kind, &locked.pane, &locked.tab, &locked.workspace),
+            r#"{"op":"workspace.close","workspace":"w2"}"#
+        );
+    }
+
+    #[test]
+    fn menu_pick_and_items_lock() {
+        let pane = menu_items(MenuKind::Pane);
+        assert_eq!(pane.len(), 4);
+        assert!(pane.iter().any(|(l, _)| *l == "Tách phải"));
+        assert!(pane.iter().any(|(l, _)| *l == "Đóng ô"));
+        assert_eq!(
+            menu_pick(MenuKind::Pane, KeyCode::Char('1')),
+            MenuPick::Run(MenuVerb::SplitRight)
+        );
+        assert_eq!(
+            menu_pick(MenuKind::Pane, KeyCode::Char('4')),
+            MenuPick::Run(MenuVerb::ClosePane)
+        );
+        assert_eq!(menu_pick(MenuKind::Pane, KeyCode::Esc), MenuPick::Cancel);
+        assert_eq!(menu_pick(MenuKind::Pane, KeyCode::Char('9')), MenuPick::Ignore);
+        assert_eq!(
+            menu_pick(MenuKind::Tab, KeyCode::Char('2')),
+            MenuPick::Run(MenuVerb::CloseTab)
+        );
+        assert_eq!(
+            menu_pick(MenuKind::Workspace, KeyCode::Char('1')),
+            MenuPick::Run(MenuVerb::Picker)
+        );
+        let lines = menu_lines(MenuKind::Pane);
+        assert!(lines.iter().any(|l| l.contains("1 Tách phải")));
+        assert!(lines[0].contains("chọn  1.."));
+        let confirm = confirm_lines(ConfirmKind::Workspace);
+        assert!(confirm[0].contains("đóng cửa sổ"));
+        assert!(confirm[0].contains("y/n"));
+        assert_eq!(confirm_overlay_pick(1), ConfirmPick::Yes);
+        assert_eq!(confirm_overlay_pick(2), ConfirmPick::No);
+        assert_eq!(confirm_overlay_pick(0), ConfirmPick::Ignore);
+        let ask = &confirm_lines(ConfirmKind::Workspace)[0];
+        let byte_y = ask.find("y/n").expect("y/n") as u16;
+        assert_eq!(ask.chars().take_while(|c| *c != 'y').count() as u16, 15);
+        assert_ne!(byte_y, 15, "byte index must not be the click column");
+        assert_eq!(confirm_yn_token(ask, 15), Some(ConfirmPick::Yes));
+        assert_eq!(confirm_yn_token(ask, 17), Some(ConfirmPick::No));
+        assert_eq!(confirm_yn_token(ask, byte_y), None);
+        let foot = format!(" {}", confirm_ask(ConfirmKind::Workspace));
+        assert_eq!(confirm_yn_token(&foot, 15), Some(ConfirmPick::Yes));
+        assert_eq!(confirm_yn_token(&foot, 17), Some(ConfirmPick::No));
+        assert!(menu_items(MenuKind::Workspace)
+            .iter()
+            .any(|(label, _)| *label == "Chọn cửa sổ"));
+        assert_eq!(overlay_paint_rows(Mode::Menu, 5, 40), 5);
+        assert_eq!(overlay_paint_rows(Mode::Picker, 3, 40), 3);
+        assert_eq!(overlay_paint_rows(Mode::Confirm, 3, 40), 3);
+        assert_eq!(overlay_paint_rows(Mode::Onboard, 11, 40), 11);
+        assert_eq!(overlay_paint_rows(Mode::Help, 5, 40), 40);
     }
 
     #[test]
@@ -2145,5 +4253,222 @@ mod tests {
         let mut parser = vt100::Parser::new(4, 20, 0);
         parser.process(leftover);
         assert!(parser.screen().contents().contains("hello"));
+    }
+
+    #[test]
+    fn footer_hint_idle_is_mouse_sentence() {
+        let idle = footer_hint(Mode::Terminal, "");
+        assert!(!idle.contains("hjkl"));
+        assert!(!idle.contains("^B q"));
+        assert!(idle.contains("chuột phải"));
+        assert!(idle.contains("Ctrl-b"));
+        let prefix = footer_hint(Mode::Prefix, "ignored dump");
+        assert!(prefix.contains("rời"));
+        assert!(prefix.contains("Ctrl-b"));
+        assert!(!prefix.contains("^B"));
+        assert!(!prefix.contains("detach"));
+        assert_eq!(footer_hint(Mode::Help, help_text()), " esc đóng bảng");
+        assert!(!footer_hint(Mode::Help, help_text()).contains('\n'));
+        assert_eq!(footer_hint(Mode::Menu, "menu  1..  esc"), " 1.. chạy  esc hủy");
+        assert_eq!(
+            footer_hint(Mode::Picker, "workspace picker"),
+            " j/k chọn  enter  esc"
+        );
+        assert_eq!(footer_hint(Mode::Terminal, "đã chép"), "đã chép");
+        assert_eq!(footer_hint(Mode::Terminal, "ô cuối giữ"), "ô cuối giữ");
+        let onboard = footer_hint(Mode::Onboard, "attach failed");
+        assert!(onboard.contains("nhớ"));
+        assert!(onboard.contains("esc"));
+        assert!(!onboard.contains("tiếp"));
+        assert!(!onboard.contains("attach failed"));
+    }
+
+    #[test]
+    fn onboard_helpers_use_injected_path() {
+        let root = std::env::temp_dir().join(format!(
+            "dory-onboard-{}-{}",
+            std::process::id(),
+            "helpers"
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("onboarded");
+        assert!(!should_show_onboard(None, false));
+        assert!(!should_show_onboard(Some(&path), true));
+        assert!(should_show_onboard(Some(&path), false));
+        assert!(matches!(initial_mode(Some(&path), false), Mode::Onboard));
+        assert!(matches!(initial_mode(None, false), Mode::Terminal));
+        mark_onboarded(&path).unwrap();
+        assert!(path.is_file());
+        assert!(!fs::read(&path).unwrap().is_empty());
+        assert!(!should_show_onboard(Some(&path), false));
+        assert!(matches!(initial_mode(Some(&path), false), Mode::Terminal));
+        let blocker = root.join("not-a-dir");
+        fs::write(&blocker, b"x").unwrap();
+        let bad = blocker.join("onboarded");
+        assert!(should_show_onboard(Some(&bad), false));
+        assert!(mark_onboarded(&bad).is_err());
+        assert!(!bad.exists());
+        let as_dir = root.join("dir-flag");
+        fs::create_dir_all(&as_dir).unwrap();
+        assert!(!should_show_onboard(Some(&as_dir), false));
+        assert!(mark_onboarded(&as_dir).is_err());
+        let link = root.join("link-flag");
+        std::os::unix::fs::symlink(&path, &link).unwrap();
+        assert!(!should_show_onboard(Some(&link), false));
+        assert!(mark_onboarded(&link).is_err());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn onboard_copy_and_input_table() {
+        let lines = onboard_lines();
+        let blob = lines.join("\n");
+        assert!(blob.contains("chuột phải"));
+        assert!(!blob.contains("node bin/dory.js serve"));
+        assert!(!blob.contains(":7380"));
+        assert!(blob.contains("không ghi nhớ") || blob.contains("không ghi"));
+        assert!(overlay_paints(Mode::Onboard));
+        assert!(!overlay_paints(Mode::Terminal));
+        assert_eq!(
+            onboard_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
+            OnboardKey::Persist
+        );
+        assert_eq!(
+            onboard_key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE)),
+            OnboardKey::Persist
+        );
+        assert_eq!(
+            onboard_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)),
+            OnboardKey::Dismiss
+        );
+        assert_eq!(
+            onboard_key(KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE)),
+            OnboardKey::Eat
+        );
+        let ctrl_b = KeyEvent::new(KeyCode::Char('b'), KeyModifiers::CONTROL);
+        assert_eq!(onboard_key(ctrl_b), OnboardKey::Prefix);
+        assert_eq!(
+            onboard_mouse(MouseEventKind::Down(MouseButton::Left)),
+            OnboardMouse::Release
+        );
+        assert_eq!(
+            onboard_mouse(MouseEventKind::Down(MouseButton::Right)),
+            OnboardMouse::Release
+        );
+        assert_eq!(onboard_mouse(MouseEventKind::Moved), OnboardMouse::Eat);
+    }
+
+    #[test]
+    fn parse_tree_reads_workspace_cwd() {
+        let body = r#"{"ok":true,"result":{"focused":"w1:p1","items":[{"k":"w","id":"w1","cwd":"/home/u/flow"},{"k":"t","id":"w1:t1","cwd":"/home/u/flow"},{"k":"p","id":"w1:p1"}]}}"#;
+        let (rows, _, ws, _) = parse_tree(body);
+        assert_eq!(ws, "w1");
+        assert_eq!(rows[0].cwd, "/home/u/flow");
+        assert_eq!(rows[1].cwd, "/home/u/flow");
+        assert_eq!(workspace_cwd_name("/home/u/flow").as_deref(), Some("flow"));
+        assert_eq!(workspace_cwd_name("/").as_deref(), None);
+        assert_eq!(workspace_label(&rows, "w1"), "flow");
+        assert_eq!(tab_label(&rows, "w1", "w1:t1"), "flow");
+    }
+
+    #[test]
+    fn sidebar_wide_card_uses_cwd_basename() {
+        let mut rows = glance_rows();
+        rows[0].cwd = "/home/u/flow".into();
+        rows[4].cwd = "/tmp/other".into();
+        let model = sidebar_model(&rows, "w1", SIDEBAR, 0);
+        let cards: Vec<_> = model
+            .iter()
+            .filter(|h| matches!(h.kind, SideKind::Workspace))
+            .collect();
+        assert!(cards[0].text.contains("flow"));
+        assert!(!cards[0].text.contains("w1"));
+        assert!(cards[1].text.contains("other"));
+        assert_eq!(cards[0].workspace, "w1");
+        let fallback = sidebar_model(&glance_rows(), "w1", SIDEBAR, 0);
+        assert!(fallback.iter().any(|h| h.text.contains("w1")));
+        let picker = picker_lines(&rows, 0);
+        assert!(picker.iter().any(|l| l.contains("flow")));
+        assert!(!picker.iter().any(|l| l.contains("w1")));
+    }
+
+    #[test]
+    fn title_and_tab_chips_use_folder_names() {
+        let body = r#"{"ok":true,"result":{"focused":"w1:p1","items":[{"k":"w","id":"w1","cwd":"/home/u/flow"},{"k":"t","id":"w1:t1","cwd":"/home/u/flow"},{"k":"p","id":"w1:p1"},{"k":"t","id":"w1:t2","cwd":"/home/u/dory"},{"k":"p","id":"w1:p2"}]}}"#;
+        let (rows, _, _, _) = parse_tree(body);
+        assert_eq!(title_loc(&rows, "w1", "w1:t1", "w1:p1"), "  flow · flow · p1");
+        assert_eq!(tab_chip_text(&rows, "w1", "w1:t1", "w1:t1"), "[flow]");
+        assert_eq!(tab_chip_text(&rows, "w1", "w1:t2", "w1:t1"), " dory ");
+        assert_eq!(
+            tab_chip_at(&rows, "w1", SIDEBAR + 1, SIDEBAR).as_deref(),
+            Some("w1:p1")
+        );
+        let next = SIDEBAR + 1 + display_width("[flow]") as u16;
+        assert_eq!(tab_chip_at(&rows, "w1", next, SIDEBAR).as_deref(), Some("w1:p2"));
+        let collide = r#"{"ok":true,"result":{"focused":"w1:p1","items":[{"k":"w","id":"w1","cwd":"/tmp/flow"},{"k":"t","id":"w1:t1","cwd":"/tmp/flow"},{"k":"p","id":"w1:p1"},{"k":"w","id":"w2","cwd":"/var/flow"},{"k":"t","id":"w2:t1","cwd":"/var/flow"},{"k":"p","id":"w2:p1"},{"k":"t","id":"w2:t2","cwd":"/var/flow"},{"k":"p","id":"w2:p2"}]}}"#;
+        let (dup, _, _, _) = parse_tree(collide);
+        assert_eq!(workspace_label(&dup, "w1"), "flow w1");
+        assert_eq!(workspace_label(&dup, "w2"), "flow w2");
+        assert_eq!(tab_label(&dup, "w2", "w2:t1"), "flow t1");
+        assert_eq!(tab_label(&dup, "w2", "w2:t2"), "flow t2");
+    }
+
+    #[test]
+    fn title_chips_mark_prefix_and_zoom() {
+        assert_eq!(title_chips(Mode::Terminal, false), "");
+        assert_eq!(title_chips(Mode::Prefix, false), "  Ctrl-b");
+        assert_eq!(title_chips(Mode::Terminal, true), "  z");
+        assert_eq!(title_chips(Mode::Prefix, true), "  Ctrl-b  z");
+        let clipped = bar_line(" dory  flow · flow · p1  Ctrl-b  z", 20);
+        assert_eq!(display_width(&clipped), 19);
+        assert!(!clipped.contains('\n'));
+    }
+
+    #[test]
+    fn divider_touches_only_focused_shared_edge() {
+        let body = r#"{"ok":true,"result":{"focused":"w1:p2","cells":[{"id":"w1:p1","x":0,"y":0,"w":40,"h":22},{"id":"w1:p2","x":40,"y":0,"w":40,"h":22}]}}"#;
+        let cells = parse_layout_cells(body);
+        let edge = crate::layout::divider_at(&cells, 39, 1).expect("shared edge");
+        assert!(edge.0 == "w1:p1" || edge.1 == "w1:p1");
+        assert!(divider_touches_focus(&cells, 39, 1, "w1:p1"));
+        assert!(divider_touches_focus(&cells, 39, 1, "w1:p2"));
+        assert!(!divider_touches_focus(&cells, 39, 1, "w1:p9"));
+    }
+
+    #[test]
+    fn overlay_box_menu_follows_pointer_and_clamps() {
+        let lines = menu_lines(MenuKind::Workspace);
+        let max_w = lines.iter().map(|l| display_width(l)).max().unwrap_or(0);
+        let fit = overlay_box(Mode::Menu, lines.len(), max_w, 80, 24, SIDEBAR, 2, Some((3, 4)));
+        assert_eq!(fit.x, 3);
+        assert_eq!(fit.y, 4);
+        assert_eq!(fit.h, overlay_paint_rows(Mode::Menu, lines.len(), 21));
+        assert!(fit.w >= 8);
+        assert!(fit.x + fit.w + 1 <= 80);
+        let edge = overlay_box(
+            Mode::Menu,
+            lines.len(),
+            max_w,
+            80,
+            24,
+            SIDEBAR,
+            2,
+            Some((75, 22)),
+        );
+        assert_eq!(edge.x, 80 - edge.w - 1);
+        assert_eq!(edge.y, 24 - edge.h - 1);
+        assert!(overlay_contains(fit, 3, 4, 24));
+        assert!(!overlay_contains(fit, 3, 23, 24));
+        let confirm = overlay_box(Mode::Confirm, 3, 20, 80, 24, SIDEBAR, 2, Some((3, 4)));
+        let (ox, oy) = content_origin(SIDEBAR, 2);
+        assert_eq!(confirm.x, ox);
+        assert_eq!(confirm.y, oy);
+        assert_ne!(confirm.x, 3);
+        for mode in [Mode::Picker, Mode::Help, Mode::Onboard] {
+            let other = overlay_box(mode, 3, 20, 80, 24, SIDEBAR, 2, Some((3, 4)));
+            assert_eq!(other.x, ox);
+            assert_eq!(other.y, oy);
+        }
     }
 }
