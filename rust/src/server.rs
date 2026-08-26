@@ -925,8 +925,9 @@ fn desk_tree(world: &World) -> String {
         }
         first = false;
         items.push_str(&format!(
-            "{{\"k\":\"w\",\"id\":{}}}",
-            envelope::json_string(&ws.id)
+            "{{\"k\":\"w\",\"id\":{},\"cwd\":{}}}",
+            envelope::json_string(&ws.id),
+            envelope::json_string(&world.cwd.to_string_lossy())
         ));
         for tab in &ws.tabs {
             items.push(',');
