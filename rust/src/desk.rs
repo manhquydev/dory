@@ -18,18 +18,17 @@ use crossterm::terminal::{
 use crossterm::{execute, queue};
 use std::env;
 use std::fs::{self, OpenOptions};
-use std::io::{self, BufRead, BufReader, Read, Write};
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
+use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 const SIDEBAR: u16 = 26;
 const SIDEBAR_DOTS: u16 = 4;
 const AGENT_REGION: u16 = 6;
 const AGENT_REGION_DOTS: u16 = 4;
 const TAB_ROW: u16 = 1;
-const CONFIRM_CARD_ROWS: u16 = 3;
 const TAB_CHIP_MAX: usize = 16;
 const CTRL_B: u8 = 0x02;
 
@@ -275,6 +274,10 @@ struct Desk {
     retired_ws: Vec<String>,
     retired_tab: Vec<String>,
     retired_pane: Vec<String>,
+    flow_glance: Option<String>,
+    flow_mtime: Option<SystemTime>,
+    flow_path: Option<PathBuf>,
+    footer_dirty: bool,
 }
 
 impl Desk {
@@ -312,6 +315,10 @@ impl Desk {
             retired_ws: Vec::new(),
             retired_tab: Vec::new(),
             retired_pane: Vec::new(),
+            flow_glance: None,
+            flow_mtime: None,
+            flow_path: None,
+            footer_dirty: false,
         };
         desk.refresh_tree();
         desk.mode = initial_mode(
@@ -381,10 +388,11 @@ impl Desk {
                     Event::FocusGained | Event::FocusLost => {}
                 }
             }
-            if self.chrome_dirty || self.tiles_dirty {
+            if self.chrome_dirty || self.tiles_dirty || self.footer_dirty {
                 self.draw(out)?;
                 self.chrome_dirty = false;
                 self.tiles_dirty = false;
+                self.footer_dirty = false;
             }
         }
     }
@@ -431,6 +439,19 @@ impl Desk {
         if self.tree_sig() != before {
             self.chrome_dirty = true;
             self.tiles_dirty = true;
+        }
+        self.refresh_flow_glance();
+    }
+
+    fn refresh_flow_glance(&mut self) {
+        let path = workspace_cwd(&self.rows, &self.workspace).map(flow_journal_path);
+        if poll_flow_glance(
+            path.as_deref(),
+            &mut self.flow_glance,
+            &mut self.flow_mtime,
+            &mut self.flow_path,
+        ) {
+            self.footer_dirty = true;
         }
     }
 
@@ -664,10 +685,10 @@ impl Desk {
     }
 
     fn handle_confirm(&mut self, key: KeyEvent) -> bool {
-        match key.code {
-            KeyCode::Char('y' | 'Y' | '1') | KeyCode::Enter => self.confirm_yes(),
-            KeyCode::Char('n' | 'N' | '2') | KeyCode::Esc => self.confirm_no(),
-            _ => {}
+        match confirm_key(key.code) {
+            ConfirmPick::Yes => self.confirm_yes(),
+            ConfirmPick::No => self.confirm_no(),
+            ConfirmPick::Ignore => {}
         }
         false
     }
@@ -725,21 +746,24 @@ impl Desk {
                 }
                 self.chrome_dirty = true;
             }
-            KeyCode::Enter => {
-                if let Some(ws) = spaces.get(self.picker_idx) {
-                    if let Some(pane) = first_pane_of(&self.rows, ws) {
-                        self.zoomed = false;
-                        self.focus_tile(&pane);
-                        self.reconcile_tiles();
-                    }
-                }
-                self.close_picker();
-            }
+            KeyCode::Enter => self.picker_enter(),
             KeyCode::Esc => {
                 self.close_picker();
             }
             _ => {}
         }
+    }
+
+    fn picker_enter(&mut self) {
+        let spaces = workspaces_of(&self.rows);
+        if let Some(ws) = spaces.get(self.picker_idx) {
+            if let Some(pane) = first_pane_of(&self.rows, ws) {
+                self.zoomed = false;
+                self.focus_tile(&pane);
+                self.reconcile_tiles();
+            }
+        }
+        self.close_picker();
     }
 
     fn prefix_cmd(&mut self, key: KeyEvent) -> bool {
@@ -993,34 +1017,24 @@ impl Desk {
             MouseEventKind::Down(btn) => {
                 let side = self.sidebar_cols;
                 let top = self.top_rows;
-                let (origin_x, origin_y) = content_origin(side, top);
-                if mouse.row + 1 >= self.rows_n {
-                    match confirm_yn_token(&format!(" {}", self.status), mouse.column) {
-                        Some(ConfirmPick::Yes) => self.confirm_yes(),
-                        Some(ConfirmPick::No) => self.confirm_no(),
-                        Some(ConfirmPick::Ignore) | None => {}
-                    }
-                    return false;
-                }
-                let in_card = mouse.column >= origin_x
-                    && mouse.row >= origin_y
-                    && mouse.row.saturating_sub(origin_y) < CONFIRM_CARD_ROWS;
-                if in_card {
-                    let overlay_row = mouse.row.saturating_sub(origin_y);
-                    let pick = confirm_overlay_pick(overlay_row);
-                    let pick = if pick == ConfirmPick::Ignore {
-                        let ask = self
-                            .confirm
-                            .as_ref()
-                            .map(|c| confirm_lines(c.kind))
-                            .and_then(|lines| lines.into_iter().next())
-                            .unwrap_or_default();
-                        confirm_yn_token(&ask, mouse.column.saturating_sub(origin_x))
-                            .unwrap_or(ConfirmPick::Ignore)
-                    } else {
-                        pick
-                    };
-                    match pick {
+                let lines = self
+                    .confirm
+                    .as_ref()
+                    .map(|c| confirm_lines(c.kind))
+                    .unwrap_or_default();
+                let max_line_w = lines.iter().map(|l| display_width(l)).max().unwrap_or(0);
+                let card = overlay_box(
+                    Mode::Confirm,
+                    lines.len(),
+                    max_line_w,
+                    self.cols,
+                    self.rows_n,
+                    side,
+                    top,
+                    None,
+                );
+                if overlay_contains(card, mouse.column, mouse.row, self.rows_n) {
+                    match confirm_overlay_pick(mouse.row.saturating_sub(card.y)) {
                         ConfirmPick::Yes => self.confirm_yes(),
                         ConfirmPick::No => self.confirm_no(),
                         ConfirmPick::Ignore => {}
@@ -1062,17 +1076,26 @@ impl Desk {
             MouseEventKind::Down(btn) => {
                 let side = self.sidebar_cols;
                 let top = self.top_rows;
-                let (origin_x, origin_y) = content_origin(side, top);
-                let card_h = overlay_paint_rows(
+                let lines = picker_lines(&self.rows, self.picker_idx);
+                let max_line_w = lines.iter().map(|l| display_width(l)).max().unwrap_or(0);
+                let card = overlay_box(
                     Mode::Picker,
-                    picker_lines(&self.rows, self.picker_idx).len(),
-                    self.rows_n.saturating_sub(self.top_rows + 1),
+                    lines.len(),
+                    max_line_w,
+                    self.cols,
+                    self.rows_n,
+                    side,
+                    top,
+                    None,
                 );
-                let in_card = mouse.column >= origin_x
-                    && mouse.row >= origin_y
-                    && mouse.row.saturating_sub(origin_y) < card_h
-                    && mouse.row + 1 < self.rows_n;
-                if in_card {
+                if overlay_contains(card, mouse.column, mouse.row, self.rows_n) {
+                    let overlay_row = mouse.row.saturating_sub(card.y);
+                    if let Some(idx) =
+                        picker_mouse_pick(overlay_row, workspaces_of(&self.rows).len())
+                    {
+                        self.picker_idx = idx;
+                        self.picker_enter();
+                    }
                     return false;
                 }
                 self.close_picker();
@@ -1390,7 +1413,7 @@ impl Desk {
     }
 
     fn ask_confirm_target(&mut self, confirm: Confirm) {
-        self.status = confirm_ask(confirm.kind).to_string();
+        self.status.clear();
         self.confirm = Some(confirm);
         self.mode = Mode::Confirm;
         self.chrome_dirty = true;
@@ -1447,7 +1470,7 @@ impl Desk {
             }
             Ok(body) => {
                 self.status = if body.contains("last live pane") {
-                    "ô cuối giữ".to_string()
+                    last_room_copy(kind).to_string()
                 } else {
                     "không đóng".to_string()
                 };
@@ -1511,6 +1534,8 @@ impl Desk {
             self.draw_title(out, cols)?;
             self.draw_tab_bar(out, cols)?;
             self.draw_sidebar(out, rows)?;
+            self.draw_footer(out, cols, rows)?;
+        } else if self.footer_dirty {
             self.draw_footer(out, cols, rows)?;
         }
         if self.tiles_dirty {
@@ -1769,7 +1794,7 @@ impl Desk {
     }
 
     fn draw_footer(&self, out: &mut io::Stdout, cols: u16, rows: u16) -> io::Result<()> {
-        let hint = footer_hint(self.mode, &self.status);
+        let hint = footer_line(self.mode, &self.status, self.flow_glance.as_deref());
         let line = bar_line(&format!(" {hint}"), cols);
         queue!(
             out,
@@ -2038,6 +2063,321 @@ fn slice_object(s: &str) -> Option<&str> {
     None
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct FlowGlance {
+    code: Option<i32>,
+    arg0: String,
+    error: Option<String>,
+}
+
+struct Jc<'a> {
+    inner: std::iter::Peekable<std::str::Chars<'a>>,
+}
+
+impl<'a> Jc<'a> {
+    fn new(s: &'a str) -> Self {
+        Self {
+            inner: s.chars().peekable(),
+        }
+    }
+
+    fn peek(&mut self) -> Option<char> {
+        self.inner.peek().copied()
+    }
+
+    fn bump(&mut self) -> Option<char> {
+        self.inner.next()
+    }
+
+    fn skip_ws(&mut self) {
+        while matches!(self.peek(), Some(' ' | '\t' | '\n' | '\r')) {
+            self.bump();
+        }
+    }
+
+    fn eat(&mut self, want: char) -> Option<()> {
+        if self.peek() == Some(want) {
+            self.bump();
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn eat_lit(&mut self, lit: &str) -> Option<()> {
+        for c in lit.chars() {
+            self.eat(c)?;
+        }
+        Some(())
+    }
+
+    fn hex4(&mut self) -> Option<u32> {
+        let mut n = 0u32;
+        for _ in 0..4 {
+            let d = self.bump()?;
+            n = (n << 4)
+                + match d {
+                    '0'..='9' => u32::from(d as u8 - b'0'),
+                    'a'..='f' => u32::from(d as u8 - b'a' + 10),
+                    'A'..='F' => u32::from(d as u8 - b'A' + 10),
+                    _ => return None,
+                };
+        }
+        Some(n)
+    }
+
+    fn string(&mut self) -> Option<String> {
+        self.eat('"')?;
+        let mut out = String::new();
+        loop {
+            let c = self.bump()?;
+            match c {
+                '"' => return Some(out),
+                '\\' => match self.bump()? {
+                    '"' => out.push('"'),
+                    '\\' => out.push('\\'),
+                    'n' => out.push('\n'),
+                    'r' => out.push('\r'),
+                    't' => out.push('\t'),
+                    'u' => {
+                        let n = self.hex4()?;
+                        out.push(char::from_u32(n)?);
+                    }
+                    _ => return None,
+                },
+                c if (c as u32) >= 0x20 => out.push(c),
+                _ => return None,
+            }
+        }
+    }
+
+    fn skip_number(&mut self) -> Option<()> {
+        let _ = self.eat('-');
+        let mut any = false;
+        while matches!(self.peek(), Some('0'..='9')) {
+            any = true;
+            self.bump();
+        }
+        if self.peek() == Some('.') {
+            self.bump();
+            while matches!(self.peek(), Some('0'..='9')) {
+                self.bump();
+            }
+        }
+        if matches!(self.peek(), Some('e' | 'E')) {
+            self.bump();
+            let _ = self.eat('+');
+            let _ = self.eat('-');
+            while matches!(self.peek(), Some('0'..='9')) {
+                self.bump();
+            }
+        }
+        if any { Some(()) } else { None }
+    }
+
+    fn i32_or_null(&mut self) -> Option<Option<i32>> {
+        self.skip_ws();
+        if self.peek() == Some('n') {
+            self.eat_lit("null")?;
+            return Some(None);
+        }
+        let neg = self.eat('-').is_some();
+        let mut raw = String::new();
+        while matches!(self.peek(), Some('0'..='9')) {
+            raw.push(self.bump()?);
+        }
+        if raw.is_empty() {
+            return None;
+        }
+        let mut n: i32 = raw.parse().ok()?;
+        if neg {
+            n = n.checked_neg()?;
+        }
+        Some(Some(n))
+    }
+
+    fn skip_value(&mut self) -> Option<()> {
+        self.skip_ws();
+        match self.peek()? {
+            '"' => {
+                self.string()?;
+                Some(())
+            }
+            '{' => self.skip_object(),
+            '[' => self.skip_array(),
+            't' => self.eat_lit("true"),
+            'f' => self.eat_lit("false"),
+            'n' => self.eat_lit("null"),
+            '-' | '0'..='9' => self.skip_number(),
+            _ => None,
+        }
+    }
+
+    fn skip_object(&mut self) -> Option<()> {
+        self.eat('{')?;
+        loop {
+            self.skip_ws();
+            if self.eat('}').is_some() {
+                return Some(());
+            }
+            self.string()?;
+            self.skip_ws();
+            self.eat(':')?;
+            self.skip_value()?;
+            self.skip_ws();
+            if self.eat(',').is_some() {
+                continue;
+            }
+            self.eat('}')?;
+            return Some(());
+        }
+    }
+
+    fn skip_array(&mut self) -> Option<()> {
+        self.eat('[')?;
+        loop {
+            self.skip_ws();
+            if self.eat(']').is_some() {
+                return Some(());
+            }
+            self.skip_value()?;
+            self.skip_ws();
+            if self.eat(',').is_some() {
+                continue;
+            }
+            self.eat(']')?;
+            return Some(());
+        }
+    }
+
+    fn first_array_string(&mut self) -> Option<String> {
+        self.skip_ws();
+        self.eat('[')?;
+        self.skip_ws();
+        if self.eat(']').is_some() {
+            return Some(String::new());
+        }
+        let first = if self.peek() == Some('"') {
+            self.string()?
+        } else {
+            self.skip_value()?;
+            String::new()
+        };
+        loop {
+            self.skip_ws();
+            if self.eat(']').is_some() {
+                return Some(first);
+            }
+            if self.eat(',').is_some() {
+                self.skip_value()?;
+                continue;
+            }
+            return None;
+        }
+    }
+}
+
+fn with_top_value<T>(obj: &str, key: &str, f: impl FnOnce(&mut Jc<'_>) -> Option<T>) -> Option<T> {
+    let mut jc = Jc::new(obj);
+    jc.skip_ws();
+    jc.eat('{')?;
+    loop {
+        jc.skip_ws();
+        if jc.eat('}').is_some() {
+            return None;
+        }
+        let k = jc.string()?;
+        jc.skip_ws();
+        jc.eat(':')?;
+        jc.skip_ws();
+        if k == key {
+            return f(&mut jc);
+        }
+        jc.skip_value()?;
+        jc.skip_ws();
+        if jc.eat(',').is_some() {
+            continue;
+        }
+        jc.eat('}')?;
+        return None;
+    }
+}
+
+fn top_json_string(obj: &str, key: &str) -> Option<String> {
+    with_top_value(obj, key, |jc| match jc.peek()? {
+        '"' => jc.string(),
+        'n' => {
+            jc.eat_lit("null")?;
+            None
+        }
+        _ => None,
+    })
+}
+
+fn top_json_i32(obj: &str, key: &str) -> Option<i32> {
+    with_top_value(obj, key, |jc| jc.i32_or_null())?
+}
+
+fn top_json_first_arg(obj: &str) -> Option<String> {
+    with_top_value(obj, "args", |jc| jc.first_array_string())
+}
+
+fn flow_glance_from_obj(obj: &str) -> Option<FlowGlance> {
+    let mut jc = Jc::new(obj);
+    jc.skip_ws();
+    jc.eat('{')?;
+    let mut typ = None;
+    loop {
+        jc.skip_ws();
+        if jc.eat('}').is_some() {
+            break;
+        }
+        let key = jc.string()?;
+        jc.skip_ws();
+        jc.eat(':')?;
+        jc.skip_ws();
+        if key == "type" {
+            typ = Some(jc.string()?);
+        } else {
+            jc.skip_value()?;
+        }
+        jc.skip_ws();
+        if jc.eat(',').is_some() {
+            continue;
+        }
+        if jc.eat('}').is_some() {
+            break;
+        }
+        return None;
+    }
+    if typ.as_deref() != Some("flow/result") {
+        return None;
+    }
+    Some(FlowGlance {
+        code: top_json_i32(obj, "code"),
+        arg0: top_json_first_arg(obj).unwrap_or_default(),
+        error: top_json_string(obj, "error").filter(|s| !s.is_empty()),
+    })
+}
+
+fn last_flow_result_bytes(buf: &[u8]) -> Option<FlowGlance> {
+    for raw in buf.rsplit(|&b| b == b'\n') {
+        if raw.is_empty() {
+            continue;
+        }
+        let Ok(text) = std::str::from_utf8(raw) else {
+            continue;
+        };
+        let Some(obj) = slice_object(text.trim_start()) else {
+            continue;
+        };
+        if let Some(g) = flow_glance_from_obj(obj) {
+            return Some(g);
+        }
+    }
+    None
+}
+
 fn parse_item(obj: &str) -> Option<Item> {
     let k = attach::json_string_field(obj, "k")?;
     let id = attach::json_string_field(obj, "id")?;
@@ -2253,7 +2593,12 @@ fn overlay_box(
         }
     }
     let (x, y) = content_origin(sidebar, top);
-    let w = cols.saturating_sub(x).saturating_sub(1);
+    let cap = cols.saturating_sub(x).saturating_sub(1);
+    let w = if matches!(mode, Mode::Confirm | Mode::Picker) {
+        (max_line_w as u16).max(8).min(cap)
+    } else {
+        cap
+    };
     OverlayBox { x, y, w, h }
 }
 
@@ -2373,6 +2718,19 @@ fn row_cwd<'a>(rows: &'a [Row], kind: char, id: &str) -> &'a str {
         .find(|r| r.kind == kind && r.id == id)
         .map(|r| r.cwd.as_str())
         .unwrap_or("")
+}
+
+fn workspace_cwd<'a>(rows: &'a [Row], workspace: &str) -> Option<&'a str> {
+    rows.iter()
+        .find(|r| r.kind == 'w' && r.id == workspace && !r.cwd.is_empty())
+        .map(|r| r.cwd.as_str())
+}
+
+fn flow_journal_path(cwd: &str) -> PathBuf {
+    Path::new(cwd)
+        .join(".dory")
+        .join("sessions")
+        .join("s1.jsonl")
 }
 
 fn folder_label(cwd: &str, id: &str) -> String {
@@ -2906,9 +3264,9 @@ fn menu_lines(kind: MenuKind) -> Vec<String> {
 
 fn confirm_ask(kind: ConfirmKind) -> &'static str {
     match kind {
-        ConfirmKind::Pane => "đóng ô?  y/n  esc",
-        ConfirmKind::Tab => "đóng thẻ?  y/n  esc",
-        ConfirmKind::Workspace => "đóng cửa sổ?  y/n  esc",
+        ConfirmKind::Pane => "đóng ô?",
+        ConfirmKind::Tab => "đóng thẻ?",
+        ConfirmKind::Workspace => "đóng cửa sổ?",
     }
 }
 
@@ -2928,37 +3286,12 @@ fn confirm_overlay_pick(overlay_row: u16) -> ConfirmPick {
     }
 }
 
-fn term_cells(c: char) -> u16 {
-    // Crossterm mouse.column is terminal cells. Vietnamese NFC letters are
-    // one cell. Do not use UTF-8 byte index or display_width (non-ASCII=2).
-    if c.is_ascii() || !c.is_control() {
-        1
-    } else {
-        0
+fn confirm_key(code: KeyCode) -> ConfirmPick {
+    match code {
+        KeyCode::Char('y' | 'Y' | '1') | KeyCode::Enter => ConfirmPick::Yes,
+        KeyCode::Char('n' | 'N' | '2') | KeyCode::Esc => ConfirmPick::No,
+        _ => ConfirmPick::Ignore,
     }
-}
-
-fn confirm_yn_token(text: &str, col: u16) -> Option<ConfirmPick> {
-    let chars: Vec<char> = text.chars().collect();
-    let mut cells = 0u16;
-    let mut i = 0;
-    while i + 2 < chars.len() {
-        if chars[i].eq_ignore_ascii_case(&'y')
-            && chars[i + 1] == '/'
-            && chars[i + 2].eq_ignore_ascii_case(&'n')
-        {
-            if col == cells {
-                return Some(ConfirmPick::Yes);
-            }
-            if col == cells + 2 {
-                return Some(ConfirmPick::No);
-            }
-            return None;
-        }
-        cells = cells.saturating_add(term_cells(chars[i]));
-        i += 1;
-    }
-    None
 }
 
 fn menu_hit(
@@ -3057,8 +3390,15 @@ fn close_rpc_line(kind: ConfirmKind, pane: &str, tab: &str, workspace: &str) -> 
     }
 }
 
+fn last_room_copy(kind: ConfirmKind) -> &'static str {
+    match kind {
+        ConfirmKind::Workspace => "cửa sổ cuối giữ",
+        _ => "ô cuối giữ",
+    }
+}
+
 const PREFIX_FOOTER: &str =
-    " Ctrl-b — q rời  c thẻ  n/p thẻ  w chọn  Shift-n cửa sổ  x đóng  ? bảng";
+    " Ctrl-b. q rời  c thẻ  n/p thẻ  w chọn  Shift-n cửa sổ  x đóng  ? bảng";
 
 fn footer_hint(mode: Mode, status: &str) -> &str {
     match mode {
@@ -3067,9 +3407,62 @@ fn footer_hint(mode: Mode, status: &str) -> &str {
         Mode::Help => " esc đóng bảng",
         Mode::Menu => " 1.. chạy  esc hủy",
         Mode::Picker => " j/k chọn  enter  esc",
+        Mode::Confirm => " 1 có  2 không  esc",
         _ if !status.is_empty() => status,
         _ => " chuột phải menu  kéo≥2 copy  Ctrl-b prefix",
     }
+}
+
+fn footer_line<'a>(mode: Mode, status: &'a str, glance: Option<&'a str>) -> &'a str {
+    if mode == Mode::Terminal && status.is_empty() {
+        if let Some(g) = glance {
+            if !g.is_empty() {
+                return g;
+            }
+        }
+    }
+    footer_hint(mode, status)
+}
+
+fn clip_glance(s: &str) -> String {
+    s.chars()
+        .map(|c| {
+            let u = c as u32;
+            if u < 0x20
+                || u == 0x7F
+                || (0x80..=0x9F).contains(&u)
+                || (0x202A..=0x202E).contains(&u)
+                || (0x2066..=0x2069).contains(&u)
+                || u == 0x200E
+                || u == 0x200F
+                || u == 0x061C
+                || u == 0x2028
+                || u == 0x2029
+            {
+                ' '
+            } else {
+                c
+            }
+        })
+        .collect()
+}
+
+fn flow_glance_line(g: &FlowGlance) -> String {
+    let payload = g.arg0.as_str();
+    let raw = if let Some(err) = g.error.as_deref().filter(|e| !e.is_empty()) {
+        format!("Flow lỗi. {err}")
+    } else if let Some(n) = g.code {
+        if payload.is_empty() {
+            format!("Flow {n}.")
+        } else {
+            format!("Flow {n}. {payload}")
+        }
+    } else if payload.is_empty() {
+        "Flow.".to_string()
+    } else {
+        format!("Flow. {payload}")
+    };
+    clip_glance(&raw)
 }
 
 fn overlay_paints(mode: Mode) -> bool {
@@ -3107,6 +3500,67 @@ fn onboard_meta(path: &Path) -> io::Result<fs::Metadata> {
 
 fn is_regular_file(meta: &fs::Metadata) -> bool {
     meta.file_type().is_file()
+}
+
+fn last_flow_result(path: &Path) -> Option<FlowGlance> {
+    let meta = fs::symlink_metadata(path).ok()?;
+    if !is_regular_file(&meta) {
+        return None;
+    }
+    let mut file = OpenOptions::new()
+        .read(true)
+        .custom_flags(0o400000 | 0o4000)
+        .open(path)
+        .ok()?;
+    let opened = file.metadata().ok()?;
+    if !is_regular_file(&opened) {
+        return None;
+    }
+    if opened.dev() != meta.dev() || opened.ino() != meta.ino() {
+        return None;
+    }
+    let len = opened.len();
+    file.seek(SeekFrom::Start(len.saturating_sub(65536))).ok()?;
+    let mut buf = Vec::new();
+    file.take(65536).read_to_end(&mut buf).ok()?;
+    last_flow_result_bytes(&buf)
+}
+
+fn poll_flow_glance(
+    path: Option<&Path>,
+    prev: &mut Option<String>,
+    mtime: &mut Option<SystemTime>,
+    cached_path: &mut Option<PathBuf>,
+) -> bool {
+    let Some(path) = path else {
+        let dirty = prev.is_some();
+        *prev = None;
+        *mtime = None;
+        *cached_path = None;
+        return dirty;
+    };
+    let meta = match fs::symlink_metadata(path) {
+        Ok(m) => m,
+        Err(_) => {
+            let dirty = prev.is_some();
+            *prev = None;
+            *mtime = None;
+            *cached_path = None;
+            return dirty;
+        }
+    };
+    let new_mtime = meta.modified().ok();
+    if cached_path.as_deref() == Some(path) && new_mtime.is_some() && new_mtime == *mtime {
+        return false;
+    }
+    let next = last_flow_result(path)
+        .map(|g| flow_glance_line(&g))
+        .filter(|s| !s.is_empty());
+    let dirty = next.as_deref() != prev.as_deref();
+    *prev = next;
+    *mtime = new_mtime;
+    *cached_path = Some(path.to_path_buf());
+    dirty
 }
 
 fn onboarded_file_done(path: &Path) -> bool {
@@ -3186,7 +3640,7 @@ fn mark_onboarded(path: &Path) -> io::Result<()> {
 fn onboard_lines() -> Vec<String> {
     vec![
         "dory".to_string(),
-        "chỗ ngồi — chuột trước, prefix sau".to_string(),
+        "chỗ ngồi. chuột trước, prefix sau".to_string(),
         String::new(),
         "chuột phải ô / chip thẻ / card cửa sổ = menu".to_string(),
         "kéo ≥2 ô = copy".to_string(),
@@ -3247,6 +3701,14 @@ fn picker_lines(rows: &[Row], idx: usize) -> Vec<String> {
         lines.push(format!("{mark} {}", workspace_label(rows, &ws)));
     }
     lines
+}
+
+fn picker_mouse_pick(overlay_row: u16, n: usize) -> Option<usize> {
+    if overlay_row == 0 || n == 0 {
+        None
+    } else {
+        Some((overlay_row as usize - 1).min(n - 1))
+    }
 }
 
 fn cell_drag_span(a: (u16, u16), b: (u16, u16)) -> u32 {
@@ -4218,20 +4680,11 @@ mod tests {
         assert!(lines[0].contains("chọn  1.."));
         let confirm = confirm_lines(ConfirmKind::Workspace);
         assert!(confirm[0].contains("đóng cửa sổ"));
-        assert!(confirm[0].contains("y/n"));
+        assert!(!confirm[0].contains("y/n"));
+        assert!(!confirm.iter().any(|l| l.contains("y/n")));
         assert_eq!(confirm_overlay_pick(1), ConfirmPick::Yes);
         assert_eq!(confirm_overlay_pick(2), ConfirmPick::No);
         assert_eq!(confirm_overlay_pick(0), ConfirmPick::Ignore);
-        let ask = &confirm_lines(ConfirmKind::Workspace)[0];
-        let byte_y = ask.find("y/n").expect("y/n") as u16;
-        assert_eq!(ask.chars().take_while(|c| *c != 'y').count() as u16, 15);
-        assert_ne!(byte_y, 15, "byte index must not be the click column");
-        assert_eq!(confirm_yn_token(ask, 15), Some(ConfirmPick::Yes));
-        assert_eq!(confirm_yn_token(ask, 17), Some(ConfirmPick::No));
-        assert_eq!(confirm_yn_token(ask, byte_y), None);
-        let foot = format!(" {}", confirm_ask(ConfirmKind::Workspace));
-        assert_eq!(confirm_yn_token(&foot, 15), Some(ConfirmPick::Yes));
-        assert_eq!(confirm_yn_token(&foot, 17), Some(ConfirmPick::No));
         assert!(menu_items(MenuKind::Workspace)
             .iter()
             .any(|(label, _)| *label == "Chọn cửa sổ"));
@@ -4276,6 +4729,14 @@ mod tests {
         );
         assert_eq!(footer_hint(Mode::Terminal, "đã chép"), "đã chép");
         assert_eq!(footer_hint(Mode::Terminal, "ô cuối giữ"), "ô cuối giữ");
+        assert_eq!(
+            footer_hint(Mode::Confirm, "ignored"),
+            " 1 có  2 không  esc"
+        );
+        assert_ne!(
+            footer_hint(Mode::Confirm, "ignored"),
+            confirm_ask(ConfirmKind::Pane)
+        );
         let onboard = footer_hint(Mode::Onboard, "attach failed");
         assert!(onboard.contains("nhớ"));
         assert!(onboard.contains("esc"));
@@ -4465,10 +4926,269 @@ mod tests {
         assert_eq!(confirm.x, ox);
         assert_eq!(confirm.y, oy);
         assert_ne!(confirm.x, 3);
-        for mode in [Mode::Picker, Mode::Help, Mode::Onboard] {
+        let cap = 80u16.saturating_sub(ox).saturating_sub(1);
+        assert_eq!(confirm.w, 20u16.max(8).min(cap));
+        let picker = overlay_box(Mode::Picker, 3, 20, 80, 24, SIDEBAR, 2, Some((3, 4)));
+        assert_eq!(picker.x, ox);
+        assert_eq!(picker.y, oy);
+        assert_eq!(picker.w, 20u16.max(8).min(cap));
+        for mode in [Mode::Help, Mode::Onboard] {
             let other = overlay_box(mode, 3, 20, 80, 24, SIDEBAR, 2, Some((3, 4)));
             assert_eq!(other.x, ox);
             assert_eq!(other.y, oy);
+            assert_eq!(other.w, cap);
         }
+    }
+
+    #[test]
+    fn overlay_grammar_copy_hits_and_keys() {
+        assert_eq!(
+            footer_hint(Mode::Confirm, "ignored"),
+            " 1 có  2 không  esc"
+        );
+        for kind in [ConfirmKind::Pane, ConfirmKind::Tab, ConfirmKind::Workspace] {
+            let blob = confirm_lines(kind).join("\n");
+            assert!(!blob.contains("y/n"));
+            assert!(!confirm_ask(kind).contains("y/n"));
+        }
+        assert_eq!(picker_mouse_pick(1, 3), Some(0));
+        assert_eq!(picker_mouse_pick(0, 3), None);
+        assert_eq!(picker_mouse_pick(2, 3), Some(1));
+        let lines = confirm_lines(ConfirmKind::Pane);
+        let max_w = lines.iter().map(|l| display_width(l)).max().unwrap_or(0);
+        let card = overlay_box(Mode::Confirm, lines.len(), max_w, 80, 24, SIDEBAR, 2, None);
+        let (ox, oy) = content_origin(SIDEBAR, 2);
+        assert_eq!((card.x, card.y), (ox, oy));
+        assert!(overlay_contains(card, card.x, card.y + 1, 24));
+        assert!(!overlay_contains(
+            card,
+            card.x.saturating_add(card.w),
+            card.y + 1,
+            24
+        ));
+        assert!(!PREFIX_FOOTER.contains('—'));
+        assert!(!onboard_lines()[1].contains('—'));
+        assert_eq!(empty_dash(""), "—");
+        assert_eq!(last_room_copy(ConfirmKind::Workspace), "cửa sổ cuối giữ");
+        assert_eq!(last_room_copy(ConfirmKind::Pane), "ô cuối giữ");
+        assert_eq!(last_room_copy(ConfirmKind::Tab), "ô cuối giữ");
+        assert_eq!(confirm_key(KeyCode::Char('y')), ConfirmPick::Yes);
+        assert_eq!(confirm_key(KeyCode::Char('Y')), ConfirmPick::Yes);
+        assert_eq!(confirm_key(KeyCode::Char('1')), ConfirmPick::Yes);
+        assert_eq!(confirm_key(KeyCode::Enter), ConfirmPick::Yes);
+        assert_eq!(confirm_key(KeyCode::Char('n')), ConfirmPick::No);
+        assert_eq!(confirm_key(KeyCode::Char('N')), ConfirmPick::No);
+        assert_eq!(confirm_key(KeyCode::Char('2')), ConfirmPick::No);
+        assert_eq!(confirm_key(KeyCode::Esc), ConfirmPick::No);
+    }
+
+    fn glance_tmp(tag: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(format!(
+            "dory-flow-glance-{}-{tag}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join(".dory").join("sessions")).unwrap();
+        root
+    }
+
+    fn glance_journal(root: &Path) -> PathBuf {
+        root.join(".dory").join("sessions").join("s1.jsonl")
+    }
+
+    #[test]
+    fn last_flow_result_skips_missing_invoke_and_broken() {
+        let missing = PathBuf::from("/no/such/dory-flow-glance.jsonl");
+        assert!(last_flow_result(&missing).is_none());
+        assert!(last_flow_result_bytes(b"{\"type\":\"flow/invoke\",\"args\":[\"code\"]}\n").is_none());
+        assert!(last_flow_result_bytes(b"{not json\n").is_none());
+        assert!(last_flow_result_bytes(b"{\"type\":\"flow/result\",\"error\":\"unterminated\n").is_none());
+    }
+
+    #[test]
+    fn last_flow_result_picks_final_code_and_ignores_stdout_keys() {
+        let two = concat!(
+            r#"{"type":"flow/result","args":["first"],"code":1}"#,
+            "\n",
+            r#"{"type":"flow/result","args":["code"],"code":0}"#,
+            "\n"
+        );
+        let g = last_flow_result_bytes(two.as_bytes()).unwrap();
+        assert_eq!(g.code, Some(0));
+        assert_eq!(flow_glance_line(&g), "Flow 0. code");
+        let seven = last_flow_result_bytes(br#"{"type":"flow/result","code":7}"#).unwrap();
+        assert_eq!(seven.code, Some(7));
+        assert_eq!(flow_glance_line(&seven), "Flow 7.");
+        let nested = last_flow_result_bytes(
+            br#"{"type":"flow/result","stdout":"{\"code\":99}","code":0}"#,
+        )
+        .unwrap();
+        assert_eq!(nested.code, Some(0));
+        assert_eq!(flow_glance_line(&nested), "Flow 0.");
+        let pwn = last_flow_result_bytes(
+            br#"{"type":"flow/result","stdout":"{\"error\":\"pwn\"}","code":0}"#,
+        )
+        .unwrap();
+        let line = flow_glance_line(&pwn);
+        assert_eq!(line, "Flow 0.");
+        assert!(!line.contains("lỗi"));
+        let timeout = last_flow_result_bytes(
+            br#"{"type":"flow/result","code":null,"error":"timed out after 15000ms"}"#,
+        )
+        .unwrap();
+        assert_eq!(timeout.code, None);
+        assert_eq!(
+            flow_glance_line(&timeout),
+            "Flow lỗi. timed out after 15000ms"
+        );
+        let obj = r#"{"type":"flow/result","args":["code"],"code":0}"#;
+        assert_eq!(top_json_first_arg(obj).as_deref(), Some("code"));
+        assert_eq!(top_json_i32(obj, "code"), Some(0));
+        assert_eq!(top_json_string(obj, "type").as_deref(), Some("flow/result"));
+        assert_eq!(top_json_i32(r#"{"code":null}"#, "code"), None);
+    }
+
+    #[test]
+    fn clip_glance_keeps_vietnamese_and_strips_controls() {
+        let nl = last_flow_result_bytes(
+            br#"{"type":"flow/result","args":["a\nb"],"code":0}"#,
+        )
+        .unwrap();
+        let nl_line = flow_glance_line(&nl);
+        assert!(!nl_line.contains('\n'));
+        let esc = last_flow_result_bytes(
+            br#"{"type":"flow/result","code":null,"error":"\u001b[2J"}"#,
+        )
+        .unwrap();
+        let esc_line = flow_glance_line(&esc);
+        assert!(!esc_line.contains('\u{1b}'));
+        let loi = last_flow_result_bytes(
+            "{\"type\":\"flow/result\",\"code\":null,\"error\":\"lỗi\"}".as_bytes(),
+        )
+        .unwrap();
+        assert_eq!(flow_glance_line(&loi), "Flow lỗi. lỗi");
+        let da = last_flow_result_bytes(
+            "{\"type\":\"flow/result\",\"args\":[\"đã\"],\"code\":0}".as_bytes(),
+        )
+        .unwrap();
+        assert_eq!(flow_glance_line(&da), "Flow 0. đã");
+        let mixed = format!(
+            "{{\"type\":\"flow/result\",\"code\":null,\"error\":\"lỗi{}{}{}\"}}",
+            '\u{2028}', '\u{009B}', '\u{202E}'
+        );
+        let g = last_flow_result_bytes(mixed.as_bytes()).unwrap();
+        let line = flow_glance_line(&g);
+        assert!(line.contains("lỗi"));
+        assert!(!line.contains('\u{2028}'));
+        assert!(!line.contains('\u{009B}'));
+        assert!(!line.contains('\u{202E}'));
+        assert!(line.contains(' '));
+    }
+
+    #[test]
+    fn last_flow_result_reads_small_and_tail_and_rejects_special_files() {
+        let root = glance_tmp("io");
+        let path = glance_journal(&root);
+        fs::write(
+            &path,
+            concat!(
+                r#"{"type":"flow/invoke","args":["code"]}"#,
+                "\n",
+                r#"{"type":"flow/result","args":["code"],"code":0}"#,
+                "\n"
+            ),
+        )
+        .unwrap();
+        let small = last_flow_result(&path).unwrap();
+        assert_eq!(flow_glance_line(&small), "Flow 0. code");
+        let mut big = Vec::new();
+        while big.len() < 70_000 {
+            big.extend_from_slice(b"{\"type\":\"flow/invoke\",\"args\":[]}\n");
+        }
+        big.extend_from_slice(br#"{"type":"flow/result","args":["tail"],"code":7}"#);
+        big.push(b'\n');
+        fs::write(&path, &big).unwrap();
+        let tail = last_flow_result(&path).unwrap();
+        assert_eq!(flow_glance_line(&tail), "Flow 7. tail");
+        assert!(last_flow_result(&path).is_some());
+        fs::remove_file(&path).unwrap();
+        assert!(last_flow_result(&path).is_none());
+        fs::write(&path, br#"{"type":"flow/result","code":0}"#).unwrap();
+        let mut glance = last_flow_result(&path).map(|g| flow_glance_line(&g));
+        let mut mtime = fs::symlink_metadata(&path)
+            .ok()
+            .and_then(|m| m.modified().ok());
+        let mut cached = Some(path.clone());
+        assert!(glance.is_some());
+        fs::remove_file(&path).unwrap();
+        assert!(poll_flow_glance(
+            Some(&path),
+            &mut glance,
+            &mut mtime,
+            &mut cached
+        ));
+        assert!(glance.is_none());
+        fs::write(&path, br#"{"type":"flow/result","code":0}"#).unwrap();
+        let link = root.join("link.jsonl");
+        std::os::unix::fs::symlink(&path, &link).unwrap();
+        assert!(last_flow_result(&link).is_none());
+        let fifo = root.join("fifo.jsonl");
+        let st = std::process::Command::new("mkfifo")
+            .arg(&fifo)
+            .status()
+            .unwrap();
+        assert!(st.success());
+        assert!(last_flow_result(&fifo).is_none());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn footer_line_glance_idle_status_and_overlays() {
+        let idle = " chuột phải menu  kéo≥2 copy  Ctrl-b prefix";
+        assert_eq!(footer_hint(Mode::Terminal, ""), idle);
+        assert_eq!(
+            footer_line(Mode::Terminal, "", Some("Flow 0. code")),
+            "Flow 0. code"
+        );
+        assert_eq!(footer_line(Mode::Terminal, "", None), idle);
+        assert_eq!(
+            footer_line(Mode::Terminal, "đã chép", Some("Flow 0. code")),
+            "đã chép"
+        );
+        assert_eq!(
+            footer_line(Mode::Confirm, "", Some("Flow 0. code")),
+            " 1 có  2 không  esc"
+        );
+        assert_eq!(
+            footer_line(Mode::Prefix, "", Some("Flow 0. code")),
+            PREFIX_FOOTER
+        );
+        assert_eq!(
+            footer_line(Mode::Help, "", Some("Flow 0. code")),
+            " esc đóng bảng"
+        );
+        assert_eq!(
+            footer_line(Mode::Picker, "", Some("Flow 0. code")),
+            " j/k chọn  enter  esc"
+        );
+        assert_eq!(
+            footer_line(Mode::Menu, "", Some("Flow 0. code")),
+            " 1.. chạy  esc hủy"
+        );
+        assert_eq!(
+            footer_line(Mode::Onboard, "", Some("Flow 0. code")),
+            " enter nhớ  esc bỏ  Ctrl-b q rời"
+        );
+        let long = format!("Flow 0. {}", "x".repeat(200));
+        let painted = bar_line(&format!(" {long}"), 40);
+        assert_eq!(display_width(&painted), 39);
+        assert!(display_width(&painted) <= 39);
+        assert_eq!(
+            flow_journal_path("/live/after/cd"),
+            PathBuf::from("/live/after/cd/.dory/sessions/s1.jsonl")
+        );
+        let rows = empty_shell_rows("/live/after/cd");
+        assert_eq!(workspace_cwd(&rows, "w1"), Some("/live/after/cd"));
+        assert!(!pane_wipe_on_tile_draw(false));
     }
 }
