@@ -1498,6 +1498,7 @@ fn agent_prompt(
         if let Some(occ) = pane.occupant.as_mut() {
             occ.scan_from = mark;
             occ.ready = false;
+            occ.report = None;
         }
         refresh_occupant(pane);
     }
