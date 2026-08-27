@@ -51,6 +51,7 @@ fn start() -> Harness {
     let mut server = Command::new(bin())
         .arg("server")
         .env("XDG_RUNTIME_DIR", &xdg)
+        .env_remove("DORY_SOCKET")
         .current_dir(&xdg)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -210,10 +211,11 @@ fn neighbor_walks_split_panes() {
 }
 
 #[test]
-fn bare_dory_without_tty_starts_server() {
+fn bare_dory_without_server_fails_closed() {
     let xdg = temp_xdg();
     let out = Command::new(bin())
         .env("XDG_RUNTIME_DIR", &xdg)
+        .env_remove("DORY_SOCKET")
         .env_remove("DORY_ENV")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -227,38 +229,86 @@ fn bare_dory_without_tty_starts_server() {
         String::from_utf8_lossy(&out.stderr)
     );
     let err = String::from_utf8_lossy(&out.stderr);
-    assert!(err.contains("needs a tty"), "{err}");
+    assert!(
+        err.contains("dory: server not running; start with `dory server`"),
+        "{err}"
+    );
 
     let list = Command::new(bin())
         .args(["workspace", "list"])
         .env("XDG_RUNTIME_DIR", &xdg)
+        .env_remove("DORY_SOCKET")
+        .env_remove("DORY_ENV")
         .output()
         .expect("list");
-    let body = String::from_utf8_lossy(&list.stdout);
     assert!(
-        list.status.success(),
-        "{}",
+        !list.status.success(),
+        "workspace list must fail without server stdout={} stderr={}",
+        String::from_utf8_lossy(&list.stdout),
         String::from_utf8_lossy(&list.stderr)
     );
-    assert!(body.contains("\"workspaces\""), "{body}");
-    assert!(body.contains("w"), "{body}");
 
-    let _ = Command::new(bin())
-        .args(["server", "stop"])
-        .env("XDG_RUNTIME_DIR", &xdg)
-        .output();
+    let sock = session_sock(&xdg);
+    assert!(
+        UnixStream::connect(&sock).is_err(),
+        "temp XDG sock must not be connectable"
+    );
+
+    let h = start();
+    let out2 = Command::new(bin())
+        .env("XDG_RUNTIME_DIR", &h.xdg)
+        .env_remove("DORY_SOCKET")
+        .env_remove("DORY_ENV")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("bare dory with server");
+    assert_eq!(
+        out2.status.code(),
+        Some(1),
+        "stderr={}",
+        String::from_utf8_lossy(&out2.stderr)
+    );
+    let err2 = String::from_utf8_lossy(&out2.stderr);
+    assert!(err2.contains("needs a tty"), "{err2}");
+
     let _ = fs::remove_dir_all(&xdg);
 }
 
 #[test]
 fn attach_help_and_usage_name_sit_down() {
-    let out = Command::new(bin()).args(["--help"]).output().expect("help");
+    let out = Command::new(bin())
+        .args(["--help"])
+        .env_remove("DORY_SOCKET")
+        .env_remove("DORY_ENV")
+        .output()
+        .expect("help");
     let body = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success());
     assert!(body.contains("dory attach"), "{body}");
     assert!(body.contains("Bare `dory` opens the desk"), "{body}");
     assert!(body.contains("--plain"), "{body}");
     assert!(!body.contains("/workplace"), "{body}");
+    assert!(!body.contains("Starts the server if needed"), "{body}");
+
+    let attach = Command::new(bin())
+        .args(["attach", "--help"])
+        .env_remove("DORY_SOCKET")
+        .env_remove("DORY_ENV")
+        .output()
+        .expect("attach help");
+    let attach_body = String::from_utf8_lossy(&attach.stdout);
+    assert!(attach.status.success());
+    assert!(attach_body.contains("dory attach"), "{attach_body}");
+    assert!(
+        !attach_body.contains("Starts the server if needed"),
+        "{attach_body}"
+    );
+    assert!(
+        !attach_body.contains("Starts `dory server` if needed"),
+        "{attach_body}"
+    );
 }
 
 #[test]

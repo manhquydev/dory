@@ -1,23 +1,17 @@
 //! Human sit-down client. Not the skill. Not a Ratatui clone.
 //!
-//! Bare `dory` / `dory attach` starts the daemon if needed and sits at the
-//! desk (tiled live panes). `--plain` is one raw PTY. Detach ≠ kill.
+//! Bare `dory` / `dory attach` sits at the desk (tiled live panes).
+//! `--plain` is one raw PTY. Detach ≠ kill.
 
 use crate::server;
-use std::env;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::os::fd::AsRawFd;
 use std::os::unix::net::UnixStream;
-use std::os::unix::process::CommandExt;
-use std::process::{Command, Stdio};
-use std::thread;
-use std::time::{Duration, Instant};
 
 const CTRL_B: u8 = 0x02;
 const CTRL_BACKSLASH: u8 = 0x1c;
 
 unsafe extern "C" {
-    fn setsid() -> i32;
     fn isatty(fd: i32) -> i32;
     fn tcgetattr(fd: i32, t: *mut Termios) -> i32;
     fn tcsetattr(fd: i32, action: i32, t: *const Termios) -> i32;
@@ -114,7 +108,7 @@ Usage:
   dory attach --pane <id>
   dory attach --plain [--pane <id>]
 
-Starts `dory server` if needed. Default is the desk (sidebar + tiled live panes).
+Default is the desk (sidebar + tiled live panes).
 `--plain` is the raw PTY client.
 
 Desk prefix Ctrl-b:
@@ -333,36 +327,7 @@ pub fn ensure_server() -> Result<(), i32> {
     if ping() {
         return Ok(());
     }
-    let exe = env::current_exe().map_err(|err| {
-        eprintln!("dory: {err}");
-        1
-    })?;
-    let mut cmd = Command::new(exe);
-    cmd.arg("server")
-        .env("DORY_SIT_SHELL", "1")
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-    unsafe {
-        cmd.pre_exec(|| {
-            if setsid() < 0 {
-                return Err(io::Error::last_os_error());
-            }
-            Ok(())
-        });
-    }
-    cmd.spawn().map_err(|err| {
-        eprintln!("dory: start server: {err}");
-        1
-    })?;
-    let start = Instant::now();
-    while start.elapsed() < Duration::from_secs(5) {
-        if ping() {
-            return Ok(());
-        }
-        thread::sleep(Duration::from_millis(50));
-    }
-    eprintln!("dory: server did not come up");
+    eprintln!("dory: server not running; start with `dory server`");
     Err(1)
 }
 

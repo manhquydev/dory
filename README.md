@@ -12,7 +12,7 @@ Trong một terminal thật:
 dory
 ```
 
-Lần đầu sẽ bật `dory server` rồi mở **desk**: Spaces + Agents bên trái, hàng thẻ, **nhiều PTY sống** của thẻ đang chọn bên phải. Ô trống dùng `$SHELL` (có rc), không phải `bash --norc` (`bash-5.2$`). Thẻ mới theo cwd ô đang focus; cửa sổ mới theo thư mục lúc gõ `dory`. Server cũ còn `--norc`: `dory server stop` rồi `dory`.
+Chạy `dory server` rồi `dory` để mở **desk**: Spaces + Agents bên trái, hàng thẻ, **nhiều PTY sống** của thẻ đang chọn bên phải. Ô trống dùng `$SHELL` (có rc), không phải `bash --norc` (`bash-5.2$`). Thẻ mới theo cwd ô đang focus; cửa sổ mới theo thư mục lúc gõ `dory`. Server cũ còn `--norc`: `dory server stop` rồi `dory`.
 
 Prefix là `Ctrl-b`. Không có phím trần `x` / `1` / `w`.
 

@@ -47,7 +47,7 @@ Usage:
   dory flow -- <args>
 
 Mutating workspace/tab/pane/agent/flow verbs require DORY_ENV=1.
-Bare `dory` opens the desk (sidebar + tiled live panes). Starts the server if needed.
+Bare `dory` opens the desk (sidebar + tiled live panes).
 Sit-down shells use $SHELL with rc (`DORY_SIT_SHELL=1`). `dory server` in tests stays
 `bash --norc --noprofile`. New tabs follow the focused pane cwd; desk new workspace
 uses the directory where you typed `dory`. `dory server stop` then `dory` if an old
@@ -702,6 +702,7 @@ mod tests {
             "flow is a taxi, not a stub"
         );
         assert!(!super::USAGE.contains("/workplace"));
+        assert!(!super::USAGE.contains("Starts the server if needed"));
         assert!(!super::USAGE.contains("X-Dory-Inside"));
         assert!(!super::USAGE.contains("--kind"));
         assert!(!super::USAGE.contains(":7380"));
