@@ -1,0 +1,96 @@
+REVIEW_PATH_PASS
+
+role=review_path
+lens=retarget/PATH (phase 3 trap 1, 9, 10; A2)
+when=2026-08-27 10:07:12 +0700
+cwd=/home/manhquy/Downloads/flow/dory
+REVIEW_SESSION=orca (not herdr; HERDR_ENV=UNSET)
+COOK_TAB=w13:t1W
+TEST_TAB=w13:t1X
+invoked_dory=no
+ln_isolate=no
+dory_ln=FORBIDDEN not used
+
+== env refuse (must be unset) ==
+DORY_SOCKET=UNSET
+DORY_ENV=UNSET
+DORY_RECYCLE=UNSET
+PI_CODING_AGENT_DIR=UNSET
+DORY_PANE_ID=UNSET
+DORY_TAB_ID=UNSET
+DORY_*=NONE
+XDG_RUNTIME_DIR=/run/user/1000
+refuse_set=NONE
+action=continue (no refuse)
+
+== A2 live re-measure (hash -r; type -a empty; PATH walk 0) ==
+hash -r
+type -a dory:
+type: dory not found
+TYPE_EXIT:1
+command -v dory: empty
+COMMAND_V_EXIT:1
+
+path=/home/manhquy/.local/bin/dory
+test ! -e → 0
+test ! -L → 0
+lexists=False
+exists=False
+is_symlink=False
+lstat=ENOENT
+
+PATH_ENTRIES=37
+PATH_UNIQUE_DIRS=29
+LOCAL_BIN_ON_PATH_COUNT=5
+PATH walk */dory (lexists, no exec): COUNT=0 HITS=[]
+DISTINCT_REALPATHS=0
+
+A2=PASS
+retarget=NONE (empty name only; not “≠ leftover”)
+
+== cook before vs this review ==
+cook before type -a: five repeats of /home/manhquy/.local/bin/dory (PATH lists ~/.local/bin ×5; one inode)
+cook before realpath: /home/manhquy/Downloads/flow/dory/rust/target/debug/dory
+cook after / test A2: type: dory not found TYPE_EXIT=1 COUNT=0
+this review: same empty. No second inode. No isolate on PATH.
+
+== trap 1 ln isolate (cấm) ==
+did_not: ln -sfn isolate land-4b70f79
+did_not: dory/ln
+did_not: retarget PATH to isolate ELF
+isolate debug observe-only (not PATH name):
+  exists=/home/manhquy/.cache/dory-isolates/land-4b70f79/rust/target/debug/dory
+  size=18493816 inode=1063590 islink=False
+  not exec'd
+~/.local/bin names *dory*: NONE
+
+trap1=HOLD (no ln)
+
+== leftover ELF (observe PATH-safety; not ELF lens) ==
+leftover ELF still on disk (not rm realpath):
+  path=/home/manhquy/Downloads/flow/dory/rust/target/debug/dory
+  exists=True size=18568240 inode=2490742 islink=False
+  not on PATH as name dory
+  not exec'd
+
+== forbidden argv (this lens) ==
+dory=no
+dory attach=no
+dory server=no
+leftover ELF exec=no
+isolate ELF exec=no
+ln=no
+ln isolate=no
+dory/ln=no
+cargo leftover=no
+sit t13=no
+rm leftover ELF=no
+
+== known broken (not this increment) ==
+Hop / USAGE / sit-child still PATH `dory` after unlink. Not patched. Not exec'd.
+
+== verdict ==
+critical_count=0
+PATH name dory gone. ~/.local/bin/dory does not exist.
+After hash -r, type -a dory empty. No isolate retarget.
+REVIEW_PATH_PASS

@@ -1,0 +1,31 @@
+TEST_ELF_PASS
+
+when=2026-08-27
+cwd=/home/manhquy/Downloads/flow/dory
+phase=2 leftover ELF sha (ut_elf)
+exec=none leftover/isolate/dory
+
+== leftover ELF (keep; do not exec) ==
+path=/home/manhquy/Downloads/flow/dory/rust/target/debug/dory
+sha256=3ba0e3bc3e9630c8f0b544523610b2f4e784c6f47ad049ab0b67f10704f1bc14
+expect=3ba0e3bc3e9630c8f0b544523610b2f4e784c6f47ad049ab0b67f10704f1bc14
+sha256_vs_cook=MATCH
+mtime_epoch=1787716801
+mtime=2026-08-26 11:00:01.084955950 +0700
+size=18568240
+inode=2490742
+mtime_epoch_vs_cook=MATCH
+mtime_vs_cook=MATCH
+size_vs_cook=MATCH
+inode_vs_cook=MATCH
+
+== strings (allowed; not exec) ==
+cmd=strings /home/manhquy/Downloads/flow/dory/rust/target/debug/dory | rg -c workspace_live_cwd
+workspace_live_cwd=59
+scout_expect=59
+strings_vs_scout=MATCH
+
+== forbidden argv ==
+leftover ELF: not exec'd
+isolate ELF: not exec'd
+dory: not invoked

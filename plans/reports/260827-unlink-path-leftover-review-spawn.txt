@@ -1,0 +1,172 @@
+SPAWN_REVIEW_PASS
+
+role=review_spawn
+when=2026-08-27 10:07:22 +0700
+cwd=/home/manhquy/Downloads/flow/dory
+phase=3 spawn (receipts prove no dory/ELF invoke; leftover ELF still on disk)
+plan=plans/260827-0940-unlink-leftover-path-dory/phase-03-review-and-ship-receipts.md
+cook=plans/reports/260827-unlink-path-leftover-cook.md
+before=plans/reports/260827-unlink-path-leftover-before.txt
+test=plans/reports/260827-unlink-path-leftover-test.md
+test_elf=plans/reports/260827-unlink-path-leftover-test-elf.txt
+test_hash=plans/reports/260827-unlink-path-leftover-test-hash.txt
+test_sock=plans/reports/260827-unlink-path-leftover-test-sock.txt
+exec=none leftover/isolate/dory
+sit_t13=no
+COOK_TAB=w13:t1W
+TEST_TAB=w13:t1X
+this_review_did_not_sit_t13=yes
+
+== verdict ==
+SPAWN_GATE=HOLD
+critical_count=0
+trap2_dory_invoke=not fired
+trap3_rm_leftover_elf=not fired
+no_new_connectable_default=HOLD
+
+== leftover ELF still on disk (this review; sha256sum; NOT exec) ==
+path=/home/manhquy/Downloads/flow/dory/rust/target/debug/dory
+exists=True
+file=ELF 64-bit LSB pie executable, x86-64, dynamically linked, with debug_info, not stripped
+BuildID[sha1]=fb3fc895976090b4c51a9e33c585613bc1130d0c
+sha256=3ba0e3bc3e9630c8f0b544523610b2f4e784c6f47ad049ab0b67f10704f1bc14
+expect=3ba0e3bc3e9630c8f0b544523610b2f4e784c6f47ad049ab0b67f10704f1bc14
+sha256_vs_cook_before=MATCH
+sha256_vs_cook_after=MATCH
+sha256_vs_test_A5=MATCH
+sha256_vs_test_elf=MATCH
+mtime_epoch=1787716801
+mtime=2026-08-26 11:00:01.084955950 +0700
+size=18568240
+inode=2490742
+mode=775
+mtime_epoch_vs_cook=MATCH
+mtime_vs_cook=MATCH
+size_vs_cook=MATCH
+inode_vs_cook=MATCH
+execd=no
+
+== receipts: no dory/ELF argv invoke ==
+scanned:
+  260827-unlink-path-leftover-cook.md
+  260827-unlink-path-leftover-before.txt
+  260827-unlink-path-leftover-test.md
+  260827-unlink-path-leftover-test-elf.txt
+  260827-unlink-path-leftover-test-hash.txt
+  260827-unlink-path-leftover-test-sock.txt
+
+argv_hits (line-start `dory `, `./dory`, leftover ELF as command, isolate ELF as command, `cargo run`, `ln -s`):
+  NONE
+
+cook.md:
+  action=`rm /home/manhquy/.local/bin/dory` (symlink path only)
+  forbidden argv: No `dory`, `dory attach`, `dory server`, leftover ELF, isolate ELF
+  did_not: `dory server stop`; `iso()` / `DORY_SOCKET=` on stop
+
+before.txt:
+  verify=`type -a` PATH-walk `test -L` `ls -l` `readlink` `realpath` sha256/stat python AF_UNIX
+  action=continue (not connectable; no dory server stop; no iso()/DORY_SOCKET=)
+
+test.md:
+  phase=2 independent PATH re-measure (no unlink; no dory/ELF exec)
+  forbidden argv: No `dory`. No leftover ELF exec. No isolate ELF exec.
+
+test-elf.txt:
+  exec=none leftover/isolate/dory
+  allowed: `strings … | rg -c workspace_live_cwd` (not exec)
+  leftover ELF: not exec'd
+  isolate ELF: not exec'd
+  dory: not invoked
+
+test-hash.txt:
+  cmd=`git hash-object` leftover 5
+  forbidden=dory,cargo,git add (not run)
+
+test-sock.txt:
+  invoked_dory=no
+  dory=no
+  dory attach=no
+  dory server=no
+  dory server stop=no
+  leftover ELF exec=no
+  isolate ELF exec=no
+
+== why invoke would spawn (cite HEAD, not leftover attach.rs) ==
+cmd=`git show HEAD:rust/src/attach.rs` (nl)
+HEAD=5a6095367f905a42ff1c38886ebffa0f0840977d
+ensure_server HEAD :332-370:
+  if !ping() { Command::new(current_exe()).arg("server").spawn() }
+Trap 2: typing `dory` / leftover ELF on factory XDG auto-spawns `$XDG_RUNTIME_DIR/dory/default`.
+Spawn proof is therefore: receipts have no invoke argv AND live default sock still absent.
+
+== live spawn signal (python AF_UNIX 1s; not dory) ==
+DORY_SOCKET=UNSET
+DORY_ENV=UNSET
+DORY_RECYCLE=UNSET
+PI_CODING_AGENT_DIR=UNSET
+DORY_*=NONE
+XDG_RUNTIME_DIR=/run/user/1000
+sock=$XDG_RUNTIME_DIR/dory/default/dory.sock
+resolved=/run/user/1000/dory/default/dory.sock
+dory_dir_lexists=False
+lexists=False
+exists=False
+connectable=False
+err=FileNotFoundError(2, 'No such file or directory')
+elapsed_s=0.0
+dead_inode=no
+matches_cook_after=yes
+matches_test_A4=yes
+matches_test_sock=yes
+no_new_connectable_default=HOLD
+
+== live PATH name (hash -r; type -a; not exec) ==
+type: dory not found
+TYPE_EXIT:1
+test ! -e /home/manhquy/.local/bin/dory → 0
+test ! -L /home/manhquy/.local/bin/dory → 0
+PATH_WALK_COUNT=0
+PATH_WALK_HITS=[]
+
+== live process (no leftover/isolate ELF running) ==
+pgrep -af 'target/debug/dory|dory server|dory attach' → empty
+leftover ELF process=no
+isolate ELF process=no
+
+== isolate observe-only (not exec) ==
+path=/home/manhquy/.cache/dory-isolates/land-4b70f79/rust/target/debug/dory
+exists=True
+size=18493816
+inode=1063590
+not_execd=yes
+matches_test_observe=yes
+
+== leftover 5 observe (mint; not this fold job) ==
+README.md                 68190a5ffa073c082aa318aad5ed032e13cc90e3 MATCH
+rust/src/attach.rs        602479094e84d31ad6f017775a3d55aeb485c644 MATCH
+rust/src/main.rs          373d688636ff7315ccd665f450069d8284eb47ff MATCH
+rust/src/server.rs        4de1554ad56e248cdcf42f02111b7389b08dae82 MATCH
+rust/tests/p5_attach.rs   9c28fc3e0f3666498a8952411242d5301f7911de MATCH
+desk.rs                   4c788562e4fdda10c8edd2878ed1fdd46050c218 (observe)
+porcelain leftover 5: still M (unstaged)
+cached leftover 5: empty
+?? scripts/: pre-existing
+
+== forbidden argv (this spawn review) ==
+dory=no
+dory attach=no
+dory server=no
+dory server stop=no
+leftover ELF exec=no
+isolate ELF exec=no
+iso()=no
+DORY_SOCKET= on stop=no
+ln=no
+cargo leftover=no
+rm leftover ELF=no
+sit t13=no
+herdr server stop=no
+
+== known broken (not this increment) ==
+Hop / USAGE / sit-child still PATH `dory` after unlink. Not exec'd here.
+HEAD ensure_server still auto-spawns. C unpaid. PATH name gone; leftover ELF kept.

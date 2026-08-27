@@ -1,0 +1,13 @@
+PASS
+
+cwd=/home/manhquy/Downloads/flow/dory
+when=2026-08-27
+cmd=git hash-object README.md rust/src/attach.rs rust/src/main.rs rust/src/server.rs rust/tests/p5_attach.rs
+mint=plans/260827-0940-unlink-leftover-path-dory/research/researcher-02-leftover.md
+forbidden=dory,cargo,git add (not run)
+
+README.md                 68190a5ffa073c082aa318aad5ed032e13cc90e3 MATCH
+rust/src/attach.rs        602479094e84d31ad6f017775a3d55aeb485c644 MATCH
+rust/src/main.rs          373d688636ff7315ccd665f450069d8284eb47ff MATCH
+rust/src/server.rs        4de1554ad56e248cdcf42f02111b7389b08dae82 MATCH
+rust/tests/p5_attach.rs   9c28fc3e0f3666498a8952411242d5301f7911de MATCH

@@ -1,0 +1,38 @@
+{
+  "dory-unlink-cook": {
+    "tab": "w13:t1W",
+    "panes": [
+      "w13:p5C",
+      "w13:p5D",
+      "w13:p5E",
+      "w13:p5F"
+    ]
+  },
+  "dory-unlink-test": {
+    "tab": "w13:t1X",
+    "panes": [
+      "w13:p5G",
+      "w13:p5H",
+      "w13:p5J",
+      "w13:p5K"
+    ]
+  },
+  "dory-unlink-review": {
+    "tab": "w13:t1Y",
+    "panes": [
+      "w13:p5M",
+      "w13:p5N",
+      "w13:p5P",
+      "w13:p5Q"
+    ]
+  },
+  "dory-unlink-ship": {
+    "tab": "w13:t1Z",
+    "panes": [
+      "w13:p5R",
+      "w13:p5S",
+      "w13:p5T",
+      "w13:p5V"
+    ]
+  }
+}

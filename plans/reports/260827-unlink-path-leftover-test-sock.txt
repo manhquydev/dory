@@ -1,0 +1,102 @@
+TEST_SOCK_PASS
+
+role=ut_sock
+TEST_TAB=w13:t1X
+TEST_PANE=w13:p5J
+COOK_TAB=w13:t1W
+COOK_PANE=w13:p5C
+cwd=/home/manhquy/Downloads/flow/dory
+when=2026-08-27 10:02:23 +0700
+phase=2 independent PATH test — sock witness only
+invoked_dory=no
+
+== env refuse (must be unset; refuse if set) ==
+DORY_SOCKET=UNSET
+DORY_ENV=UNSET
+DORY_RECYCLE=UNSET
+PI_CODING_AGENT_DIR=UNSET
+DORY_PANE_ID=UNSET
+DORY_TAB_ID=UNSET
+XDG_RUNTIME_DIR=/run/user/1000
+refuse_set=NONE
+action=continue (no refuse)
+
+== snapshot XDG_RUNTIME_DIR ==
+path=/run/user/1000
+realpath=/run/user/1000
+exists=True
+islink=False
+mode=0o40700
+uid=1000
+gid=1000
+dory_dir=/run/user/1000/dory
+dory_dir_lexists=False
+dory_dir_isdir=False
+dory_dir_islink=False
+xdg_top_dory_names=NONE
+
+xdg_top_level:
+FILE ICEauthority
+DIR  at-spi
+FILE bus
+FILE chromoting.host_services_mojo_ipc
+DIR  crd_audio#Ja2CO62wZw
+DIR  crd_crashpad
+DIR  dbus-1
+DIR  dconf
+DIR  doc
+DIR  gcr
+DIR  gdm
+FILE gnome-session-leader-fifo
+DIR  gnome-shell
+DIR  gnupg
+DIR  gvfs
+DIR  gvfsd
+DIR  keyring
+FILE pipewire-0
+FILE pipewire-0-manager
+FILE pipewire-0-manager.lock
+FILE pipewire-0.lock
+FILE pk-debconf-socket
+DIR  pulse
+DIR  snap.canonical-livepatch
+DIR  snap.codex
+DIR  snap.firefox
+DIR  snap.firmware-updater
+DIR  snap.snap-store
+DIR  snap.snapd-desktop-integration
+FILE snapd-session-agent.socket
+DIR  speech-dispatcher
+DIR  systemd
+FILE update-notifier.pid
+
+== sock (AF_UNIX, timeout=1s) ==
+path=$XDG_RUNTIME_DIR/dory/default/dory.sock
+resolved=/run/user/1000/dory/default/dory.sock
+lexists=False
+exists=False
+islink=False
+connectable=False
+err=FileNotFoundError: [Errno 2] No such file or directory
+elapsed_s=0.0000
+dead_inode=no
+action=continue (not connectable; no dory server stop; no iso(); no DORY_SOCKET=)
+
+== forbidden argv (this witness) ==
+dory=no
+dory attach=no
+dory server=no
+dory server stop=no
+leftover ELF exec=no
+isolate ELF exec=no
+iso()=no
+DORY_SOCKET= on stop=no
+
+== A assert 4 ==
+"$XDG_RUNTIME_DIR/dory/default/dory.sock" not connectable → HOLD
+matches cook after: connectable=False (FileNotFoundError)
+
+== identity ==
+TEST_TAB != COOK_TAB: w13:t1X != w13:t1W HOLD
+TEST_TAB != t13: w13:t1X != w13:t13 HOLD
+TEST_PANE=w13:p5J (roster ut_sock)

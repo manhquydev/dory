@@ -1,0 +1,67 @@
+COOK_PASS
+
+COOK_TAB=w13:t1W
+COOK_PANE=w13:p5C
+cwd=/home/manhquy/Downloads/flow/dory
+when=2026-08-27
+
+== env refuse (must be unset) ==
+DORY_SOCKET=UNSET
+DORY_ENV=UNSET
+DORY_RECYCLE=UNSET
+PI_CODING_AGENT_DIR=UNSET
+XDG_RUNTIME_DIR=/run/user/1000
+
+== git status --porcelain (pre-rm; leftover 5 M + ?? scripts/ expected) ==
+ M README.md
+ M rust/src/attach.rs
+ M rust/src/main.rs
+ M rust/src/server.rs
+ M rust/tests/p5_attach.rs
+?? scripts/
+git diff --cached --name-only: empty
+other ?? (plans/, journals, reports, .claude/, eval/, src/workplace/, test/phase*.test.js) pre-existing; not rust/scripts drift
+
+== leftover 5 git hash-object vs researcher-02 (checked BEFORE rm) ==
+README.md            68190a5ffa073c082aa318aad5ed032e13cc90e3 MATCH
+rust/src/attach.rs   602479094e84d31ad6f017775a3d55aeb485c644 MATCH
+rust/src/main.rs     373d688636ff7315ccd665f450069d8284eb47ff MATCH
+rust/src/server.rs   4de1554ad56e248cdcf42f02111b7389b08dae82 MATCH
+rust/tests/p5_attach.rs 9c28fc3e0f3666498a8952411242d5301f7911de MATCH
+
+== type -a dory (pre-rm) ==
+dory is /home/manhquy/.local/bin/dory
+dory is /home/manhquy/.local/bin/dory
+dory is /home/manhquy/.local/bin/dory
+dory is /home/manhquy/.local/bin/dory
+dory is /home/manhquy/.local/bin/dory
+TYPE_EXIT:0
+note: PATH lists ~/.local/bin five times; one inode
+
+== PATH walk */dory (pre-rm) ==
+HIT /home/manhquy/.local/bin/dory islink=True realpath=/home/manhquy/Downloads/flow/dory/rust/target/debug/dory
+DISTINCT_REALPATHS=1
+realpath=/home/manhquy/Downloads/flow/dory/rust/target/debug/dory
+
+== symlink (pre-rm) ==
+test -L /home/manhquy/.local/bin/dory → 0
+ls -l: lrwxrwxrwx 1 manhquy manhquy 56 Aug 23 19:33 /home/manhquy/.local/bin/dory -> /home/manhquy/Downloads/flow/dory/rust/target/debug/dory
+readlink=/home/manhquy/Downloads/flow/dory/rust/target/debug/dory
+realpath=/home/manhquy/Downloads/flow/dory/rust/target/debug/dory
+
+== leftover ELF (pre-rm; keep; do not exec) ==
+path=/home/manhquy/Downloads/flow/dory/rust/target/debug/dory
+sha256=3ba0e3bc3e9630c8f0b544523610b2f4e784c6f47ad049ab0b67f10704f1bc14
+mtime_epoch=1787716801
+mtime=2026-08-26 11:00:01.084955950 +0700
+size=18568240
+inode=2490742
+
+== sock (pre-rm) ==
+path=/run/user/1000/dory/default/dory.sock
+lexists=False
+exists=False
+connectable=False
+err=FileNotFoundError: [Errno 2] No such file or directory
+dead_inode=no
+action=continue (not connectable; no dory server stop; no iso()/DORY_SOCKET=)
