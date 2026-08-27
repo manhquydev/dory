@@ -127,6 +127,7 @@ OMP: `herdr agent start NAME --kind omp --pane ID --timeout 180000 -- --no-sessi
 - Founder `prompt --wait` / five states `working`/`blocked`
 - Full 6-stage Flow project + semantic gate
 - Leftover 5 fold / PATH retarget
+- Isolate unlock `flow -- next` → sibling plan `plans/260827-1657-isolate-flow-next-unlock/` (not this cook)
 
 ## Red Team Review
 
