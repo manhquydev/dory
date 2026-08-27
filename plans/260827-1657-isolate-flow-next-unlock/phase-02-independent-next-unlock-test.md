@@ -49,9 +49,9 @@ Tab `dory-aoe5n-test` mint sit pane riêng (`SIT_PANE`/`SIT_TAB` mới). Cùng `
 
 ## Success Criteria
 
-- [ ] TEST_PASS
-- [ ] Independent journal measure (not copy-paste cook)
-- [ ] Leftover 5 mint; sock connectable=0
+- [x] TEST_PASS
+- [x] Independent journal measure (not copy-paste cook)
+- [x] Leftover 5 mint; sock connectable=0
 
 ## Risk Assessment
 

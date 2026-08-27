@@ -91,10 +91,10 @@ Do **not** fill `01-research.md` after unlock.
 
 ## Success Criteria
 
-- [ ] Script path exists and does not `exec`/`source` paid scripts (judge included)
-- [ ] COOK_PASS receipt with journal codes 1 then 0, bin = abs flow.sh, both args `["next"]`, copied `01-research.md` sha == template
-- [ ] Sit needles both seen (`Flow 1. next` / `Flow 0. next`)
-- [ ] Leftover 5 mint; sock connectable=0
+- [x] Script path exists and does not `exec`/`source` paid scripts (judge included)
+- [x] COOK_PASS receipt with journal codes 1 then 0, bin = abs flow.sh, both args `["next"]`, copied `01-research.md` sha == template
+- [x] Sit needles both seen (`Flow 1. next` / `Flow 0. next`)
+- [x] Leftover 5 mint; sock connectable=0
 
 ## Risk Assessment
 

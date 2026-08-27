@@ -78,10 +78,10 @@ Write `plans/reports/260827-ensure-aoe5-flow-next-ops.md`.
 
 ## Success Criteria
 
-- [ ] REVIEW_ACCEPT critical 0
-- [ ] Paper commit pathspec-only; leftover 5 unstaged mint
-- [ ] No push
-- [ ] Wave tabs closed; `w13:t13` remains
+- [x] REVIEW_ACCEPT critical 0
+- [x] Paper commit pathspec-only; leftover 5 unstaged mint
+- [x] No push
+- [x] Wave tabs closed; `w13:t13` remains
 
 ## Risk Assessment
 
