@@ -1,0 +1,62 @@
+REVIEW pane rv_spawn — HEAD blobs only
+HEAD: b544f5ff75a3c085ae6ab51ccafb3b58fa551db2
+Scope: prove or reject ensure_server no-spawn hunk.
+Did not invoke dory. Did not cargo leftover. Did not sit t13.
+Did not cite leftover attach.rs.
+
+## Verdict
+SPAWN_ACCEPT
+Critical: 0
+Important: 0
+Nit: 0
+
+## Claims
+
+### 1. ensure_server has no arg("server") spawn — PROVED
+git show HEAD:rust/src/attach.rs:326-332
+
+```
+pub fn ensure_server() -> Result<(), i32> {
+    if ping() {
+        return Ok(());
+    }
+    eprintln!("dory: server not running; start with `dory server`");
+    Err(1)
+}
+```
+
+Whole HEAD attach.rs blob: `arg("server")`, `Command::new`, `setsid`, `cmd.spawn`, `spawn_server`, `wait_ping`, `dory: start server:`, `server did not come up` all absent (python find = -1).
+
+### 2. eprintln locked — PROVED
+Same blob :330 is exactly:
+`dory: server not running; start with `dory server``
+Ping-miss is not silent Err(1).
+
+### 3. sit + desk::run_with_pane still call it — PROVED
+git show HEAD:rust/src/attach.rs:129-131
+```
+fn sit(pane: Option<&str>) -> i32 {
+    if let Err(code) = ensure_server() {
+        return code;
+```
+
+git show HEAD:rust/src/desk.rs:165-167
+```
+pub fn run_with_pane(pane: Option<&str>) -> i32 {
+    if let Err(code) = attach::ensure_server() {
+        return code;
+```
+
+Bare `dory` remains desk::run → run_with_pane (desk.rs:161-162; main.rs:68-69).
+
+### 4. dory server still run_foreground — PROVED
+git show HEAD:rust/src/main.rs:77-79
+```
+        "server" => match args.get(1).map(String::as_str) {
+            None => server::run_foreground(),
+            Some("stop") => server::stop(),
+```
+
+`dory server` does not call ensure_server.
+
+SPAWN_ACCEPT

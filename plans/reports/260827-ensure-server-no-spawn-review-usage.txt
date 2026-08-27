@@ -1,0 +1,63 @@
+# rv_usage — HEAD USAGE / README / help
+
+role=rv_usage
+skill=ak:code-review (read-only)
+HEAD=b544f5ff75a3c085ae6ab51ccafb3b58fa551db2
+lens=usage/help/README (not spawn hunk, not leftover WT)
+invoked_dory=no
+rewrote_readme_now=no
+
+== git show HEAD:rust/src/main.rs ==
+
+USAGE has:
+  Bare `dory` opens the desk (sidebar + tiled live panes).
+
+USAGE does not contain:
+  Starts the server if needed
+
+Unit lock in same blob `usage_names_groups_not_http_workplace`:
+  assert!(!super::USAGE.contains("Starts the server if needed"));
+  assert!(super::USAGE.contains("Bare `dory` opens the desk"));
+
+== git show HEAD:rust/src/attach.rs (module + help) ==
+
+Module:
+  Bare `dory` / `dory attach` sits at the desk (tiled live panes).
+  `--plain` is one raw PTY. Detach ≠ kill.
+
+print_attach_help:
+  dory attach — sit on the workplace desk
+  Default is the desk (sidebar + tiled live panes).
+  `--plain` is the raw PTY client.
+  Detach does not kill the PTY.
+
+No auto-start sentence in module docs or help
+(no "Starts the server if needed", no "Starts `dory server` if needed",
+no "if needed", no "auto-start").
+
+== git show HEAD:README.md ==
+
+:15 sit = server then dory:
+  Chạy `dory server` rồi `dory` để mở **desk**
+
+:31 still:
+  | `Ctrl-b b` | Thu sidebar 22↔4↔0 |
+
+Leftover README Now (`dory` fence at :9–:13) not rewritten (out of this lens).
+
+== git show HEAD:rust/tests/p5_attach.rs ==
+
+`attach_help_and_usage_name_sit_down` forbids auto-start on both surfaces:
+
+  assert!(!body.contains("Starts the server if needed"), "{body}");
+  assert!(!attach_body.contains("Starts the server if needed"), "{attach_body}");
+  assert!(!attach_body.contains("Starts `dory server` if needed"), "{attach_body}");
+
+Also requires:
+  body.contains("Bare `dory` opens the desk")
+
+== verdict ==
+
+critical_count=0
+HEAD help/USAGE/README match no-auto-start sit contract.
+USAGE_ACCEPT

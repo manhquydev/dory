@@ -1,0 +1,128 @@
+FOLD_ACCEPT
+
+role=rv_fold
+when=2026-08-27 11:04:38 +0700
+cwd=/home/manhquy/Downloads/flow/dory
+phase=3 fold / factory doors (read-only; no dory/ELF/cargo leftover)
+plan=plans/260827-1032-ensure-server-no-auto-spawn/plan.md
+phase3=plans/260827-1032-ensure-server-no-auto-spawn/phase-03-review-and-ship.md
+cook=plans/reports/260827-ensure-server-no-spawn-cook.md
+NEWHEAD=b544f5ff75a3c085ae6ab51ccafb3b58fa551db2
+exec=none leftover/isolate/dory
+sit_t13=no
+cargo_leftover=no
+git_add_leftover5=no
+
+== verdict ==
+FOLD_GATE=HOLD
+critical_count=0
+claim_factory_doors_held=no
+leftover_ELF_still_embeds_spawn=yes (kept; not a fold fail)
+PATH name gone; leftover ELF still spawn-capable. C locks HEAD inode only.
+Do not claim "factory doors held."
+
+== criticals (live) ==
+
+1 leftover 5 staged
+  git diff --cached --name-only = empty (index names count 0)
+  leftover 5 cached names = empty
+  porcelain leftover 5 = unstaged space-M:
+    M README.md
+    M rust/src/attach.rs
+    M rust/src/main.rs
+    M rust/src/server.rs
+    M rust/tests/p5_attach.rs
+  FIRED=no
+
+2 leftover-tree cargo (leftover ELF sha ≠ 3ba0e3bc…)
+  path=/home/manhquy/Downloads/flow/dory/rust/target/debug/dory
+  sha256=3ba0e3bc3e9630c8f0b544523610b2f4e784c6f47ad049ab0b67f10704f1bc14
+  expect=3ba0e3bc3e9630c8f0b544523610b2f4e784c6f47ad049ab0b67f10704f1bc14
+  MATCH
+  size=18568240 inode=2490742 mtime_epoch=1787716801
+  mtime=2026-08-26 11:00:01 (same inode/mtime as 0940/1027)
+  leftover fingerprint latest_mtime=1787716801 (no leftover rebuild)
+  isolate cargo (allowed) ELF mtime=2026-08-27 10:56:04 inode=1065212
+  FIRED=no
+
+3 factory dory / leftover ELF / isolate ELF exec
+  this review: none
+  /proc/*/exe leftover+isolate+*/dory hits=0
+  cook receipt: No factory dory / leftover ELF / isolate ELF argv
+  default sock still not connectable → no new factory default
+  FIRED=no
+
+4 $XDG_RUNTIME_DIR/dory/default/dory.sock connectable
+  DORY_SOCKET=UNSET DORY_ENV=UNSET DORY_RECYCLE=UNSET PI_CODING_AGENT_DIR=UNSET
+  DORY_*=NONE
+  XDG_RUNTIME_DIR=/run/user/1000
+  sock=/run/user/1000/dory/default/dory.sock
+  probe=UnixStream AF_UNIX 1s on dory.sock (not session dir)
+  lexists=False exists=False
+  connectable=False
+  err=FileNotFoundError: [Errno 2] No such file or directory
+  elapsed_s=0.0001
+  FIRED=no
+
+5 type -a dory non-empty
+  hash -r; type -a dory → type: dory not found
+  TYPE_EXIT=1 command -v empty CMD_EXIT=1
+  PATH_WALK_COUNT=0 PATH_WALK_HITS=[]
+  ~/.local/bin/dory lexists=False
+  FIRED=no
+
+6 isolate HEAD ≠ b544f5ff75a3c085ae6ab51ccafb3b58fa551db2
+  factory HEAD=b544f5ff75a3c085ae6ab51ccafb3b58fa551db2
+  isolate HEAD=b544f5ff75a3c085ae6ab51ccafb3b58fa551db2
+  isolate porcelain=empty (detached)
+  worktree list: factory b544f5f [main]; isolate b544f5f (detached HEAD)
+  ≠ 5a60953
+  FIRED=no
+
+7 isolate ELF still has `dory: start server:`
+  path=/home/manhquy/.cache/dory-isolates/land-4b70f79/rust/target/debug/dory
+  sha256=2ef2073031d5ddfe23f5cbc906342bd0c6143137494b91df18b0518a1ff2f6b3
+  size=18474184 inode=1065212 mtime_epoch=1787802964
+  `dory: start server:` False count 0
+  `server did not come up` False count 0
+  `dory: server not running; start with `dory server`` True count 1
+  leftover ELF (kept, not exec'd): spawn strings still present (count 1 each)
+  FIRED=no
+
+8 claim "factory doors held"
+  cook.md: no match
+  cook-prompt.md / test-prompt.md: no match
+  this fold: does not claim it
+  FIRED=no
+
+== leftover 5 mint (observe; left pane owns) ==
+README.md                 68190a5ffa073c082aa318aad5ed032e13cc90e3 MATCH
+rust/src/attach.rs        602479094e84d31ad6f017775a3d55aeb485c644 MATCH
+rust/src/main.rs          373d688636ff7315ccd665f450069d8284eb47ff MATCH
+rust/src/server.rs        4de1554ad56e248cdcf42f02111b7389b08dae82 MATCH
+rust/tests/p5_attach.rs   9c28fc3e0f3666498a8952411242d5301f7911de MATCH
+unstaged M those five. cached empty. server.rs never staged this increment.
+
+== leftover ELF spawn-strings (kept) ==
+has dory: start server: True count 1
+has server did not come up True count 1
+has new stderr False count 0
+sha held. Not exec'd.
+
+== forbidden argv (this fold review) ==
+dory=no
+dory attach=no
+dory server=no
+dory server stop=no
+leftover ELF exec=no
+isolate ELF exec=no
+cargo leftover=no
+git add leftover 5=no
+sit t13=no
+herdr server stop=no
+factory reset --hard=no
+ln retarget=no
+
+== trap 15 ==
+PATH name gone. Leftover ELF still embeds spawn. C is HEAD inode fail-closed.
+FOLD_ACCEPT is doors-not-broken, not "factory doors held."
