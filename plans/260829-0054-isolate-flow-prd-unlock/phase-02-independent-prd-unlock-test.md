@@ -26,7 +26,7 @@ Chạy lại script trên sit mới. Đọc copied journal.
 
 ## Success Criteria
 
-- [ ] TEST_PASS independent journal
+- [x] TEST_PASS independent journal
 
 ## Risk Assessment
 

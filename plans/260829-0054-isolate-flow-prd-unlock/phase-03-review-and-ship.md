@@ -40,8 +40,8 @@ Ban `ak:git`. Ban 1743 eval. Ban leftover 5.
 
 ## Success Criteria
 
-- [ ] REVIEW_ACCEPT critical 0
-- [ ] Paper commit pathspec-only
+- [x] REVIEW_ACCEPT critical 0
+- [x] Paper commit pathspec-only
 
 ## Risk Assessment
 

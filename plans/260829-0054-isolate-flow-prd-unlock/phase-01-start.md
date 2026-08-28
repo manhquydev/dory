@@ -39,8 +39,8 @@ Journal: taxi1 FAIL `02-scope`; taxi2 `unlocked stage 3 (flow/03-prd.md)`. 03 sh
 
 ## Success Criteria
 
-- [ ] Script executable, self-refuses O
-- [ ] COOK_PASS once
+- [x] Script executable, self-refuses O
+- [x] COOK_PASS once
 
 ## Risk Assessment
 
