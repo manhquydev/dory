@@ -121,10 +121,12 @@ Factory OMP: skills ON. Isolate occupants: `--no-skills`. Ban factory `flow/` mi
 
 ## Remainder (named unpaid — not this cook)
 
+O is **paid** (`bcab751`). Sibling cook **P**: [260829-0054-isolate-flow-prd-unlock](../260829-0054-isolate-flow-prd-unlock/plan.md) (isolate fill 02 + `flow -- next` → `03-prd.md`).
+
 - Default occupancy / sit default
 - Founder `prompt --wait` / five states / p5 trap-10 lock
 - Skill taxi paper
-- Full 6-stage + semantic `gate-rules.md` + `card` + fill 02 / walk 03–05
+- Full 6-stage + semantic `gate-rules.md` + `card` + fill 03 / walk 04–05
 - Leftover 5 fold / PATH retarget / leftover ELF rm
 
 ## Red Team Review
