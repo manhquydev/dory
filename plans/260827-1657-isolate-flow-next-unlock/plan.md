@@ -129,10 +129,12 @@ Factory cook/test/review/ship OMP: skills ON so they may run `ak:cook` / `ak:tes
 
 ## Remainder (named unpaid — not this cook)
 
+N is **paid** (`bcf7c72`). Sibling cook **O**: [260828-1612-isolate-flow-scope-unlock](../260828-1612-isolate-flow-scope-unlock/plan.md) (isolate fill 01 + `flow -- next` → `02-scope.md`).
+
 - Default occupancy / sit default
 - Founder `prompt --wait` / five states `working`/`blocked` / p5 trap-10 lock
 - Skill taxi paper (empty `--` → `status`; 15s SIGTERM)
-- Full 6-stage + fill `01-research.md` + semantic `gate-rules.md` + `card`
+- Full 6-stage + semantic `gate-rules.md` + `card` + fill 02 / walk 03–05 (O takes one `next` only)
 - Leftover 5 fold / PATH retarget / leftover ELF rm
 
 ## Red Team Review
