@@ -69,8 +69,8 @@ Mechanical: all gate boxes `[x]`; zero `[FILL`. Not semantic `gate-rules.md`.
 
 ## Success Criteria
 
-- [ ] Script exists, executable, self-refuses N
-- [ ] COOK_PASS once: codes `[1,0]`, unlock-2, leftover mint, sock dead
+- [x] Script exists, executable, self-refuses N
+- [x] COOK_PASS once: codes `[1,0]`, unlock-2, leftover mint, sock dead
 
 ## Risk Assessment
 

@@ -48,9 +48,9 @@ Tab `dory-aoe5s-test` mint sit pane riêng. Cùng `SIT_DORY`. Không reuse ISO c
 
 ## Success Criteria
 
-- [ ] TEST_PASS
-- [ ] Independent journal measure
-- [ ] Leftover 5 mint; sock connectable=0
+- [x] TEST_PASS
+- [x] Independent journal measure
+- [x] Leftover 5 mint; sock connectable=0
 
 ## Risk Assessment
 

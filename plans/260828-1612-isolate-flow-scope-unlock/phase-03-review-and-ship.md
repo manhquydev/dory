@@ -72,9 +72,9 @@ Do not push. After commit: leftover 5 still ` M`; rust log `b544f5f`.
 
 ## Success Criteria
 
-- [ ] REVIEW_ACCEPT critical 0
-- [ ] Paper commit pathspec-only; leftover 5 unstaged mint
-- [ ] No push
+- [x] REVIEW_ACCEPT critical 0
+- [x] Paper commit pathspec-only; leftover 5 unstaged mint
+- [x] No push
 
 ## Risk Assessment
 
