@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Review and ship"
-status: pending
+status: completed
 priority: P1
 effort: "45m"
 dependencies: [2]

@@ -13,6 +13,8 @@ Formerly `HIEN-PHAP.md`. Citations of that path still bind.
 
 Đọc tờ này lạnh trước khi thêm file nào khác vào thư mục này.
 
+WHERE hiện tại (paid / unpaid, leftover door): [docs/README.md](docs/README.md).
+
 ## Bốn hộp (đừng gộp)
 
 | Hộp | Việc | Nhà | Trạng thái |

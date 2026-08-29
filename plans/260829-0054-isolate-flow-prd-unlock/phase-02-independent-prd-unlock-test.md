@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Independent prd unlock test"
-status: pending
+status: completed
 priority: P1
 effort: "45m"
 dependencies: [1]

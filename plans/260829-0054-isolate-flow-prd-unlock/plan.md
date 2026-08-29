@@ -1,7 +1,7 @@
 ---
 title: "Isolate flow prd unlock"
 description: "New isolate script: factory mint O world-state (00+01 PASS + 02 template); occupant PASS scope; taxi dory flow -- next fail then pass; world-state flow/03-prd.md. No rust. No default. Leftover 5 mint."
-status: pending
+status: completed
 priority: P1
 effort: 3h
 branch: main
@@ -74,18 +74,18 @@ Tab mới `w13`, `--no-focus`, cwd dory. 4–6 pane. Không split `t13`.
 
 | # | Phase | Status |
 |---|-------|--------|
-| 1 | [New isolate prd-unlock script](./phase-01-start.md) | Pending |
-| 2 | [Independent prd unlock test](./phase-02-independent-prd-unlock-test.md) | Pending |
-| 3 | [Review and ship](./phase-03-review-and-ship.md) | Pending |
+| 1 | [New isolate prd-unlock script](./phase-01-start.md) | Done |
+| 2 | [Independent prd unlock test](./phase-02-independent-prd-unlock-test.md) | Done |
+| 3 | [Review and ship](./phase-03-review-and-ship.md) | Done |
 
 ## Success Criteria
 
-- [ ] `scripts/dory-isolate-aoe5-flow-prd.sh` exit 0; self-refuses O/N/judge
-- [ ] Taxi 1 FAIL `02-scope`; no `03-prd.md`
-- [ ] Occupant writes PASS `02-scope.md`
-- [ ] Taxi 2 `unlocked stage 3`; 03 sha == template
-- [ ] Sit `Flow 1. next` / `Flow 0. next`
-- [ ] Leftover 5 mint; sock dead; PATH empty; rust log `b544f5f`
+- [x] `scripts/dory-isolate-aoe5-flow-prd.sh` exit 0; self-refuses O/N/judge
+- [x] Taxi 1 FAIL `02-scope`; no `03-prd.md`
+- [x] Occupant writes PASS `02-scope.md`
+- [x] Taxi 2 `unlocked stage 3`; 03 sha == template
+- [x] Sit `Flow 1. next` / `Flow 0. next`
+- [x] Leftover 5 mint; sock dead; PATH empty; rust log `b544f5f`
 
 ## Remainder (named unpaid)
 

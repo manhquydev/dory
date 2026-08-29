@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "New isolate prd-unlock script"
-status: pending
+status: completed
 priority: P1
 effort: "2h"
 dependencies: []
