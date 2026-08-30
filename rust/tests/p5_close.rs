@@ -111,8 +111,9 @@ fn root_pane(h: &Harness) -> String {
 }
 
 fn snap_focused(h: &Harness) -> String {
-    json_field(&rpc(h, r#"{"op":"snapshot"}"#), "focused")
-        .expect("focused")
+    let snap = rpc(h, r#"{"op":"snapshot"}"#);
+    json_field(&snap, "focused")
+        .unwrap_or_else(|| panic!("focused missing in {snap}"))
         .to_string()
 }
 

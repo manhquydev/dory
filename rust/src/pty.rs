@@ -1,6 +1,4 @@
 use portable_pty::{Child, CommandBuilder, MasterPty, PtySize, native_pty_system};
-#[cfg(not(target_os = "linux"))]
-use std::collections::HashMap;
 use std::collections::{HashSet, VecDeque};
 
 use std::ffi::OsString;
@@ -94,16 +92,21 @@ fn refused_spawn_name(token: &str) -> Option<&'static str> {
 }
 
 /// Walk children of `root_pid` and collect `comm` names.
-/// Linux reads `/proc`. Other unix (macOS) walks `ps` and also
-/// includes the session-leader comm — portable-pty often has no wrapper.
+/// Linux reads `/proc`. Darwin uses libproc (no extra child — do not
+/// spawn `ps` from the server; SIGCHLD would reap pane slaves).
 pub fn descendant_comms(root_pid: u32) -> Vec<String> {
     #[cfg(target_os = "linux")]
     {
         descendant_comms_proc(root_pid)
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "macos")]
     {
-        descendant_comms_ps(root_pid)
+        descendant_comms_libproc(root_pid)
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    {
+        let _ = root_pid;
+        Vec::new()
     }
 }
 
@@ -135,39 +138,57 @@ fn descendant_comms_proc(root_pid: u32) -> Vec<String> {
     out
 }
 
-#[cfg(not(target_os = "linux"))]
-fn descendant_comms_ps(root_pid: u32) -> Vec<String> {
-    let output = match std::process::Command::new("ps")
-        .args(["-axo", "pid=,ppid=,comm="])
-        .output()
-    {
-        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).into_owned(),
-        _ => return Vec::new(),
-    };
-    let mut by_ppid: HashMap<u32, Vec<(u32, String)>> = HashMap::new();
-    let mut root_comm = None;
-    for line in output.lines() {
-        let mut parts = line.split_whitespace();
-        let Some(pid) = parts.next().and_then(|s| s.parse::<u32>().ok()) else {
-            continue;
-        };
-        let Some(ppid) = parts.next().and_then(|s| s.parse::<u32>().ok()) else {
-            continue;
-        };
-        let raw = parts.collect::<Vec<_>>().join(" ");
-        if raw.is_empty() {
-            continue;
-        }
-        let comm = Path::new(&raw)
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or(&raw)
-            .to_string();
-        if pid == root_pid {
-            root_comm = Some(comm.clone());
-        }
-        by_ppid.entry(ppid).or_default().push((pid, comm));
+#[cfg(target_os = "macos")]
+unsafe extern "C" {
+    fn proc_listchildpids(pid: i32, buffer: *mut u8, buffersize: i32) -> i32;
+    fn proc_name(pid: i32, buffer: *mut u8, buffersize: u32) -> i32;
+}
+
+#[cfg(target_os = "macos")]
+fn proc_comm(pid: u32) -> Option<String> {
+    let mut buf = [0u8; 32];
+    let n = unsafe { proc_name(pid as i32, buf.as_mut_ptr(), buf.len() as u32) };
+    if n <= 0 {
+        return None;
     }
+    let end = buf.iter().position(|&b| b == 0).unwrap_or(n as usize);
+    let name = std::str::from_utf8(&buf[..end]).ok()?.trim();
+    if name.is_empty() {
+        None
+    } else {
+        Some(name.to_string())
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn proc_children(pid: u32) -> Vec<u32> {
+    unsafe {
+        let hint = proc_listchildpids(pid as i32, std::ptr::null_mut(), 0);
+        let cap = if hint > 0 {
+            (hint as usize / 4) + 8
+        } else {
+            32
+        };
+        let mut buf = vec![0i32; cap];
+        let n = proc_listchildpids(
+            pid as i32,
+            buf.as_mut_ptr() as *mut u8,
+            (buf.len() * 4) as i32,
+        );
+        if n <= 0 {
+            return Vec::new();
+        }
+        buf[..(n as usize / 4)]
+            .iter()
+            .copied()
+            .filter(|p| *p > 1)
+            .map(|p| p as u32)
+            .collect()
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn descendant_comms_libproc(root_pid: u32) -> Vec<String> {
     let mut out = Vec::new();
     let mut seen = HashSet::new();
     let mut stack = vec![root_pid];
@@ -175,15 +196,15 @@ fn descendant_comms_ps(root_pid: u32) -> Vec<String> {
         if !seen.insert(pid) {
             continue;
         }
-        if let Some(kids) = by_ppid.get(&pid) {
-            for (child, comm) in kids {
-                out.push(comm.clone());
-                stack.push(*child);
+        if pid != root_pid {
+            if let Some(name) = proc_comm(pid) {
+                out.push(name);
             }
         }
+        stack.extend(proc_children(pid));
     }
     // Direct slave argv (no wrapper) must still match argv0 comm.
-    if let Some(comm) = root_comm {
+    if let Some(comm) = proc_comm(root_pid) {
         if !out.iter().any(|c| c == &comm) {
             out.push(comm);
         }

@@ -50,7 +50,7 @@ jobs:
               --skip server::tests::sit_shell_drops_norc_default_keeps_it \
               --skip server::tests::tab_and_workspace_follow_pane_or_explicit_cwd
           fi
-          cargo test --locked --bins \
+          cargo test --locked --bins --no-fail-fast \
             --test ensure_bin \
             --test flow_taxi \
             --test pane_io \
