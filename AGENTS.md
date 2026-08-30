@@ -14,4 +14,4 @@
 - Do not `git remote add origin`. Push `git push https://github.com/manhquydev/dory.git main`.
 - Do not claim `npm i @manhquy/dory` is desk `dory`. Lamp bin is `dory-serve`.
 - Do not bootstrap Node (fnm/nvm/NodeSource/`curl | sh`) from a Dory script. Doctor detects and points at nodejs.org.
-- Do not `npm i -g dory` (unscoped; other product). Do not republish `0.1.0-next.0` (spent 2026-08-30). Next lamp bump is `0.1.0-next.1`.
+- Do not `npm i -g dory` (unscoped; other product). Do not republish `0.1.0-next.0` / `0.1.0-next.1` (spent). Next lamp bump is `0.1.0-next.2`.

@@ -4,7 +4,7 @@ Journal **lamp** (Session OS). Not the desk. Needs Node `>=22.14.0`. This packag
 
 ```bash
 # pin; npx without a version follows latest
-npx @manhquy/dory@0.1.0-next.0 dory-serve -- serve --workspace /abs
+npx @manhquy/dory@0.1.0-next.1 dory-serve -- serve --workspace /abs
 ```
 
 Then open `http://127.0.0.1:7380/`. Gõ `dory` is the Rust desk (not this package). Bin here is **`dory-serve` only**.

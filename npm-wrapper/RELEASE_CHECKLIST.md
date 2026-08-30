@@ -37,7 +37,9 @@ Live OIDC run https://github.com/manhquydev/dory/actions/runs/33295896563 : Sigs
 
 **Door 1b closed 2026-08-30:** laptop `npm publish --access public --tag next` (no `--provenance`) as npm user `manhquy`. Registry: `@manhquy/dory@0.1.0-next.0`. Bin `dory-serve` only. First publish also set dist-tag `latest` (npm default). Packument GET stayed 404 ~3 min after version + tarball + dist-tags were live — do not treat that lag as “publish failed.”
 
-That semver is **spent**. Next OIDC / live bump is `0.1.0-next.1`. Operator reported package-page Trusted Publisher saved 2026-08-30. Dry-run on spent `0.1.0-next.0` (run 33298110732) is green — that does **not** prove PUT. Live `0.1.0-next.1` is the TP proof. Revoke any token used for 1b. Never paste tokens into chat.
+That semver is **spent**.
+
+**OIDC live closed 2026-08-30:** run https://github.com/manhquydev/dory/actions/runs/33298599393 SHA `dc5506e` → `+ @manhquy/dory@0.1.0-next.1`, provenance visible, tag `npm@0.1.0-next.1`. Dist-tag `next` = `0.1.0-next.1`. Dist-tag `latest` still `0.1.0-next.0` (first-publish default; do not promote from GHA). Next bump is `0.1.0-next.2`. TP on the package page is proven by this PUT (dry-run alone never was).
 
 ## Publish
 

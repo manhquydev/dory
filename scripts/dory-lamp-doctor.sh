@@ -44,7 +44,7 @@ print_node_help() {
 Node >= 22.14.0 is required for the lamp. Dory will not install Node.
   https://nodejs.org/en/download
   or fnm: https://github.com/Schniz/fnm
-Then: npx @manhquy/dory@0.1.0-next.0 dory-serve -- serve --workspace /abs
+Then: npx @manhquy/dory@0.1.0-next.1 dory-serve -- serve --workspace /abs
 EOF
 }
 
@@ -124,7 +124,7 @@ diagnose() {
     echo "PATH dory-serve: (none) — expected unless you --install. use npx."
   fi
 
-  echo "run: npx ${PKG}@0.1.0-next.0 ${BIN} -- serve --workspace /abs"
+  echo "run: npx ${PKG}@0.1.0-next.1 ${BIN} -- serve --workspace /abs"
   echo "uninstall: npm uninstall -g $PKG"
   echo "never: npm i -g $UNSCOPED_TRAP"
   return "$rc"
