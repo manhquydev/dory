@@ -1,0 +1,39 @@
+{
+  "name": "@manhquy/dory",
+  "version": "0.1.0-next.0",
+  "description": "Dory journal lamp (Session OS). Desk SKU is the Rust binary, not this package.",
+  "type": "module",
+  "private": false,
+  "bin": {
+    "dory-serve": "bin/dory-serve.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "scripts": {
+    "sync": "node scripts/sync.mjs",
+    "prepack": "node scripts/sync.mjs",
+    "pretest": "node scripts/sync.mjs",
+    "test": "node --test --test-concurrency=1 test/bin.test.mjs"
+  },
+  "keywords": [
+    "dory",
+    "session-os",
+    "journal"
+  ],
+  "author": "manhquy <manhquy.mqy@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/manhquydev/dory#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/manhquydev/dory.git"
+  },
+  "bugs": {
+    "url": "https://github.com/manhquydev/dory/issues"
+  }
+}

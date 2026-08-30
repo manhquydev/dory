@@ -1,0 +1,165 @@
+name: Publish npm-wrapper to npm (trusted publishing)
+
+on:
+  push:
+    tags:
+      - 'npm@*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (must match npm-wrapper/package.json)'
+        required: true
+      dist_tag:
+        description: 'npm dist-tag'
+        required: true
+        default: 'next'
+        type: choice
+        options: [next, latest]
+      dry_run:
+        description: 'If true, run npm publish --dry-run only'
+        required: false
+        default: 'true'
+        type: choice
+        options: ['true', 'false']
+      promote_to:
+        description: 'NOT automated — prints manual npm dist-tag add and FAILS (OIDC cannot dist-tag). Leave none.'
+        required: false
+        default: 'none'
+        type: choice
+        options: ['none', 'latest', 'next']
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: npm-publish
+    defaults:
+      run:
+        working-directory: npm-wrapper
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version + dist-tag from trigger
+        id: meta
+        working-directory: ${{ github.workspace }}
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            version="${GITHUB_REF_NAME#npm@}"
+            case "$version" in
+              *"-"*) dist_tag=next; dry_run=false ;;
+              *)     dist_tag=latest; dry_run=false ;;
+            esac
+          else
+            version="${{ inputs.version }}"
+            dist_tag="${{ inputs.dist_tag }}"
+            dry_run="${{ inputs.dry_run }}"
+          fi
+          case "$version" in
+            *"-"*)
+              if [ "$dist_tag" = "latest" ]; then
+                echo "FAIL: pre-release version '$version' cannot publish to dist-tag 'latest'" >&2
+                exit 1
+              fi
+              ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "dist_tag=$dist_tag" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+
+      - name: Promote is manual-only (early exit — no install/test/publish)
+        if: github.event_name == 'workflow_dispatch' && inputs.promote_to != 'none' && inputs.promote_to != ''
+        working-directory: ${{ github.workspace }}
+        run: |
+          ver="${{ steps.meta.outputs.version }}"
+          tag="${{ inputs.promote_to }}"
+          echo "FAIL: promote_to=$tag cannot run via GitHub OIDC (npm dist-tag add → E401)." >&2
+          echo "Promote from a write-capable npm auth path:" >&2
+          echo "  npm dist-tag add @manhquy/dory@${ver} ${tag}" >&2
+          exit 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Upgrade npm to a pinned known-good OIDC-capable range
+        working-directory: ${{ github.workspace }}
+        run: |
+          npm install -g "npm@^11.5.1"
+          npm_version="$(npm --version)"
+          echo "npm version: $npm_version"
+          case "$npm_version" in
+            11.5.*|11.[6-9].*|11.[1-9][0-9].*) ;;
+            *) echo "FAIL: npm $npm_version is below the OIDC floor 11.5.1" >&2; exit 1 ;;
+          esac
+
+      - name: Verify npm-wrapper/package.json version matches trigger
+        run: |
+          pkg_version=$(node -p "require('./package.json').version")
+          expected="${{ steps.meta.outputs.version }}"
+          if [ "$pkg_version" != "$expected" ]; then
+            echo "FAIL: npm-wrapper/package.json version ($pkg_version) != trigger ($expected)" >&2
+            exit 1
+          fi
+
+      - name: Materialize lamp src
+        run: npm run sync
+
+      - name: Install (no lifecycle scripts)
+        run: npm ci --ignore-scripts
+
+      - name: Test
+        run: npm test
+
+      - name: Guard — package bin is not dory
+        run: |
+          node -e "const b=require('./package.json').bin; if (b.dory) { console.error('FAIL: bin.dory steals desk SKU'); process.exit(1) } if (!b['dory-serve']) { console.error('FAIL: missing dory-serve'); process.exit(1) }"
+
+      - name: Tarball audit (< 1MB unpacked; no leftover README/rust; no symlinks)
+        run: |
+          npm pack --dry-run --ignore-scripts --json > pack.json
+          node -e "
+            const raw=require('./pack.json');
+            const p=Array.isArray(raw)?raw[0]:raw[Object.keys(raw)[0]];
+            if(p.unpackedSize>1048576){console.error('unpacked > 1MB: '+p.unpackedSize); process.exit(1)}
+            const names=(p.files||[]).map(f=>f.path);
+            const rust=names.filter(n=>n.startsWith('rust/')||n==='../../README.md');
+            if(rust.length){console.error('leftover rust/root in tarball',rust); process.exit(1)}
+            const bad=(p.files||[]).filter(f=>f.mode && (f.mode & 0o170000)===0o120000);
+            if(bad.length){console.error('symlink in tarball:',bad); process.exit(1)}
+          "
+
+      - name: Publish (OIDC + provenance)
+        if: steps.meta.outputs.dry_run == 'false'
+        run: npm publish --provenance --access public --tag "${{ steps.meta.outputs.dist_tag }}"
+
+      - name: Publish dry-run
+        if: steps.meta.outputs.dry_run == 'true'
+        run: npm publish --dry-run --provenance --access public --tag "${{ steps.meta.outputs.dist_tag }}"
+
+      - name: Verify provenance visible from registry
+        if: steps.meta.outputs.dry_run == 'false'
+        run: |
+          for i in $(seq 1 10); do
+            sleep 20
+            if npm view "@manhquy/dory@${{ steps.meta.outputs.version }}" dist.attestations.provenance 2>/dev/null | grep -q '.'; then
+              echo "provenance OK after $i attempt(s)"
+              exit 0
+            fi
+          done
+          echo "WARN: provenance not visible after 200s; publish already succeeded." >&2
+
+      - name: Create git tag (workflow_dispatch only)
+        if: steps.meta.outputs.dry_run == 'false' && github.event_name == 'workflow_dispatch'
+        working-directory: ${{ github.workspace }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "npm@${{ steps.meta.outputs.version }}"
+          git push origin "npm@${{ steps.meta.outputs.version }}"
