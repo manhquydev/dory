@@ -38,6 +38,7 @@ Discover current paper with `git log --oneline -- scripts/dory-isolate-aoe5-flow
 - Company Phase 5 (a real project completed *inside* Dory)
 - Leftover 5 fold / PATH retarget / leftover ELF rm
 - Founder `prompt --wait` / skill taxi paper
+- Desk GitHub release / cargo-dist (`curl | sh` ELF) — lamp doctor is not that
 
 ## Factory doors
 
@@ -51,6 +52,7 @@ Two engines stay two engines. Green CI on `main` is the land/lamp compile-and-te
 |---|---|
 | What CI runs / skips | `.github/workflows/ci.yml` |
 | How the lamp ships | `.github/workflows/publish-npm-wrapper.yml` + [npm-wrapper/RELEASE_CHECKLIST.md](../npm-wrapper/RELEASE_CHECKLIST.md) |
+| How a user installs the lamp | [npm-wrapper/README.md](../npm-wrapper/README.md) + `scripts/dory-lamp-doctor.sh` |
 | Costly actions | [AGENTS.md](../AGENTS.md) |
 
 Rejected: laptop `--provenance`, `NPM_TOKEN` in git, publish `version` = environment name, folding leftover 5 to make Darwin `/proc` tests pass, `ps`/libproc inside the desk server. Dist-tag promote is laptop-only (OIDC E401) — token never in chat. First live E404 after Sigstore is “package does not exist / TP not on the package page” — see [RELEASE_CHECKLIST.md](../npm-wrapper/RELEASE_CHECKLIST.md) § First package.
