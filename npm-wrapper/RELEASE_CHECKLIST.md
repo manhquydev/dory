@@ -37,7 +37,7 @@ Live OIDC run https://github.com/manhquydev/dory/actions/runs/33295896563 : Sigs
 
 **Door 1b closed 2026-08-30:** laptop `npm publish --access public --tag next` (no `--provenance`) as npm user `manhquy`. Registry: `@manhquy/dory@0.1.0-next.0`. Bin `dory-serve` only. First publish also set dist-tag `latest` (npm default). Packument GET stayed 404 ~3 min after version + tarball + dist-tags were live — do not treat that lag as “publish failed.”
 
-That semver is **spent**. Next OIDC / live bump is `0.1.0-next.1`. Bind Trusted Publisher on the **package** page (`https://www.npmjs.com/package/@manhquy/dory` → Settings): owner `manhquydev`, repo `dory`, workflow `publish-npm-wrapper.yml`, environment `npm-publish`, action **publish**. Revoke any token used for 1b. Never paste tokens into chat.
+That semver is **spent**. Next OIDC / live bump is `0.1.0-next.1`. Operator reported package-page Trusted Publisher saved 2026-08-30. Dry-run on spent `0.1.0-next.0` (run 33298110732) is green — that does **not** prove PUT. Live `0.1.0-next.1` is the TP proof. Revoke any token used for 1b. Never paste tokens into chat.
 
 ## Publish
 
@@ -50,13 +50,13 @@ Order is a gate. Do not skip.
 ```
 gh workflow run "Publish npm-wrapper to npm (trusted publishing)" \
   --repo manhquydev/dory --ref main \
-  -f version=0.1.0-next.0 -f dist_tag=next -f dry_run=true -f promote_to=none
+  -f version=0.1.0-next.1 -f dist_tag=next -f dry_run=true -f promote_to=none
 ```
 
 4. Dry-run must print `Publishing … (dry-run)` and `+ @manhquy/dory@…`. Bin stays `dory-serve`.
 5. Dispatch the same inputs with `dry_run=false`. Approve `npm-publish` again (each run waits).
-6. Or push tag `npm@0.1.0-next.0` (pre-release → dist-tag `next`).
-7. After live: `npm view @manhquy/dory@0.1.0-next.0` and `npm view @manhquy/dory dist-tags --json`.
+6. Or push tag `npm@0.1.0-next.1` (pre-release → dist-tag `next`).
+7. After live: `npm view @manhquy/dory@0.1.0-next.1` and `npm view @manhquy/dory dist-tags --json`.
 8. Promote `next` → `latest` only from your shell (`npm dist-tag add …`). Not GHA. Then revoke the token.
 
 Bump `npm-wrapper/package.json` version **before** the next live. Same SHA cannot republish the same semver.
