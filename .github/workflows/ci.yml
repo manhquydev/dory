@@ -37,10 +37,13 @@ jobs:
         working-directory: rust
         # Factory-path tests stay local-only (FLOW_BIN / occ_skill SKILL).
         # macOS: skip land unit tests that read /proc (pid/cwd/environ/cmdline).
+        # Occupant done/idle still needs argv0 comm == descendant comm; Darwin
+        # /bin/sh is bash — unpaid to fold leftover classify_word. Skip those four.
         # Do not fold leftover server.rs to invent Darwin helpers.
         run: |
           set --
           if [ "$(uname -s)" = Darwin ]; then
+            export RUST_TEST_THREADS=1
             set -- \
               --skip server::tests::p2_10_second_server_same_session_refuses \
               --skip server::tests::p2_3_client_disconnect_does_not_kill \
