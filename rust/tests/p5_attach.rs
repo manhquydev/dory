@@ -27,6 +27,15 @@ impl Drop for Harness {
     }
 }
 
+
+unsafe extern "C" {
+    fn kill(pid: i32, sig: i32) -> i32;
+}
+
+fn pid_alive(pid: u32) -> bool {
+    unsafe { kill(pid as i32, 0) == 0 }
+}
+
 fn bin() -> &'static str {
     env!("CARGO_BIN_EXE_dory")
 }
@@ -170,7 +179,7 @@ fn attach_handshake_writes_and_detach_leaves_pty() {
     assert!(snap2.contains("\"live\":true"), "{snap2}");
     let pid = json_u32(&snap2, "pid").expect("pid");
     assert!(
-        Path::new(&format!("/proc/{pid}")).exists(),
+        pid_alive(pid),
         "detach must not kill pid {pid}"
     );
 }

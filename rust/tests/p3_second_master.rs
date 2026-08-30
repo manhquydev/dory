@@ -109,8 +109,13 @@ fn result_id(json: &str, key: &str) -> String {
     json_field(json, key).to_string()
 }
 
+unsafe extern "C" {
+    fn kill(pid: i32, sig: i32) -> i32;
+}
+
 fn pid_alive(pid: u32) -> bool {
-    Path::new(&format!("/proc/{pid}")).exists()
+    // kill(pid, 0) is portable; /proc exists only on Linux.
+    unsafe { kill(pid as i32, 0) == 0 }
 }
 
 #[test]
