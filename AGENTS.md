@@ -13,3 +13,4 @@
 - Do not spawn `ps` or libproc from the desk server. Darwin occupant `done`/`idle` stays unpaid; CI skips those tests.
 - Do not `git remote add origin`. Push `git push https://github.com/manhquydev/dory.git main`.
 - Do not claim `npm i @manhquy/dory` is desk `dory`. Lamp bin is `dory-serve`.
+- Do not treat Sigstore / dry-run as “package exists”. GET `registry.npmjs.org/@manhquy/dory` E404 means first package is unpaid until npmjs package-page TP or laptop bootstrap (no `--provenance`, token never in chat).
