@@ -6,12 +6,14 @@ Copied from flow-skill traps. Do not invent a token path.
 
 Same four fields as flow-skill, only `repo` changes:
 
-| Field | Value |
-|---|---|
-| owner | `manhquydev` |
-| repo | `dory` |
-| workflow | `publish-npm-wrapper.yml` |
-| environment | `npm-publish` |
+| Field | Value | Not |
+|---|---|---|
+| owner (GitHub) | `manhquydev` | npm account `manhquy` |
+| repo | `dory` | |
+| workflow | `publish-npm-wrapper.yml` | display name, or path `.github/workflows/…` |
+| environment | `npm-publish` | blank |
+
+npm scope `@manhquy` ≠ GitHub owner. flow-skill lives on this same pair. If the GitHub owner field is `manhquy`, OIDC does not match `manhquydev/dory` (PUT 404; Sigstore can still sign).
 
 Allowed action: **publish** (required after 2026-05-20).
 
