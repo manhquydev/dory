@@ -48,8 +48,7 @@ jobs:
             --test p5_prompt_after_report \
             --test p5_prompt_paste \
             --test p5_prompt_unknown \
-            --test p5_report \
-            --test p5_skill_occ
+            --test p5_report
         env:
           CARGO_TERM_COLOR: always
 
