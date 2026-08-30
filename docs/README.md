@@ -42,3 +42,15 @@ Discover current paper with `git log --oneline -- scripts/dory-isolate-aoe5-flow
 ## Factory doors
 
 Herdr is the factory chair. Do not sit factory `w13:t13`. Do not start `/run/user/$UID/dory/default/dory.sock` from factory. Stop isolate only with the 2357 compound in the isolate scripts.
+
+## Ship loop (lamp + land CI)
+
+Two engines stay two engines. Green CI on `main` is the land/lamp compile-and-test door. npm Trusted Publishing is the lamp ship door. Owners:
+
+| Door | Owner |
+|---|---|
+| What CI runs / skips | `.github/workflows/ci.yml` |
+| How the lamp ships | `.github/workflows/publish-npm-wrapper.yml` + [npm-wrapper/RELEASE_CHECKLIST.md](../npm-wrapper/RELEASE_CHECKLIST.md) |
+| Costly actions | [AGENTS.md](../AGENTS.md) |
+
+Rejected: laptop `--provenance`, `NPM_TOKEN` in git, publish `version` = environment name, folding leftover 5 to make Darwin `/proc` tests pass, `ps`/libproc inside the desk server. Dist-tag promote is laptop-only (OIDC E401) — token never in chat.

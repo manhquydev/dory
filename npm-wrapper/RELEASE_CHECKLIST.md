@@ -31,7 +31,22 @@ Repo must stay **public** (OIDC audience). Environment `npm-publish` has require
 
 ## Publish
 
-1. `npm-wrapper/package.json` version == tag semver.
-2. Push tag `npm@0.1.0-next.0` → workflow dist-tag `next`.
-3. Or Actions → workflow_dispatch → `dry_run=true` first.
-4. After first live publish: `npm view @manhquy/dory dist-tags --json`.
+Order is a gate. Do not skip.
+
+1. SHA on `main`. CI `all-checks-passed` green. Owner: `.github/workflows/ci.yml`.
+2. `npm-wrapper/package.json` version == dispatch/tag semver. **Not** the environment name `npm-publish`.
+3. Dispatch dry-run, then **Approve** environment `npm-publish`:
+
+```
+gh workflow run "Publish npm-wrapper to npm (trusted publishing)" \
+  --repo manhquydev/dory --ref main \
+  -f version=0.1.0-next.0 -f dist_tag=next -f dry_run=true -f promote_to=none
+```
+
+4. Dry-run must print `Publishing … (dry-run)` and `+ @manhquy/dory@…`. Bin stays `dory-serve`.
+5. Dispatch the same inputs with `dry_run=false`. Approve `npm-publish` again (each run waits).
+6. Or push tag `npm@0.1.0-next.0` (pre-release → dist-tag `next`).
+7. After live: `npm view @manhquy/dory@0.1.0-next.0` and `npm view @manhquy/dory dist-tags --json`.
+8. Promote `next` → `latest` only from your shell (`npm dist-tag add …`). Not GHA. Then revoke the token.
+
+Bump `npm-wrapper/package.json` version **before** the next live. Same SHA cannot republish the same semver.
