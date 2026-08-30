@@ -33,20 +33,11 @@ Repo must stay **public** (OIDC audience). Environment `npm-publish` has require
 
 ## First package (paid trap — 2026-08-30)
 
-Live run https://github.com/manhquydev/dory/actions/runs/33295896563 : Sigstore provenance signed, then `PUT @manhquy/dory` → **E404**. Same as flow-skill before TP was actually saved on the **package** page. Dry-run and Sigstore do not create the package.
+Live OIDC run https://github.com/manhquydev/dory/actions/runs/33295896563 : Sigstore signed, then `PUT` **E404**. Package did not exist.
 
-npmjs Trusted Publisher is configured on an **existing** package (`Package → Settings`). If `@manhquy/dory` has no package page, the “new package” form did not bind. Do not re-dispatch OIDC until either:
+**Door 1b closed 2026-08-30:** laptop `npm publish --access public --tag next` (no `--provenance`) as npm user `manhquy`. Registry: `@manhquy/dory@0.1.0-next.0`. Bin `dory-serve` only. First publish also set dist-tag `latest` (npm default). Packument GET stayed 404 ~3 min after version + tarball + dist-tags were live — do not treat that lag as “publish failed.”
 
-- You can open `https://www.npmjs.com/package/@manhquy/dory` and see Trusted Publisher (`owner=manhquydev` `repo=dory` `workflow=publish-npm-wrapper.yml` `environment=npm-publish` action **publish**), **or**
-- You bootstrap once from **your** shell (passkey-only account → Granular token **Bypass 2FA**, never paste into chat, no `--provenance`):
-
-```
-cd npm-wrapper
-npm run sync
-npm publish --access public --tag next
-```
-
-Then bind TP on that package page. That semver is spent (no OIDC republish). Next OIDC bump is `0.1.0-next.1`. Revoke the token after.
+That semver is **spent**. Next OIDC / live bump is `0.1.0-next.1`. Bind Trusted Publisher on the **package** page (`https://www.npmjs.com/package/@manhquy/dory` → Settings): owner `manhquydev`, repo `dory`, workflow `publish-npm-wrapper.yml`, environment `npm-publish`, action **publish**. Revoke any token used for 1b. Never paste tokens into chat.
 
 ## Publish
 
