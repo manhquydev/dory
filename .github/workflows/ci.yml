@@ -31,7 +31,25 @@ jobs:
           workspaces: rust
       - name: cargo test (land tree, unix desk)
         working-directory: rust
-        run: cargo test --locked
+        # Four integration tests pin FLOW_BIN to a factory sibling
+        # (/home/manhquy/Downloads/flow/flow-skill/...). They stay local-only.
+        run: |
+          cargo test --locked --lib --bins \
+            --test ensure_bin \
+            --test flow_taxi \
+            --test pane_io \
+            --test p3_nested_from_env \
+            --test p3_second_master \
+            --test p5_attach \
+            --test p5_close \
+            --test p5_discover \
+            --test p5_layout \
+            --test p5_occupant \
+            --test p5_prompt_after_report \
+            --test p5_prompt_paste \
+            --test p5_prompt_unknown \
+            --test p5_report \
+            --test p5_skill_occ
         env:
           CARGO_TERM_COLOR: always
 
