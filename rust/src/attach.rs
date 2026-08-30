@@ -23,6 +23,10 @@ const TCSANOW: i32 = 0;
 const POLLIN: i16 = 0x0001;
 #[cfg(target_os = "linux")]
 const TIOCGWINSZ: u64 = 0x5413;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+const TIOCGWINSZ: u64 = 0x4008_7468;
+#[cfg(all(unix, not(any(target_os = "linux", target_os = "macos", target_os = "ios"))))]
+const TIOCGWINSZ: u64 = 0x4008_7468;
 
 #[repr(C)]
 struct PollFd {
