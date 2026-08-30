@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  rust-desk:
+    name: rust-desk (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - name: cargo test (land tree, unix desk)
+        working-directory: rust
+        run: cargo test --locked
+        env:
+          CARGO_TERM_COLOR: always
+
+  rust-windows-notice:
+    name: rust-desk (windows notice)
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - name: Desk is unix-only
+        shell: bash
+        run: |
+          echo "NOTICE: rust/ uses UnixStream, flock, XDG_RUNTIME_DIR."
+          echo "Windows is not a desk target. Lamp CI covers Node on windows."
+          echo "SKIP_WINDOWS_DESK"
+
+  npm-wrapper:
+    name: npm-wrapper (node ${{ matrix.node }}, ${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: npm-wrapper
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Assert credentialless
+        shell: bash
+        run: |
+          if [ -n "${NPM_TOKEN:-}" ]; then
+            echo "FAIL: NPM_TOKEN is set; wrapper CI is credentialless" >&2
+            exit 1
+          fi
+      - name: Install (no lifecycle scripts)
+        run: npm ci --ignore-scripts
+      - name: Sync + test
+        run: npm test
+      - name: Pack dry-run + bin guard
+        shell: bash
+        run: |
+          npm pack --dry-run --ignore-scripts --json > pack.json
+          node -e "const b=require('./package.json').bin; if (b.dory) { console.error('bin.dory steals desk'); process.exit(1) }"
+          node -e "const raw=require('./pack.json'); const p=Array.isArray(raw)?raw[0]:raw[Object.keys(raw)[0]]; if(p.unpackedSize>1048576){console.error('pack too big'); process.exit(1)}"
+
+  all-checks-passed:
+    needs: [rust-desk, rust-windows-notice, npm-wrapper]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: verdict
+        run: |
+          results='${{ join(needs.*.result, ' ') }}'
+          for r in $results; do [ "$r" = "success" ] || { echo "non-success: $results"; exit 1; }; done
