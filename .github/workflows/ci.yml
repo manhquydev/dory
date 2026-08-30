@@ -29,10 +29,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: rust
+      - name: Short TMPDIR on macOS (sockaddr_un SUN_LEN)
+        if: runner.os == 'macOS'
+        run: echo "TMPDIR=/tmp" >> "$GITHUB_ENV"
+
       - name: cargo test (land tree, unix desk)
         working-directory: rust
-        # Four integration tests pin FLOW_BIN to a factory sibling
-        # (/home/manhquy/Downloads/flow/flow-skill/...). They stay local-only.
+        # Factory-path tests stay local-only (FLOW_BIN / occ_skill SKILL).
         run: |
           cargo test --locked --bins \
             --test ensure_bin \
