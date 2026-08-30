@@ -152,10 +152,13 @@ fn without_dory_env_exits_one_json_stderr_no_exec() {
 #[test]
 fn flow_bin_true_empty_dash_exits_zero_and_journals() {
     let tmp = scratch("true-empty");
+    // Local script: macOS GHA /bin/true is not a reliable spawn target.
+    let ok = tmp.path.join("ok-flow");
+    write_exec(&ok, "#!/bin/sh\nexit 0\n");
     let out = run(
         &tmp.path,
         Some("1"),
-        Some("/bin/true"),
+        Some(ok.to_str().unwrap()),
         &[],
         &["flow", "--"],
     );
@@ -181,10 +184,12 @@ fn flow_bin_true_empty_dash_exits_zero_and_journals() {
 #[test]
 fn flow_bin_true_hello_exits_zero_and_journals() {
     let tmp = scratch("true-hello");
+    let ok = tmp.path.join("ok-flow");
+    write_exec(&ok, "#!/bin/sh\nexit 0\n");
     let out = run(
         &tmp.path,
         Some("1"),
-        Some("/bin/true"),
+        Some(ok.to_str().unwrap()),
         &[],
         &["flow", "--", "hello"],
     );
@@ -368,9 +373,15 @@ fn child_cwd_is_intended_workspace_dir() {
     );
     assert_eq!(out.status.code(), Some(0), "stderr={}", stderr(&out));
     let got = fs::read_to_string(&pwd_out).unwrap_or_default();
+    let got_path = PathBuf::from(got.trim());
+    let want = workspace.canonicalize().unwrap_or_else(|_| workspace.clone());
+    let got_canon = got_path
+        .canonicalize()
+        .unwrap_or_else(|_| got_path.clone());
     assert_eq!(
+        got_canon, want,
+        "child pwd must be the workspace dir, not the CLI cwd (raw got={:?} want={:?})",
         got.trim(),
-        workspace.to_str().unwrap(),
-        "child pwd must be the workspace dir, not the CLI cwd"
+        workspace
     );
 }
