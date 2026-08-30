@@ -175,10 +175,13 @@ fn extract_kind_ids(json: &str, mid: &str) -> Vec<String> {
 }
 
 fn assert_no_http(json: &str) {
-    assert!(
-        !json.contains(":7380") && !json.contains("X-Dory-Inside"),
-        "discover must not use :7380 or X-Dory-Inside: {json}"
-    );
+    // ":7380" also matches JSON `"pid":7380` (desk PTY pid). Lamp is a URL/header.
+    let lamp = json.contains("127.0.0.1:7380")
+        || json.contains("0.0.0.0:7380")
+        || json.contains("[::1]:7380")
+        || json.contains(":7380/")
+        || json.contains("X-Dory-Inside");
+    assert!(!lamp, "discover must not use lamp :7380 or X-Dory-Inside: {json}");
 }
 
 fn assert_ok(out: &Output, what: &str) -> String {
