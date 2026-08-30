@@ -36,7 +36,20 @@ jobs:
       - name: cargo test (land tree, unix desk)
         working-directory: rust
         # Factory-path tests stay local-only (FLOW_BIN / occ_skill SKILL).
+        # macOS: skip land unit tests that read /proc (pid/cwd/environ/cmdline).
+        # Do not fold leftover server.rs to invent Darwin helpers.
         run: |
+          set --
+          if [ "$(uname -s)" = Darwin ]; then
+            set -- \
+              --skip server::tests::p2_10_second_server_same_session_refuses \
+              --skip server::tests::p2_3_client_disconnect_does_not_kill \
+              --skip server::tests::p2_4_stop_kills_group_and_next_server_is_new_pid \
+              --skip server::tests::p3_1_first_pane_environ_has_dory_vars \
+              --skip server::tests::p3_7_right_split_returns_new_pane_caller_stays_focused \
+              --skip server::tests::sit_shell_drops_norc_default_keeps_it \
+              --skip server::tests::tab_and_workspace_follow_pane_or_explicit_cwd
+          fi
           cargo test --locked --bins \
             --test ensure_bin \
             --test flow_taxi \
@@ -51,7 +64,8 @@ jobs:
             --test p5_prompt_after_report \
             --test p5_prompt_paste \
             --test p5_prompt_unknown \
-            --test p5_report
+            --test p5_report \
+            -- "$@"
         env:
           CARGO_TERM_COLOR: always
 

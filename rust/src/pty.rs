@@ -667,23 +667,27 @@ stty size < /dev/tty > "$2"
         // Keep a waiter that is unambiguously not `script`.
         let mut pty = HeldPty::spawn(std::env::temp_dir().as_path(), &argv).unwrap();
         let pid = pty.child_pid();
-        // /proc/pid/exe can still point at the test binary until execve finishes.
-        let exe = wait_exe_basename(pid, "sleep", Duration::from_secs(3));
-        let cmdline = fs::read(format!("/proc/{pid}/cmdline")).unwrap();
-        let cmdline = String::from_utf8_lossy(&cmdline);
-        assert!(
-            exe.ends_with("sleep"),
-            "child exe must be sleep, got {exe:?}"
-        );
-        assert!(
-            !cmdline
-                .split('\0')
-                .next()
-                .unwrap_or("")
-                .ends_with("/script"),
-            "spawn argv must not be script: {cmdline:?}"
-        );
-        assert!(pid_exists(pid));
+        assert!(pid_exists(pid), "sleep slave must stay live pid {pid}");
+        // /proc/pid/exe + cmdline are Linux-only; refuse list already
+        // covers "not script". Darwin has no /proc.
+        #[cfg(target_os = "linux")]
+        {
+            let exe = wait_exe_basename(pid, "sleep", Duration::from_secs(3));
+            let cmdline = fs::read(format!("/proc/{pid}/cmdline")).unwrap();
+            let cmdline = String::from_utf8_lossy(&cmdline);
+            assert!(
+                exe.ends_with("sleep"),
+                "child exe must be sleep, got {exe:?}"
+            );
+            assert!(
+                !cmdline
+                    .split('\0')
+                    .next()
+                    .unwrap_or("")
+                    .ends_with("/script"),
+                "spawn argv must not be script: {cmdline:?}"
+            );
+        }
         pty.kill_group().unwrap();
     }
 
@@ -727,7 +731,8 @@ stty size < /dev/tty > "$2"
             tab_id: "w2:t3".to_string(),
             pane_id: "w2:p4".to_string(),
         };
-        let script = r#"printenv DORY_ENV DORY_SOCKET DORY_BIN DORY_WORKSPACE_ID DORY_TAB_ID DORY_PANE_ID > "$1""#;
+        // BSD printenv (macOS) takes one name; GNU printenv takes many.
+        let script = r#"printf '%s\n' "$DORY_ENV" "$DORY_SOCKET" "$DORY_BIN" "$DORY_WORKSPACE_ID" "$DORY_TAB_ID" "$DORY_PANE_ID" > "$1""#;
         let argv = os(&["/bin/sh", "-c", script, "occupancy", mark.to_str().unwrap()]);
         let mut pty = HeldPty::spawn_occupied(std::env::temp_dir().as_path(), &argv, &occ).unwrap();
         let body = wait_file(&mark, Duration::from_secs(5));

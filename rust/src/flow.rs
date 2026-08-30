@@ -469,7 +469,17 @@ mod tests {
             Duration::from_secs(2),
         );
         assert_eq!(r.code, Some(7));
-        assert!(r.stdout.contains(&format!("cwd={}", dir.display())));
+        // macOS getcwd canonicalizes /tmp → /private/tmp; compare both.
+        let logical = format!("cwd={}", dir.display());
+        let real = dir
+            .canonicalize()
+            .map(|p| format!("cwd={}", p.display()))
+            .unwrap_or_else(|_| logical.clone());
+        assert!(
+            r.stdout.contains(&logical) || r.stdout.contains(&real),
+            "stdout={:?} expected {logical} or {real}",
+            r.stdout
+        );
         assert!(r.stdout.contains("arg=status"));
         let _ = fs::remove_dir_all(&dir);
     }
