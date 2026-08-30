@@ -34,7 +34,7 @@ jobs:
         # Four integration tests pin FLOW_BIN to a factory sibling
         # (/home/manhquy/Downloads/flow/flow-skill/...). They stay local-only.
         run: |
-          cargo test --locked --lib --bins \
+          cargo test --locked --bins \
             --test ensure_bin \
             --test flow_taxi \
             --test pane_io \
