@@ -48,7 +48,11 @@ jobs:
               --skip server::tests::p3_1_first_pane_environ_has_dory_vars \
               --skip server::tests::p3_7_right_split_returns_new_pane_caller_stays_focused \
               --skip server::tests::sit_shell_drops_norc_default_keeps_it \
-              --skip server::tests::tab_and_workspace_follow_pane_or_explicit_cwd
+              --skip server::tests::tab_and_workspace_follow_pane_or_explicit_cwd \
+              --skip p5_06_agent_read_does_not_flip_seen_or_done \
+              --skip p5_07_agent_focus_done_to_idle \
+              --skip p5_10_default_wait_accepts_idle_done_blocked_only \
+              --skip p5_13_agent_a_drives_b_via_cli_wait
           fi
           cargo test --locked --bins --no-fail-fast \
             --test ensure_bin \

@@ -188,6 +188,21 @@ fn proc_children(pid: u32) -> Vec<u32> {
 }
 
 #[cfg(target_os = "macos")]
+fn push_comm(out: &mut Vec<String>, name: &str) {
+    if !out.iter().any(|c| c == name) {
+        out.push(name.to_string());
+    }
+    let stripped = name.trim_start_matches('-');
+    if stripped != name && !out.iter().any(|c| c == stripped) {
+        out.push(stripped.to_string());
+    }
+    // /bin/sh is bash (or dash) on Darwin; argv0_comm stays "sh".
+    if matches!(stripped, "bash" | "dash") && !out.iter().any(|c| c == "sh") {
+        out.push("sh".to_string());
+    }
+}
+
+#[cfg(target_os = "macos")]
 fn descendant_comms_libproc(root_pid: u32) -> Vec<String> {
     let mut out = Vec::new();
     let mut seen = HashSet::new();
@@ -196,18 +211,10 @@ fn descendant_comms_libproc(root_pid: u32) -> Vec<String> {
         if !seen.insert(pid) {
             continue;
         }
-        if pid != root_pid {
-            if let Some(name) = proc_comm(pid) {
-                out.push(name);
-            }
+        if let Some(name) = proc_comm(pid) {
+            push_comm(&mut out, &name);
         }
         stack.extend(proc_children(pid));
-    }
-    // Direct slave argv (no wrapper) must still match argv0 comm.
-    if let Some(comm) = proc_comm(root_pid) {
-        if !out.iter().any(|c| c == &comm) {
-            out.push(comm);
-        }
     }
     out
 }

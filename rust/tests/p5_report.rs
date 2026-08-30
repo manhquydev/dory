@@ -167,7 +167,20 @@ fn occupant_name(json: &str) -> Option<String> {
 }
 
 fn rpc(h: &Harness, line: &str) -> String {
-    let mut stream = UnixStream::connect(&h.sock).expect("rpc connect");
+    let start = Instant::now();
+    let mut last = None;
+    let mut stream = loop {
+        match UnixStream::connect(&h.sock) {
+            Ok(s) => break s,
+            Err(err) => {
+                last = Some(err);
+                if start.elapsed() >= Duration::from_secs(2) {
+                    panic!("rpc connect {}: {last:?}", h.sock.display());
+                }
+                thread::sleep(Duration::from_millis(20));
+            }
+        }
+    };
     writeln!(stream, "{line}").unwrap();
     let _ = stream.flush();
     let mut reply = String::new();
