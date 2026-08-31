@@ -40,10 +40,11 @@ jobs:
         # Occupant done/idle still needs argv0 comm == descendant comm; Darwin
         # /bin/sh is bash — unpaid to fold leftover classify_word. Skip those four.
         # Do not fold leftover server.rs to invent Darwin helpers.
-        # Linux only: --test p_accept_wait (wait_dead reads /proc/{pid}).
+        # Linux and Darwin run --test p_accept_wait because wait_dead is Unix
+        # kill(0) / ESRCH (eb135be), not /proc/{pid}.
         run: |
           set --
-          extra_tests=()
+          extra_tests=(--test p_accept_wait)
           if [ "$(uname -s)" = Darwin ]; then
             export RUST_TEST_THREADS=1
             set -- \
@@ -58,8 +59,6 @@ jobs:
               --skip p5_07_agent_focus_done_to_idle \
               --skip p5_10_default_wait_accepts_idle_done_blocked_only \
               --skip p5_13_agent_a_drives_b_via_cli_wait
-          else
-            extra_tests=(--test p_accept_wait)
           fi
           cargo test --locked --bins --no-fail-fast \
             --test ensure_bin \
