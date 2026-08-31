@@ -32,6 +32,15 @@ Mechanical `dory flow -- next` on an isolate. Flow is the foreign judge. Not a D
 
 Discover current paper with `git log --oneline -- scripts/dory-isolate-aoe5-flow-prd.sh`.
 
+## Paid desk chrome and parked waits
+
+Plan `260831-2119-desk-en-chrome-rpc-accept` is paid land. Cite land rust with `git show HEAD:rust/...`. Working-tree leftover `server.rs` is not the owner.
+
+| Landing | Owner |
+|---|---|
+| English operator chrome (`ec69608`) | `git show HEAD:rust/src/desk.rs` |
+| Park wait RPCs off accept (`d8b8fb2`) | `git show HEAD:rust/src/server.rs` + `git show HEAD:rust/tests/p_accept_wait.rs` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
