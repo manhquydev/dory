@@ -11,7 +11,8 @@ Code owns WHAT and HOW. Do not copy command inventories, SHA tables, or test nam
 | [CHARTER.md](../CHARTER.md) | Two chairs, kill conditions, hình B | Current cook SHAs |
 | [CAPACITY-FREEZE.md](../CAPACITY-FREEZE.md) | Paid AOE 0; company Phase 5 freeze | Isolate taxi receipts |
 | [north star](../plans/reports/260822-north-star-aoe.md) | Session OS + Workplace OS + Flow as foreign judge | Claim that isolate unlock = Phase 5 |
-| Land `README` | Operator desk how-to | Working-tree leftover README |
+| Land `README` | Public English project face (`git show HEAD:README.md`) | Working-tree leftover README |
+| `README.vi.md` | Public Vietnamese face | Leftover WT README |
 | `AGENTS.md` | Costly-action deny list | Product overview |
 | `plans/` + `plans/reports/` | Stateful evidence | Evergreen law |
 | `scripts/dory-isolate-*.sh` | Isolate taxi contracts | Company occupancy |
@@ -42,7 +43,9 @@ Discover current paper with `git log --oneline -- scripts/dory-isolate-aoe5-flow
 
 ## Factory doors
 
-Herdr is the factory chair. Do not sit factory `w13:t13`. Do not start `/run/user/$UID/dory/default/dory.sock` from factory. Stop isolate only with the 2357 compound in the isolate scripts.
+The factory chair is not a Dory occupant. Do not sit the factory default pane. Do not start `/run/user/$UID/dory/default/dory.sock` from the factory. Stop isolate only with the 2357 compound in the isolate scripts.
+
+Public contributor docs (`README.md` land, `README.vi.md`, `npm-wrapper/README*.md`, `CONTRIBUTING*.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`) must not name the factory workplace product.
 
 ## Ship loop (lamp + land CI)
 

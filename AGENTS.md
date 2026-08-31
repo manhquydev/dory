@@ -1,6 +1,7 @@
 # Agent deny list
 
-- Do not edit leftover 5: `README.md`, `rust/src/attach.rs`, `rust/src/main.rs`, `rust/src/server.rs`, `rust/tests/p5_attach.rs`. Cite land README as `git show HEAD:README.md`. Cite rust via `git show HEAD:rust/...`.
+- Do not edit leftover 5: `README.md`, `rust/src/attach.rs`, `rust/src/main.rs`, `rust/src/server.rs`, `rust/tests/p5_attach.rs`. Cite land README as `git show HEAD:README.md`. Land a new public README with `git hash-object -w` + `git update-index --cacheinfo`, never by writing leftover WT `README.md`. Cite rust via `git show HEAD:rust/...`.
+- Public contributor docs must not mention Herdr (land `README.md`, `README.vi.md`, `npm-wrapper/README*.md`, `CONTRIBUTING*.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, issue/PR templates).
 - Do not `git add -A` or `ak:git`. Named pathspec only.
 - Do not sit factory `w13:t13` / `w13:p2R`. Do not start default `dory.sock`.
 - Do not `herdr server stop`. Do not close `wP`, `w15`, `w16`, or `t13`.

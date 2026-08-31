@@ -1,0 +1,44 @@
+name: Bug report
+description: Something does not work as documented
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        English preferred. Tiếng Việt is welcome.
+        **Security issues:** use [private reporting](https://github.com/manhquydev/dory/security/advisories/new), not this form.
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Engine
+      options:
+        - Desk (Rust `dory`)
+        - Lamp (`@manhquy/dory` / `dory-serve`)
+        - Docs / other
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: Commands, OS, Node or Rust version
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: "e.g. @manhquy/dory@0.1.0-next.1 or commit SHA"

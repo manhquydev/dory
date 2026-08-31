@@ -10,7 +10,8 @@
   "files": [
     "bin/",
     "src/",
-    "README.md"
+    "README.md",
+    "README.vi.md"
   ],
   "engines": {
     "node": ">=22.14.0"

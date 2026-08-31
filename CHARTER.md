@@ -42,14 +42,14 @@ Dory  (Session OS + Workplace OS)
 
 ## Hàng và nhà máy
 
-- **Nhà máy** được dùng Herdr / Cursor / Harness để *xây* Dory.
-- **Hàng ra khỏi Dory** cấm gọi `dsh` hoặc `herdr` lúc chạy. Học, không thuê vòng chạy.
+- **Nhà máy** dùng môi trường xây riêng để *xây* Dory.
+- **Hàng ra khỏi Dory** cấm gọi CLI chỗ làm ngoại lai lúc chạy. Học, không thuê vòng chạy.
 
 ## Cổng chết — commit động cơ
 
 Cấm thêm `package.json`, `go.mod`, vòng agent, máy cửa sổ / PTY, nhân plugin, cho đến khi **cả hai** đúng:
 
-1. Hai báo cáo xia `--compare` (Harness, rồi Herdr) đã ký, viết **trong repo này**, không viết trong `flow-deck`. — **đã đủ** 2026-08-21.
+1. Hai báo cáo so sánh đã ký, viết **trong repo này**, không viết trong `flow-deck`. — **đã đủ** 2026-08-21.
 2. Đủ người (hơn hai người full-time hoặc tiền tương đương) **hoặc** capacity-freeze memo: ngừng tính năng flow-skill 6–12 tháng. — **đã đủ** 2026-08-22: [CAPACITY-FREEZE.md](CAPACITY-FREEZE.md) (operator grant → CTO authored).
 
 Cả hai đúng. `/ak:plan` được phép. Engine commits được phép **trong repo này**, dưới điều kiện giết.
@@ -60,7 +60,7 @@ Tờ này chết — và phải dừng mã — nếu bất kỳ điều nào:
 
 - Nhét Dory vào repo hoặc lệnh `flow-deck`.
 - Nhét Dory vào `@manhquy/flow-skill` hoặc cây skill của flow.
-- Hàng xuất Dory gọi `dsh` / `herdr` như vòng chạy thật.
+- Hàng xuất Dory gọi CLI chỗ làm ngoại lai như vòng chạy thật.
 - Có commit động cơ trước khi hai báo cáo xia được ký. (lịch sử; không mở lại)
 - Xia chạy từ cửa sổ `flow-deck` rồi ghi báo cáo vào `flow-deck/plans/`.
 
@@ -73,8 +73,8 @@ Cấm hình C (một tên ôm hết). Quay hình A chỉ nếu freeze bị rút 
 ## Học (đã xong 2026-08-21, cửa sổ `dory`)
 
 1. Đóng cửa sổ `flow-deck`. Mở thư mục này. — xong
-2. Xia Harness `--compare` — xong, ký: `plans/reports/260821-1416-xia-compare-deepseek-harness.md`
-3. Xia Herdr `--compare` — xong, ký: `plans/reports/260821-1436-xia-compare-herdr.md`
+2. Báo cáo so sánh thứ nhất — xong, ký: `plans/reports/260821-1416-xia-compare-deepseek-harness.md`
+3. Báo cáo so sánh thứ hai — xong, ký: `plans/reports/260821-1436-xia-compare-herdr.md`
 4. `--port` / `--copy` / `--fast` vẫn cấm (học ≠ thuê mã nguồn).
 
 Không giao học thứ ba. Máy mở từ Phase 1.

@@ -1,24 +1,60 @@
 # `@manhquy/dory`
 
-Journal **lamp** (Session OS). Not the desk. Needs Node `>=22.14.0`. This package does **not** install Node.
+[English](README.md) · [Tiếng Việt](README.vi.md)
+
+Journal **lamp** for [Dory](https://github.com/manhquydev/dory) (Session OS). This package is **not** the desk.
+
+[![npm next](https://img.shields.io/npm/v/@manhquy/dory/next.svg)](https://www.npmjs.com/package/@manhquy/dory)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../LICENSE)
+
+| | |
+|---|---|
+| Bin | `dory-serve` only |
+| Node | `>=22.14.0` (you install Node; this package does not) |
+| Desk command | `dory` — Rust binary, built from the repo, not this tarball |
+
+Typing `dory` after `npm install` will not open the desk. Do not install the unscoped npm name `dory`; that is a different product.
+
+## Install
 
 ```bash
-# pin; npx without a version follows latest
 npx @manhquy/dory@0.1.0-next.1 dory-serve -- serve --workspace /abs
 ```
 
-Then open `http://127.0.0.1:7380/`. Gõ `dory` is the Rust desk (not this package). Bin here is **`dory-serve` only**.
+Open `http://127.0.0.1:7380/`. `--workspace` must be an absolute directory.
 
-## Verify / uninstall
+Pin the version. `npx @manhquy/dory` without a tag follows npm `latest`, which may lag the `next` tag.
+
+Need Node first? [nodejs.org](https://nodejs.org/en/download) or [fnm](https://github.com/Schniz/fnm).
+
+## Verify and uninstall
 
 ```bash
-bash scripts/dory-lamp-doctor.sh          # detect; never installs Node
 npm view @manhquy/dory name version bin
-npm uninstall -g @manhquy/dory           # lamp only; does not touch desk ELF
+# bin must be { "dory-serve": "bin/dory-serve.js" } only
+
+npm uninstall -g @manhquy/dory
 ```
 
-Never `npm i -g dory` (unscoped name is another product). Never expect this package to put `dory` on PATH.
+From a clone of the repo:
 
-Missing Node: https://nodejs.org/en/download or [fnm](https://github.com/Schniz/fnm). The doctor prints that and exits; it does not bootstrap a toolchain.
+```bash
+bash scripts/dory-lamp-doctor.sh
+```
 
-Publish: GitHub Actions OIDC — same shape as `@manhquy/flow-skill`. See `RELEASE_CHECKLIST.md`.
+The doctor detects Node and PATH collisions. It never installs Node and never binds `dory`.
+
+## Repository
+
+Source, desk build, contributing, and security policy:
+
+**https://github.com/manhquydev/dory**
+
+- [Contributing](https://github.com/manhquydev/dory/blob/main/CONTRIBUTING.md)
+- [Security](https://github.com/manhquydev/dory/blob/main/SECURITY.md)
+- [Code of Conduct](https://github.com/manhquydev/dory/blob/main/CODE_OF_CONDUCT.md)
+- [Contributors](https://github.com/manhquydev/dory/graphs/contributors)
+
+## License
+
+[MIT](https://github.com/manhquydev/dory/blob/main/LICENSE) © 2026 manhquy and Dory contributors.

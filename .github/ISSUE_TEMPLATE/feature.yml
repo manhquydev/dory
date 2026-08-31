@@ -1,0 +1,33 @@
+name: Feature request
+description: A focused change you would like to see
+title: "[feat] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: English preferred. Tiếng Việt is welcome. Open an issue before a large refactor.
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Engine
+      options:
+        - Desk (Rust `dory`)
+        - Lamp (`dory-serve`)
+        - Docs / community
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is hard or missing today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Smallest change that would help. Not a full design unless you already have one.
+    validations:
+      required: true
