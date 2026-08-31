@@ -53,6 +53,12 @@ Plan `260831-2119-desk-en-chrome-rpc-accept` is paid land. Cite land rust with `
 |---|---|
 | Linux CI `p_accept_wait` `e3defcf` | `git show HEAD:.github/workflows/ci.yml` |
 
+## Paid `wait_dead` without `/proc`
+
+| Landing | Owner |
+|---|---|
+| `wait_dead` without `/proc` `eb135be` | `git show HEAD:rust/tests/p_accept_wait.rs` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
