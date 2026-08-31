@@ -715,7 +715,7 @@ impl Desk {
         match onboard_state_path() {
             Some(path) => match mark_onboarded(&path) {
                 Ok(()) => self.status.clear(),
-                Err(_) => self.status = "không ghi nhớ".to_string(),
+                Err(_) => self.status = "could not remember".to_string(),
             },
             None => self.status.clear(),
         }
@@ -945,7 +945,7 @@ impl Desk {
                     if cell_drag_span(a, b) >= 2 {
                         if let Some(text) = selection_text(&self.tiles, &self.focused, a, b) {
                             if emit_osc52(&text).is_ok() {
-                                self.status = "đã chép".to_string();
+                                self.status = "copied".to_string();
                                 self.chrome_dirty = true;
                             }
                         }
@@ -1261,7 +1261,7 @@ impl Desk {
             self.refresh_tree();
         }
         if self.workspace.is_empty() {
-            self.status = "không có cửa sổ".to_string();
+            self.status = "no window".to_string();
             return;
         }
         let body = match server::rpc_line_quiet(&format!(
@@ -1270,7 +1270,7 @@ impl Desk {
         )) {
             Ok(b) => b,
             Err(_) => {
-                self.status = "thẻ lỗi".to_string();
+                self.status = "tab failed".to_string();
                 return;
             }
         };
@@ -1281,7 +1281,7 @@ impl Desk {
             self.tiles.clear();
             self.reconcile_tiles();
         } else {
-            self.status = "thẻ: không có ô".to_string();
+            self.status = "tab: no pane".to_string();
             self.refresh_tree();
             self.reconcile_tiles();
         }
@@ -1299,7 +1299,7 @@ impl Desk {
         let body = match server::rpc_line_quiet(&line) {
             Ok(b) => b,
             Err(_) => {
-                self.status = "cửa sổ lỗi".to_string();
+                self.status = "window failed".to_string();
                 return;
             }
         };
@@ -1310,7 +1310,7 @@ impl Desk {
             self.tiles.clear();
             self.reconcile_tiles();
         } else {
-            self.status = "cửa sổ: không có ô".to_string();
+            self.status = "window: no pane".to_string();
             self.refresh_tree();
             self.reconcile_tiles();
         }
@@ -1318,7 +1318,7 @@ impl Desk {
 
     fn split(&mut self, direction: &str) {
         if self.focused.is_empty() {
-            self.status = "không có ô".to_string();
+            self.status = "no pane".to_string();
             return;
         }
         let body = match server::rpc_line_quiet(&format!(
@@ -1327,7 +1327,7 @@ impl Desk {
         )) {
             Ok(b) => b,
             Err(_) => {
-                self.status = "tách lỗi".to_string();
+                self.status = "split failed".to_string();
                 return;
             }
         };
@@ -1337,7 +1337,7 @@ impl Desk {
             self.focus_tile(&id);
             self.reconcile_tiles();
         } else {
-            self.status = "tách: không có ô".to_string();
+            self.status = "split: no pane".to_string();
             self.refresh_tree();
             self.reconcile_tiles();
         }
@@ -1447,7 +1447,7 @@ impl Desk {
             ConfirmKind::Workspace => workspace.is_empty(),
         };
         if empty {
-            self.status = "không đóng".to_string();
+            self.status = "not closed".to_string();
             self.chrome_dirty = true;
             self.tiles_dirty = true;
             return;
@@ -1472,10 +1472,10 @@ impl Desk {
                 self.status = if body.contains("last live pane") {
                     last_room_copy(kind).to_string()
                 } else {
-                    "không đóng".to_string()
+                    "not closed".to_string()
                 };
             }
-            Err(_) => self.status = "đóng lỗi".to_string(),
+            Err(_) => self.status = "close failed".to_string(),
         }
         self.chrome_dirty = true;
         self.tiles_dirty = true;
@@ -1673,7 +1673,7 @@ impl Desk {
         }
         if self.tiles.is_empty() {
             let msg = if self.status.is_empty() {
-                " ô trống  Ctrl-b c thẻ · v/- tách"
+                " empty pane  Ctrl-b c tab · v/- split"
             } else {
                 self.status.as_str()
             };
@@ -3215,19 +3215,19 @@ fn tab_chip_hit(rows: &[Row], workspace: &str, column: u16, side: u16) -> Option
 fn menu_items(kind: MenuKind) -> &'static [(&'static str, MenuVerb)] {
     match kind {
         MenuKind::Pane => &[
-            ("Tách phải", MenuVerb::SplitRight),
-            ("Tách dưới", MenuVerb::SplitDown),
-            ("Phóng", MenuVerb::Zoom),
-            ("Đóng ô", MenuVerb::ClosePane),
+            ("Split right", MenuVerb::SplitRight),
+            ("Split down", MenuVerb::SplitDown),
+            ("Zoom", MenuVerb::Zoom),
+            ("Close pane", MenuVerb::ClosePane),
         ],
         MenuKind::Tab => &[
-            ("Thẻ mới", MenuVerb::NewTab),
-            ("Đóng thẻ", MenuVerb::CloseTab),
+            ("New tab", MenuVerb::NewTab),
+            ("Close tab", MenuVerb::CloseTab),
         ],
         MenuKind::Workspace => &[
-            ("Chọn cửa sổ", MenuVerb::Picker),
-            ("Cửa sổ mới", MenuVerb::NewWs),
-            ("Đóng cửa sổ", MenuVerb::CloseWs),
+            ("Pick window", MenuVerb::Picker),
+            ("New window", MenuVerb::NewWs),
+            ("Close window", MenuVerb::CloseWs),
         ],
     }
 }
@@ -3255,7 +3255,7 @@ fn overlay_paint_rows(mode: Mode, line_count: usize, height: u16) -> u16 {
 }
 
 fn menu_lines(kind: MenuKind) -> Vec<String> {
-    let mut lines = vec![" chọn  1..  esc".to_string()];
+    let mut lines = vec![" pick  1..  esc".to_string()];
     for (i, (label, _)) in menu_items(kind).iter().enumerate() {
         lines.push(format!("{} {label}", i + 1));
     }
@@ -3264,17 +3264,17 @@ fn menu_lines(kind: MenuKind) -> Vec<String> {
 
 fn confirm_ask(kind: ConfirmKind) -> &'static str {
     match kind {
-        ConfirmKind::Pane => "đóng ô?",
-        ConfirmKind::Tab => "đóng thẻ?",
-        ConfirmKind::Workspace => "đóng cửa sổ?",
+        ConfirmKind::Pane => "close pane?",
+        ConfirmKind::Tab => "close tab?",
+        ConfirmKind::Workspace => "close window?",
     }
 }
 
 fn confirm_lines(kind: ConfirmKind) -> Vec<String> {
     vec![
         format!(" {}", confirm_ask(kind)),
-        " 1 có".to_string(),
-        " 2 không".to_string(),
+        " 1 yes".to_string(),
+        " 2 no".to_string(),
     ]
 }
 
@@ -3392,24 +3392,24 @@ fn close_rpc_line(kind: ConfirmKind, pane: &str, tab: &str, workspace: &str) -> 
 
 fn last_room_copy(kind: ConfirmKind) -> &'static str {
     match kind {
-        ConfirmKind::Workspace => "cửa sổ cuối giữ",
-        _ => "ô cuối giữ",
+        ConfirmKind::Workspace => "last window kept",
+        _ => "last pane kept",
     }
 }
 
 const PREFIX_FOOTER: &str =
-    " Ctrl-b. q rời  c thẻ  n/p thẻ  w chọn  Shift-n cửa sổ  x đóng  ? bảng";
+    " Ctrl-b. q leave  c tab  n/p tab  w pick  Shift-n window  x close  ? keys";
 
 fn footer_hint(mode: Mode, status: &str) -> &str {
     match mode {
         Mode::Prefix => PREFIX_FOOTER,
-        Mode::Onboard => " enter nhớ  esc bỏ  Ctrl-b q rời",
-        Mode::Help => " esc đóng bảng",
-        Mode::Menu => " 1.. chạy  esc hủy",
-        Mode::Picker => " j/k chọn  enter  esc",
-        Mode::Confirm => " 1 có  2 không  esc",
+        Mode::Onboard => " enter remember  esc dismiss  Ctrl-b q leave",
+        Mode::Help => " esc close keys",
+        Mode::Menu => " 1.. run  esc cancel",
+        Mode::Picker => " j/k pick  enter  esc",
+        Mode::Confirm => " 1 yes  2 no  esc",
         _ if !status.is_empty() => status,
-        _ => " chuột phải menu  kéo≥2 copy  Ctrl-b prefix",
+        _ => " right-click menu  drag≥2 copy  Ctrl-b prefix",
     }
 }
 
@@ -3450,7 +3450,7 @@ fn clip_glance(s: &str) -> String {
 fn flow_glance_line(g: &FlowGlance) -> String {
     let payload = g.arg0.as_str();
     let raw = if let Some(err) = g.error.as_deref().filter(|e| !e.is_empty()) {
-        format!("Flow lỗi. {err}")
+        format!("Flow error. {err}")
     } else if let Some(n) = g.code {
         if payload.is_empty() {
             format!("Flow {n}.")
@@ -3640,13 +3640,13 @@ fn mark_onboarded(path: &Path) -> io::Result<()> {
 fn onboard_lines() -> Vec<String> {
     vec![
         "dory".to_string(),
-        "chỗ ngồi. chuột trước, prefix sau".to_string(),
+        "sit. mouse first, prefix after".to_string(),
         String::new(),
-        "chuột phải ô / chip thẻ / card cửa sổ = menu".to_string(),
-        "kéo ≥2 ô = copy".to_string(),
-        "Ctrl-b = prefix (q rời, ? bảng phím)".to_string(),
+        "right-click pane / tab chip / window card = menu".to_string(),
+        "drag ≥2 panes = copy".to_string(),
+        "Ctrl-b = prefix (q leave, ? keys)".to_string(),
         String::new(),
-        "[enter] nhớ lần sau    chuột / Ctrl-b dùng, không ghi nhớ    esc bỏ".to_string(),
+        "[enter] remember    mouse / Ctrl-b use, do not remember    esc dismiss".to_string(),
     ]
 }
 
@@ -3672,30 +3672,30 @@ fn onboard_mouse(kind: MouseEventKind) -> OnboardMouse {
 
 fn help_text() -> &'static str {
     "Ctrl-b prefix\n\
-     q / d       rời (PTY sống)\n\
-     Shift-d     đóng cửa sổ\n\
-     c           thẻ mới\n\
-     v / -       tách phải / dưới\n\
-     n / p       thẻ kế / trước (cửa sổ này)\n\
-     1-9         thẻ\n\
-     hjkl        ô\n\
-     w           chọn cửa sổ (không tạo)\n\
-     Shift-n     cửa sổ mới\n\
-     x           đóng ô\n\
-     Shift-x     đóng thẻ\n\
-     z           phóng (stream anh em sống)\n\
-     b           thu sidebar\n\
-     Ctrl-b      gửi C-b vào ô\n\
-     ?           bảng này\n\
-     kéo ≥2      copy (OSC 52)\n\
-     chuột phải  menu tại pointer (esc)\n\
-     đóng xác nhận y/n (chuột phải hủy)\n\
-     lần đầu     banner; chuột/Ctrl-b vẫn tách ô · thẻ · cửa sổ; enter nhớ\n\
-     Esc / q / ? đóng bảng"
+     q / d       leave (PTY stays)\n\
+     Shift-d     close window\n\
+     c           new tab\n\
+     v / -       split right / down\n\
+     n / p       next / prev tab (this window)\n\
+     1-9         tab\n\
+     hjkl        pane\n\
+     w           pick window (do not create)\n\
+     Shift-n     new window\n\
+     x           close pane\n\
+     Shift-x     close tab\n\
+     z           zoom (sibling streams stay)\n\
+     b           hide sidebar\n\
+     Ctrl-b      send C-b into pane\n\
+     ?           this keys\n\
+     drag ≥2     copy (OSC 52)\n\
+     right-click menu at pointer (esc)\n\
+     close confirm 1/2 (right-click cancel)\n\
+     first sit   banner; mouse/Ctrl-b still split pane · tab · window; enter remember\n\
+     Esc / q / ? close keys"
 }
 
 fn picker_lines(rows: &[Row], idx: usize) -> Vec<String> {
-    let mut lines = vec![" chọn cửa sổ  j/k  enter  esc".to_string()];
+    let mut lines = vec![" pick window  j/k  enter  esc".to_string()];
     for (i, ws) in workspaces_of(rows).into_iter().enumerate() {
         let mark = if i == idx { '>' } else { ' ' };
         lines.push(format!("{mark} {}", workspace_label(rows, &ws)));
@@ -4565,9 +4565,11 @@ mod tests {
         let payload = osc52_payload("hello");
         assert!(payload.starts_with("\x1b]52;c;"));
         assert!(payload.contains("aGVsbG8="));
-        assert!(help_text().contains("chọn cửa sổ"));
-        assert!(help_text().contains("chuột phải"));
-        assert!(help_text().contains("lần đầu"));
+        assert!(help_text().contains("pick window"));
+        assert!(help_text().contains("right-click"));
+        assert!(help_text().contains("first sit"));
+        assert!(help_text().contains("1/2"));
+        assert!(!help_text().contains("y/n"));
         assert!(!help_text().contains("workspace picker"));
         assert!(!help_text().contains("detach"));
     }
@@ -4655,8 +4657,8 @@ mod tests {
     fn menu_pick_and_items_lock() {
         let pane = menu_items(MenuKind::Pane);
         assert_eq!(pane.len(), 4);
-        assert!(pane.iter().any(|(l, _)| *l == "Tách phải"));
-        assert!(pane.iter().any(|(l, _)| *l == "Đóng ô"));
+        assert!(pane.iter().any(|(l, _)| *l == "Split right"));
+        assert!(pane.iter().any(|(l, _)| *l == "Close pane"));
         assert_eq!(
             menu_pick(MenuKind::Pane, KeyCode::Char('1')),
             MenuPick::Run(MenuVerb::SplitRight)
@@ -4676,10 +4678,10 @@ mod tests {
             MenuPick::Run(MenuVerb::Picker)
         );
         let lines = menu_lines(MenuKind::Pane);
-        assert!(lines.iter().any(|l| l.contains("1 Tách phải")));
-        assert!(lines[0].contains("chọn  1.."));
+        assert!(lines.iter().any(|l| l.contains("1 Split right")));
+        assert!(lines[0].contains("pick  1.."));
         let confirm = confirm_lines(ConfirmKind::Workspace);
-        assert!(confirm[0].contains("đóng cửa sổ"));
+        assert!(confirm[0].contains("close window"));
         assert!(!confirm[0].contains("y/n"));
         assert!(!confirm.iter().any(|l| l.contains("y/n")));
         assert_eq!(confirm_overlay_pick(1), ConfirmPick::Yes);
@@ -4687,7 +4689,7 @@ mod tests {
         assert_eq!(confirm_overlay_pick(0), ConfirmPick::Ignore);
         assert!(menu_items(MenuKind::Workspace)
             .iter()
-            .any(|(label, _)| *label == "Chọn cửa sổ"));
+            .any(|(label, _)| *label == "Pick window"));
         assert_eq!(overlay_paint_rows(Mode::Menu, 5, 40), 5);
         assert_eq!(overlay_paint_rows(Mode::Picker, 3, 40), 3);
         assert_eq!(overlay_paint_rows(Mode::Confirm, 3, 40), 3);
@@ -4713,33 +4715,34 @@ mod tests {
         let idle = footer_hint(Mode::Terminal, "");
         assert!(!idle.contains("hjkl"));
         assert!(!idle.contains("^B q"));
-        assert!(idle.contains("chuột phải"));
+        assert!(idle.contains("right-click"));
         assert!(idle.contains("Ctrl-b"));
         let prefix = footer_hint(Mode::Prefix, "ignored dump");
-        assert!(prefix.contains("rời"));
+        assert!(prefix.contains("leave"));
         assert!(prefix.contains("Ctrl-b"));
         assert!(!prefix.contains("^B"));
         assert!(!prefix.contains("detach"));
-        assert_eq!(footer_hint(Mode::Help, help_text()), " esc đóng bảng");
+        assert_eq!(footer_hint(Mode::Help, help_text()), " esc close keys");
         assert!(!footer_hint(Mode::Help, help_text()).contains('\n'));
-        assert_eq!(footer_hint(Mode::Menu, "menu  1..  esc"), " 1.. chạy  esc hủy");
+        assert_eq!(footer_hint(Mode::Menu, "menu  1..  esc"), " 1.. run  esc cancel");
         assert_eq!(
             footer_hint(Mode::Picker, "workspace picker"),
-            " j/k chọn  enter  esc"
+            " j/k pick  enter  esc"
         );
-        assert_eq!(footer_hint(Mode::Terminal, "đã chép"), "đã chép");
-        assert_eq!(footer_hint(Mode::Terminal, "ô cuối giữ"), "ô cuối giữ");
+        assert_eq!(footer_hint(Mode::Terminal, "copied"), "copied");
+        assert_eq!(footer_hint(Mode::Terminal, "last pane kept"), "last pane kept");
         assert_eq!(
             footer_hint(Mode::Confirm, "ignored"),
-            " 1 có  2 không  esc"
+            " 1 yes  2 no  esc"
         );
         assert_ne!(
             footer_hint(Mode::Confirm, "ignored"),
             confirm_ask(ConfirmKind::Pane)
         );
         let onboard = footer_hint(Mode::Onboard, "attach failed");
-        assert!(onboard.contains("nhớ"));
+        assert!(onboard.contains("remember"));
         assert!(onboard.contains("esc"));
+        assert!(onboard.contains("dismiss"));
         assert!(!onboard.contains("tiếp"));
         assert!(!onboard.contains("attach failed"));
     }
@@ -4785,10 +4788,12 @@ mod tests {
     fn onboard_copy_and_input_table() {
         let lines = onboard_lines();
         let blob = lines.join("\n");
-        assert!(blob.contains("chuột phải"));
+        assert!(blob.contains("right-click"));
+        assert!(blob.contains("remember"));
+        assert!(blob.contains("dismiss"));
+        assert!(!blob.contains("không ghi nhớ"));
         assert!(!blob.contains("node bin/dory.js serve"));
         assert!(!blob.contains(":7380"));
-        assert!(blob.contains("không ghi nhớ") || blob.contains("không ghi"));
         assert!(overlay_paints(Mode::Onboard));
         assert!(!overlay_paints(Mode::Terminal));
         assert_eq!(
@@ -4944,7 +4949,7 @@ mod tests {
     fn overlay_grammar_copy_hits_and_keys() {
         assert_eq!(
             footer_hint(Mode::Confirm, "ignored"),
-            " 1 có  2 không  esc"
+            " 1 yes  2 no  esc"
         );
         for kind in [ConfirmKind::Pane, ConfirmKind::Tab, ConfirmKind::Workspace] {
             let blob = confirm_lines(kind).join("\n");
@@ -4969,9 +4974,9 @@ mod tests {
         assert!(!PREFIX_FOOTER.contains('—'));
         assert!(!onboard_lines()[1].contains('—'));
         assert_eq!(empty_dash(""), "—");
-        assert_eq!(last_room_copy(ConfirmKind::Workspace), "cửa sổ cuối giữ");
-        assert_eq!(last_room_copy(ConfirmKind::Pane), "ô cuối giữ");
-        assert_eq!(last_room_copy(ConfirmKind::Tab), "ô cuối giữ");
+        assert_eq!(last_room_copy(ConfirmKind::Workspace), "last window kept");
+        assert_eq!(last_room_copy(ConfirmKind::Pane), "last pane kept");
+        assert_eq!(last_room_copy(ConfirmKind::Tab), "last pane kept");
         assert_eq!(confirm_key(KeyCode::Char('y')), ConfirmPick::Yes);
         assert_eq!(confirm_key(KeyCode::Char('Y')), ConfirmPick::Yes);
         assert_eq!(confirm_key(KeyCode::Char('1')), ConfirmPick::Yes);
@@ -5039,7 +5044,7 @@ mod tests {
         assert_eq!(timeout.code, None);
         assert_eq!(
             flow_glance_line(&timeout),
-            "Flow lỗi. timed out after 15000ms"
+            "Flow error. timed out after 15000ms"
         );
         let obj = r#"{"type":"flow/result","args":["code"],"code":0}"#;
         assert_eq!(top_json_first_arg(obj).as_deref(), Some("code"));
@@ -5066,7 +5071,7 @@ mod tests {
             "{\"type\":\"flow/result\",\"code\":null,\"error\":\"lỗi\"}".as_bytes(),
         )
         .unwrap();
-        assert_eq!(flow_glance_line(&loi), "Flow lỗi. lỗi");
+        assert_eq!(flow_glance_line(&loi), "Flow error. lỗi");
         let da = last_flow_result_bytes(
             "{\"type\":\"flow/result\",\"args\":[\"đã\"],\"code\":0}".as_bytes(),
         )
@@ -5144,7 +5149,7 @@ mod tests {
 
     #[test]
     fn footer_line_glance_idle_status_and_overlays() {
-        let idle = " chuột phải menu  kéo≥2 copy  Ctrl-b prefix";
+        let idle = " right-click menu  drag≥2 copy  Ctrl-b prefix";
         assert_eq!(footer_hint(Mode::Terminal, ""), idle);
         assert_eq!(
             footer_line(Mode::Terminal, "", Some("Flow 0. code")),
@@ -5152,12 +5157,12 @@ mod tests {
         );
         assert_eq!(footer_line(Mode::Terminal, "", None), idle);
         assert_eq!(
-            footer_line(Mode::Terminal, "đã chép", Some("Flow 0. code")),
-            "đã chép"
+            footer_line(Mode::Terminal, "copied", Some("Flow 0. code")),
+            "copied"
         );
         assert_eq!(
             footer_line(Mode::Confirm, "", Some("Flow 0. code")),
-            " 1 có  2 không  esc"
+            " 1 yes  2 no  esc"
         );
         assert_eq!(
             footer_line(Mode::Prefix, "", Some("Flow 0. code")),
@@ -5165,19 +5170,19 @@ mod tests {
         );
         assert_eq!(
             footer_line(Mode::Help, "", Some("Flow 0. code")),
-            " esc đóng bảng"
+            " esc close keys"
         );
         assert_eq!(
             footer_line(Mode::Picker, "", Some("Flow 0. code")),
-            " j/k chọn  enter  esc"
+            " j/k pick  enter  esc"
         );
         assert_eq!(
             footer_line(Mode::Menu, "", Some("Flow 0. code")),
-            " 1.. chạy  esc hủy"
+            " 1.. run  esc cancel"
         );
         assert_eq!(
             footer_line(Mode::Onboard, "", Some("Flow 0. code")),
-            " enter nhớ  esc bỏ  Ctrl-b q rời"
+            " enter remember  esc dismiss  Ctrl-b q leave"
         );
         let long = format!("Flow 0. {}", "x".repeat(200));
         let painted = bar_line(&format!(" {long}"), 40);
@@ -5190,5 +5195,56 @@ mod tests {
         let rows = empty_shell_rows("/live/after/cd");
         assert_eq!(workspace_cwd(&rows, "w1"), Some("/live/after/cd"));
         assert!(!pane_wipe_on_tile_draw(false));
+    }
+
+    #[test]
+    fn error_toasts_and_empty_tile_are_english() {
+        for toast in [
+            "no window",
+            "tab failed",
+            "tab: no pane",
+            "window failed",
+            "window: no pane",
+            "no pane",
+            "split failed",
+            "split: no pane",
+            "not closed",
+            "close failed",
+            "copied",
+            "could not remember",
+        ] {
+            assert_eq!(footer_hint(Mode::Terminal, toast), toast);
+        }
+        let blob = format!(
+            "{}\n{}\n{}\n{}\n{}\n empty pane  Ctrl-b c tab · v/- split",
+            help_text(),
+            onboard_lines().join("\n"),
+            PREFIX_FOOTER,
+            footer_hint(Mode::Terminal, ""),
+            confirm_lines(ConfirmKind::Pane).join("\n"),
+        );
+        for vi in [
+            "thẻ lỗi",
+            "tách lỗi",
+            "không đóng",
+            "đóng lỗi",
+            "không có ô",
+            "không có cửa sổ",
+            "đã chép",
+            "Tách phải",
+            "chuột phải",
+            "ô trống",
+            "ô cuối giữ",
+        ] {
+            assert!(!blob.contains(vi), "{vi}");
+        }
+        assert!(blob.contains("empty pane"));
+        assert!(blob.contains("1 yes"));
+        assert!(flow_glance_line(&FlowGlance {
+            arg0: String::new(),
+            code: None,
+            error: Some("x".into()),
+        })
+        .starts_with("Flow error. "));
     }
 }
