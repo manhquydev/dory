@@ -134,9 +134,17 @@ fn read_line(stream: UnixStream) -> String {
     reply
 }
 
+unsafe extern "C" {
+    fn kill(pid: i32, sig: i32) -> i32;
+}
+
 fn wait_dead(pid: u32) {
     let start = Instant::now();
-    while Path::new(&format!("/proc/{pid}")).exists() {
+    loop {
+        let rc = unsafe { kill(pid as i32, 0) };
+        if rc != 0 && std::io::Error::last_os_error().raw_os_error() == Some(3) {
+            return;
+        }
         if start.elapsed() > Duration::from_secs(3) {
             panic!("pid {pid} still alive");
         }
