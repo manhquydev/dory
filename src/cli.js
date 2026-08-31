@@ -2,7 +2,7 @@ import { parseArgs } from "node:util";
 import { HOST, PORT, startServer } from "./serve.js";
 
 export function usage() {
-  return "usage: dory serve --workspace <abs-dir>\nopens http://127.0.0.1:7380/ (journal lamp, not desk)";
+  return "usage: dory-serve serve --workspace <abs-dir>\nopens http://127.0.0.1:7380/ (journal lamp, not desk)";
 }
 
 export async function main(argv) {

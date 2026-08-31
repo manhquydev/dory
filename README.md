@@ -31,8 +31,10 @@ Leaving the UI ≠ stopping work.
 ### Lamp (on npm today)
 
 ```bash
-npx @manhquy/dory@0.1.0-next.1 dory-serve -- serve --workspace /abs
+npx @manhquy/dory@0.1.0-next.2 dory-serve -- serve --workspace /abs
 ```
+
+`npx @manhquy/dory` without a pin follows npm `latest` (today `0.1.0-next.0`), not `next`. Pin the version or use `@next`.
 
 Then open `http://127.0.0.1:7380/`. `--workspace` must be an absolute path.
 
@@ -79,7 +81,7 @@ Prefix is `Ctrl-b`. There are no bare `x` / `1` / `w` keys.
 | `Ctrl-b z` | Zoom focused pane; siblings stay alive |
 | `Ctrl-b w` | Window picker (does not create) |
 | `Ctrl-b Shift-n` | New window |
-| `Ctrl-b b` | Sidebar 22↔4↔0 |
+| `Ctrl-b b` | Sidebar 26↔4↔0 |
 | `Ctrl-b Ctrl-b` | Send `C-b` into the pane |
 | `Ctrl-b x` | Close pane (confirm if last on the tab) |
 | `Ctrl-b Shift-x` | Close tab |
@@ -99,7 +101,7 @@ Early public tree. The desk stack is Rust. The lamp is the published npm package
 |---|---|---|
 | Product why | Closed | [CHARTER.md](CHARTER.md) |
 | Skill / CLI / socket | Accepted | `skills/dory/` · `rust/` |
-| Lamp on npm | `@manhquy/dory@0.1.0-next.1` | `npm-wrapper/` |
+| Lamp on npm | `@manhquy/dory@0.1.0-next.2` | `npm-wrapper/` |
 | Desk binary release | Not yet | build from `rust/` |
 
 ## Contributing

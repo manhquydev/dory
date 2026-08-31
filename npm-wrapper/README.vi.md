@@ -20,12 +20,12 @@ Bản gốc tiếng Anh: [README.md](README.md).
 ## Cài đặt
 
 ```bash
-npx @manhquy/dory@0.1.0-next.1 dory-serve -- serve --workspace /abs
+npx @manhquy/dory@0.1.0-next.2 dory-serve -- serve --workspace /abs
 ```
 
 Mở `http://127.0.0.1:7380/`. `--workspace` phải là thư mục tuyệt đối.
 
-Nên ghim version. `npx @manhquy/dory` không tag sẽ theo `latest` trên npm, có thể chậm hơn tag `next`.
+Nên ghim version. `npx @manhquy/dory` không tag sẽ theo `latest` trên npm (hiện `0.1.0-next.0`), không phải `next`.
 
 Chưa có Node? [nodejs.org](https://nodejs.org/en/download) hoặc [fnm](https://github.com/Schniz/fnm).
 

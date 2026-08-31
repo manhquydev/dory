@@ -41,4 +41,4 @@ body:
     id: version
     attributes:
       label: Version
-      placeholder: "e.g. @manhquy/dory@0.1.0-next.1 or commit SHA"
+      placeholder: "e.g. @manhquy/dory@0.1.0-next.2 or commit SHA"

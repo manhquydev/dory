@@ -11,7 +11,7 @@
 ## Checks
 
 - [ ] Tests added or updated when behavior changed
-- [ ] `cargo test --manifest-path rust/Cargo.toml --offline --locked` (if desk)
+- [ ] `cargo test --manifest-path rust/Cargo.toml --locked` (if desk)
 - [ ] `cd npm-wrapper && npm test` (if lamp)
 - [ ] Lamp `bin` is still `dory-serve` only (no `dory`)
 - [ ] No secrets, tokens, or `.env` files

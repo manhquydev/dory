@@ -34,7 +34,7 @@ You need a recent stable Rust toolchain (CI uses `dtolnay/rust-toolchain@stable`
 ```bash
 git clone https://github.com/manhquydev/dory.git
 cd dory
-cargo test --manifest-path rust/Cargo.toml --offline --locked
+cargo test --manifest-path rust/Cargo.toml --locked
 cargo build --manifest-path rust/Cargo.toml --release
 ```
 

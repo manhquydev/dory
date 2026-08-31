@@ -18,12 +18,12 @@ Typing `dory` after `npm install` will not open the desk. Do not install the uns
 ## Install
 
 ```bash
-npx @manhquy/dory@0.1.0-next.1 dory-serve -- serve --workspace /abs
+npx @manhquy/dory@0.1.0-next.2 dory-serve -- serve --workspace /abs
 ```
 
 Open `http://127.0.0.1:7380/`. `--workspace` must be an absolute directory.
 
-Pin the version. `npx @manhquy/dory` without a tag follows npm `latest`, which may lag the `next` tag.
+Pin the version. `npx @manhquy/dory` without a tag follows npm `latest` (today `0.1.0-next.0`), not `next`.
 
 Need Node first? [nodejs.org](https://nodejs.org/en/download) or [fnm](https://github.com/Schniz/fnm).
 

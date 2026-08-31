@@ -34,7 +34,7 @@ Cần Rust stable gần đây (CI dùng `dtolnay/rust-toolchain@stable`; crate e
 ```bash
 git clone https://github.com/manhquydev/dory.git
 cd dory
-cargo test --manifest-path rust/Cargo.toml --offline --locked
+cargo test --manifest-path rust/Cargo.toml --locked
 cargo build --manifest-path rust/Cargo.toml --release
 ```
 
