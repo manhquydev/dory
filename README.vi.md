@@ -33,12 +33,10 @@ Rời UI ≠ tắt việc.
 ### Đèn (đã có trên npm)
 
 ```bash
-npx @manhquy/dory@0.1.0-next.2 dory-serve -- serve --workspace /abs
+npx @manhquy/dory
 ```
 
-`npx @manhquy/dory` không ghim version sẽ theo tag npm `latest` (hiện `0.1.0-next.0`), không phải `next`. Hãy ghim version hoặc dùng `@next`.
-
-Mở `http://127.0.0.1:7380/`. `--workspace` phải là đường dẫn tuyệt đối.
+Chạy từ thư mục phiên. Mở `http://127.0.0.1:7380/`. Thư mục khác: `--workspace /abs`. Ghim: `npx @manhquy/dory@0.1.0`. Preview: `@next`.
 
 ```bash
 # đo Node / registry / va chạm PATH — không cài Node
@@ -103,7 +101,7 @@ Cây công khai, giai đoạn sớm. Desk là Rust. Đèn là gói npm `@manhquy
 |---|---|---|
 | Vì sao có sản phẩm | Đóng | [CHARTER.md](CHARTER.md) |
 | Skill / CLI / socket | Accepted | `skills/dory/` · `rust/` |
-| Đèn trên npm | `@manhquy/dory@0.1.0-next.2` | `npm-wrapper/` |
+| Đèn trên npm | `@manhquy/dory@0.1.0` | `npm-wrapper/` |
 | Phát hành binary desk | Chưa | build từ `rust/` |
 
 ## Đóng góp

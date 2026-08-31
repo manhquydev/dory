@@ -4,7 +4,7 @@
 set -euo pipefail
 
 PKG="@manhquy/dory"
-PIN="0.1.0-next.2"
+PIN="0.1.0"
 BIN="dory-serve"
 NODE_MIN="22.14.0"
 UNSCOPED_TRAP="dory"
@@ -18,7 +18,7 @@ diagnose (default)
   prints the npx lamp command. does not install anything.
 
 --install
-  npm install -g @manhquy/dory@0.1.0-next.2  (lamp bin dory-serve only)
+  npm install -g @manhquy/dory@0.1.0  (lamp bin dory-serve only)
   refused if node is missing/old, or npm prefix looks like cursor-agent.
 
 --uninstall
@@ -45,7 +45,7 @@ print_node_help() {
 Node >= 22.14.0 is required for the lamp. Dory will not install Node.
   https://nodejs.org/en/download
   or fnm: https://github.com/Schniz/fnm
-Then: npx @manhquy/dory@0.1.0-next.2 dory-serve -- serve --workspace /abs
+Then: npx @manhquy/dory
 EOF
 }
 
@@ -125,7 +125,7 @@ diagnose() {
     echo "PATH dory-serve: (none) — expected unless you --install. use npx."
   fi
 
-  echo "run: npx ${PKG}@${PIN} ${BIN} -- serve --workspace /abs"
+  echo "run: npx ${PKG}    # or npx ${PKG}@${PIN} --workspace /abs"
   echo "uninstall: npm uninstall -g $PKG"
   echo "never: npm i -g $UNSCOPED_TRAP"
   return "$rc"

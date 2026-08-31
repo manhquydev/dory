@@ -69,7 +69,7 @@ test("POST /goal appends session/goal and paints Mục tiêu", async () => {
     assert.ok(html.includes("viết README &lt;b&gt;x&lt;/b&gt;"));
     assert.ok(!html.includes("<b>x</b>"));
     assert.ok(html.includes(workspace));
-    assert.match(html, /serve --workspace/);
+    assert.match(html, /npx @manhquy\/dory --workspace/);
     assert.doesNotMatch(html, /0\.0\.0\.0/);
     assert.doesNotMatch(html, /PTY|w1:t1|attach|detach/i);
   } finally {

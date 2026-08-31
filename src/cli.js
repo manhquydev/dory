@@ -2,10 +2,10 @@ import { parseArgs } from "node:util";
 import { HOST, PORT, startServer } from "./serve.js";
 
 export function usage() {
-  return "usage: dory-serve serve --workspace <abs-dir>\nopens http://127.0.0.1:7380/ (journal lamp, not desk)";
+  return "usage: dory-serve [--workspace <abs-dir>]\nopens http://127.0.0.1:7380/ on the current directory (journal lamp, not desk)";
 }
 
-export async function main(argv) {
+export function parseCli(argv, { cwd = process.cwd() } = {}) {
   let values;
   let positionals;
   try {
@@ -19,29 +19,38 @@ export async function main(argv) {
       },
     }));
   } catch (err) {
-    console.error(usage());
-    console.error(err.message);
-    return 2;
+    return { ok: false, code: 2, error: `${usage()}\n${err.message}` };
   }
 
-  if (positionals.length !== 1 || positionals[0] !== "serve") {
-    console.error(usage());
-    return 2;
+  if (positionals.length > 1) {
+    return { ok: false, code: 2, error: usage() };
+  }
+  if (positionals.length === 1 && positionals[0] !== "serve") {
+    return { ok: false, code: 2, error: usage() };
   }
 
-  if (values.workspace === undefined) {
-    console.error("dory: missing --workspace <abs-dir>");
-    return 2;
+  return {
+    ok: true,
+    workspace: values.workspace === undefined ? cwd : values.workspace,
+    host: values.host,
+  };
+}
+
+export async function main(argv) {
+  const parsed = parseCli(argv);
+  if (!parsed.ok) {
+    console.error(parsed.error);
+    return parsed.code;
   }
 
   try {
     const started = await startServer({
-      workspace: values.workspace,
-      host: values.host,
+      workspace: parsed.workspace,
+      host: parsed.host,
       port: PORT,
     });
     console.error(
-      `dory: journal projection on http://${HOST}:${started.port}/ workspace=${values.workspace} (not a workplace)`,
+      `dory: journal projection on http://${HOST}:${started.port}/ workspace=${parsed.workspace} (not a workplace)`,
     );
     await new Promise((resolve) => {
       const onStop = () => {

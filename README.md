@@ -5,7 +5,7 @@
 Local **Agent Operating Environment** for multi-agent software work. Type `dory` for the desk. The journal lamp is a separate engine.
 
 [![CI](https://github.com/manhquydev/dory/actions/workflows/ci.yml/badge.svg)](https://github.com/manhquydev/dory/actions/workflows/ci.yml)
-[![npm next](https://img.shields.io/npm/v/@manhquy/dory/next.svg)](https://www.npmjs.com/package/@manhquy/dory)
+[![npm](https://img.shields.io/npm/v/@manhquy/dory.svg)](https://www.npmjs.com/package/@manhquy/dory)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 Dory is not a new version of [flow-skill](https://github.com/manhquydev/flow-skill) (the judge) or flow-deck (the wall board). Those stay their own houses. Dory is the place you **do the work**.
@@ -31,12 +31,10 @@ Leaving the UI ≠ stopping work.
 ### Lamp (on npm today)
 
 ```bash
-npx @manhquy/dory@0.1.0-next.2 dory-serve -- serve --workspace /abs
+npx @manhquy/dory
 ```
 
-`npx @manhquy/dory` without a pin follows npm `latest` (today `0.1.0-next.0`), not `next`. Pin the version or use `@next`.
-
-Then open `http://127.0.0.1:7380/`. `--workspace` must be an absolute path.
+Run from the session directory. Open `http://127.0.0.1:7380/`. Another folder: `--workspace /abs`. Pin: `npx @manhquy/dory@0.1.0`. Preview: `@next`.
 
 ```bash
 # check Node / registry / PATH collisions — does not install Node
@@ -101,7 +99,7 @@ Early public tree. The desk stack is Rust. The lamp is the published npm package
 |---|---|---|
 | Product why | Closed | [CHARTER.md](CHARTER.md) |
 | Skill / CLI / socket | Accepted | `skills/dory/` · `rust/` |
-| Lamp on npm | `@manhquy/dory@0.1.0-next.2` | `npm-wrapper/` |
+| Lamp on npm | `@manhquy/dory@0.1.0` | `npm-wrapper/` |
 | Desk binary release | Not yet | build from `rust/` |
 
 ## Contributing

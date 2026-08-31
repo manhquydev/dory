@@ -4,7 +4,7 @@
 
 **Đèn nhật ký** của [Dory](https://github.com/manhquydev/dory) (Session OS). Gói này **không** phải desk.
 
-[![npm next](https://img.shields.io/npm/v/@manhquy/dory/next.svg)](https://www.npmjs.com/package/@manhquy/dory)
+[![npm](https://img.shields.io/npm/v/@manhquy/dory.svg)](https://www.npmjs.com/package/@manhquy/dory)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../LICENSE)
 
 | | |
@@ -20,12 +20,10 @@ Bản gốc tiếng Anh: [README.md](README.md).
 ## Cài đặt
 
 ```bash
-npx @manhquy/dory@0.1.0-next.2 dory-serve -- serve --workspace /abs
+npx @manhquy/dory
 ```
 
-Mở `http://127.0.0.1:7380/`. `--workspace` phải là thư mục tuyệt đối.
-
-Nên ghim version. `npx @manhquy/dory` không tag sẽ theo `latest` trên npm (hiện `0.1.0-next.0`), không phải `next`.
+Chạy từ thư mục phiên. Mở `http://127.0.0.1:7380/`. Thư mục khác: `--workspace /abs`. Ghim: `npx @manhquy/dory@0.1.0`. Preview: `@next`.
 
 Chưa có Node? [nodejs.org](https://nodejs.org/en/download) hoặc [fnm](https://github.com/Schniz/fnm).
 

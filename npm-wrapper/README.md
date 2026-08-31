@@ -4,7 +4,7 @@
 
 Journal **lamp** for [Dory](https://github.com/manhquydev/dory) (Session OS). This package is **not** the desk.
 
-[![npm next](https://img.shields.io/npm/v/@manhquy/dory/next.svg)](https://www.npmjs.com/package/@manhquy/dory)
+[![npm](https://img.shields.io/npm/v/@manhquy/dory.svg)](https://www.npmjs.com/package/@manhquy/dory)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../LICENSE)
 
 | | |
@@ -18,12 +18,10 @@ Typing `dory` after `npm install` will not open the desk. Do not install the uns
 ## Install
 
 ```bash
-npx @manhquy/dory@0.1.0-next.2 dory-serve -- serve --workspace /abs
+npx @manhquy/dory
 ```
 
-Open `http://127.0.0.1:7380/`. `--workspace` must be an absolute directory.
-
-Pin the version. `npx @manhquy/dory` without a tag follows npm `latest` (today `0.1.0-next.0`), not `next`.
+Run from the session directory. Open `http://127.0.0.1:7380/`. Another folder: `--workspace /abs`. Pin: `npx @manhquy/dory@0.1.0`. Preview: `@next`.
 
 Need Node first? [nodejs.org](https://nodejs.org/en/download) or [fnm](https://github.com/Schniz/fnm).
 

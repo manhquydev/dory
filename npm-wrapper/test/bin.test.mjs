@@ -6,10 +6,10 @@ import { test } from "node:test";
 
 const bin = join(dirname(fileURLToPath(import.meta.url)), "..", "bin", "dory-serve.js");
 
-test("dory-serve with no args exits 2 and names the lamp", () => {
-  const r = spawnSync(process.execPath, [bin], { encoding: "utf8" });
+test("dory-serve with a desk-shaped verb exits 2 and names the lamp", () => {
+  const r = spawnSync(process.execPath, [bin, "desk"], { encoding: "utf8" });
   assert.equal(r.status, 2);
-  assert.match(r.stderr, /serve --workspace/);
+  assert.match(r.stderr, /dory-serve \[--workspace/);
   assert.match(r.stderr, /journal lamp, not desk/);
 });
 

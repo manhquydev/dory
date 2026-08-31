@@ -5,7 +5,7 @@ import { mkdtemp, readFile, writeFile, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { main } from "../src/cli.js";
+import { main, parseCli } from "../src/cli.js";
 import { journalPath, parseJournalLines } from "../src/journal.js";
 import { HOST, startServer } from "../src/serve.js";
 
@@ -67,19 +67,25 @@ test("parseJournalLines skips empty and marks broken", () => {
   assert.equal(parseJournalLines(Buffer.alloc(0)).length, 0);
 });
 
-test("missing workspace fails", async () => {
-  const none = await runCli(["serve"]);
-  assert.notEqual(none.code, 0);
-  assert.match(none.stderr, /missing --workspace/);
+test("workspace defaults to cwd; relative and empty fail", async () => {
+  const cwd = await tempWorkspace();
+  const parsed = parseCli([], { cwd });
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.workspace, cwd);
+
+  const serveAlias = parseCli(["serve"], { cwd });
+  assert.equal(serveAlias.ok, true);
+  assert.equal(serveAlias.workspace, cwd);
 
   const emptyFlag = await runCli(["serve", "--workspace"]);
   assert.notEqual(emptyFlag.code, 0);
 
-  const code = await main(["serve"]);
-  assert.equal(code, 2);
-
   const relative = await main(["serve", "--workspace", "relative/path"]);
   assert.equal(relative, 2);
+
+  const unknown = parseCli(["desk"], { cwd });
+  assert.equal(unknown.ok, false);
+  assert.equal(unknown.code, 2);
 });
 
 test("loopback bind", async () => {

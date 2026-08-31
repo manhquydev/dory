@@ -140,7 +140,7 @@ export function renderJournalPage(bytes, { workspace, flowPreview } = {}) {
     </form>
     ${renderFlowSection(flowPreview, workspace || "")}
   </main>
-  <footer>Lamp: <code>npx @manhquy/dory@0.1.0-next.2 dory-serve -- serve --workspace ${path}</code> then open this page. Not the desk. Not an icon.</footer>
+  <footer>Lamp: <code>npx @manhquy/dory --workspace ${path}</code> then open this page. Not the desk. Not an icon.</footer>
   <script>
 (function () {
   var form = document.getElementById("flow");
