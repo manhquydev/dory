@@ -45,7 +45,7 @@ Live `--help` ships:
 - `agent report [--current | --pane <id>] --state working|blocked|idle`
 - `flow -- <args>`
 
-`dory flow -- <args>` is a taxi: exec `FLOW_BIN` or `flow.sh`, cwd = the workspace directory (`DORY_WORKSPACE_DIR` or the pane cwd). Preserve the judge exit code. No `next` / `card` / `check` inside Dory. Refuse `herdr`, `dsh`, `@deepseek-ai/dsh`.
+`dory flow -- <args>` is a taxi: exec `FLOW_BIN` or `flow.sh`, cwd = the workspace directory (`DORY_WORKSPACE_DIR` or the pane cwd). Timeout **15000 ms**, then SIGTERM / 1s / SIGKILL. Preserve the judge exit; timeout or missing code exits 1. Occupant must not wait forever. No `next` / `card` / `check` inside Dory. Refuse `herdr`, `dsh`, `@deepseek-ai/dsh`.
 
 ## Envelope and IDs
 
@@ -150,12 +150,16 @@ Five words: `working` | `blocked` | `idle` | `done` | `unknown`. `idle` = ready 
 
 ## Flow taxi
 
-Requires `DORY_ENV=1`. After `--`, args pass through to the foreign judge:
+Requires `DORY_ENV=1`. After `--`, remaining args go to the foreign judge. Empty `--` injects `status`: `dory flow --` is the same as `dory flow -- status`, not a distinct pass-through of zero args. No `--` is usage 2.
 
 ```bash
 dory flow --
 dory flow -- status
 ```
+
+Timeout **15000 ms**, then SIGTERM, 1s grace, then SIGKILL. Timeout → `code=None`, process exit `unwrap_or(1)`. Occupant must not wait forever.
+
+Taxi stdout is always `envelope::success(&event)` then `result.code.unwrap_or(1)`. JSON on stdout can look ok while the process exit is the judge code or 1. Do not treat this path as “runtime JSON stderr exit 1”. Envelope § above still holds for other RPCs.
 
 `FLOW_BIN` overrides the judge path; otherwise `flow.sh` on `PATH`. Journal: `{cwd}/.dory/sessions/s1.jsonl` with `flow/invoke` then `flow/result`. Do not implement Flow gates inside Dory.
 
