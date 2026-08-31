@@ -43,7 +43,7 @@ That semver is **spent**.
 
 **OIDC live closed 2026-08-31:** run https://github.com/manhquydev/dory/actions/runs/33359335058 SHA `fcccfaf` → `+ @manhquy/dory@0.1.0-next.2`. Dist-tag `next` = `0.1.0-next.2`. Dist-tag `latest` still `0.1.0-next.0` until `0.1.0` (no hyphen) ships as first stable.
 
-**First stable lamp (this wave):** publish `0.1.0` with `--tag latest`. Do not `dist-tag add` a hyphenated semver onto `latest`. CLI after this cut: `npx @manhquy/dory` (cwd). Next preview bump is `0.1.1-next.0`.
+**First stable lamp closed 2026-08-31:** run https://github.com/manhquydev/dory/actions/runs/33360595435 SHA `7eb5daa` → `+ @manhquy/dory@0.1.0` on dist-tag `latest`, provenance visible, tag `npm@0.1.0`. GitHub Latest: https://github.com/manhquydev/dory/releases/tag/npm%400.1.0 . Dist-tag `next` still `0.1.0-next.2`. User command: `npx @manhquy/dory`. Next preview bump is `0.1.1-next.0`.
 
 ## Publish
 
@@ -56,13 +56,13 @@ Order is a gate. Do not skip.
 ```
 gh workflow run "Publish npm-wrapper to npm (trusted publishing)" \
   --repo manhquydev/dory --ref main \
-  -f version=0.1.0 -f dist_tag=latest -f dry_run=true -f promote_to=none
+  -f version=0.1.1-next.0 -f dist_tag=next -f dry_run=true -f promote_to=none
 ```
 
 4. Dry-run must print `Publishing … (dry-run)` and `+ @manhquy/dory@…`. Bin stays `dory-serve`.
 5. Dispatch the same inputs with `dry_run=false`. Approve `npm-publish` again (each run waits).
-6. Or push tag `npm@0.1.0` (no hyphen → dist-tag `latest`).
-7. After live: `npm view @manhquy/dory@0.1.0` and `npm view @manhquy/dory dist-tags --json`.
+6. Or push tag `npm@0.1.1-next.0` (pre-release → dist-tag `next`).
+7. After live: `npm view @manhquy/dory@0.1.1-next.0` and `npm view @manhquy/dory dist-tags --json`.
 8. Promote `next` → `latest` only from your shell (`npm dist-tag add …`). Not GHA. Then revoke the token.
 
 Bump `npm-wrapper/package.json` version **before** the next live. Same SHA cannot republish the same semver.

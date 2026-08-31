@@ -9,10 +9,10 @@
 - Do not cargo the leftover dirty tree. Isolate ELF miss = FAIL, not rebuild leftover.
 - Do not claim isolate unlock N/O/P is company Phase 5.
 - Do not fill `flow/03-prd.md` or walk 04–05 unless a new cook names that hunk.
-- Do not type the GitHub environment name (`npm-publish`) into publish `version`. Semver only (`0.1.0`).
+- Do not type the GitHub environment name (`npm-publish`) into publish `version`. Semver only (`0.1.1-next.0`).
 - Do not `dry_run=false` until CI `all-checks-passed` is green on that SHA and a dry-run publish on that SHA is green.
 - Do not spawn `ps` or libproc from the desk server. Darwin occupant `done`/`idle` stays unpaid; CI skips those tests.
 - Do not `git remote add origin`. Push `git push https://github.com/manhquydev/dory.git main`.
 - Do not claim `npm i @manhquy/dory` is desk `dory`. Lamp bin is `dory-serve`.
 - Do not bootstrap Node (fnm/nvm/NodeSource/`curl | sh`) from a Dory script. Doctor detects and points at nodejs.org.
-- Do not `npm i -g dory` (unscoped; other product). Do not republish `0.1.0-next.0` / `0.1.0-next.1` / `0.1.0-next.2` / `0.1.0` once spent. After live `0.1.0` (`latest`), preview bumps are `0.1.1-next.N`. Do not put a hyphenated semver on `latest`.
+- Do not `npm i -g dory` (unscoped; other product). Do not republish `0.1.0-next.0` / `0.1.0-next.1` / `0.1.0-next.2` / `0.1.0` (spent). `latest` = `0.1.0`. Next preview is `0.1.1-next.0`. Do not put a hyphenated semver on `latest`.
