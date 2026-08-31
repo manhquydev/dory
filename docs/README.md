@@ -32,6 +32,12 @@ Mechanical `dory flow -- next` on an isolate. Flow is the foreign judge. Not a D
 
 Discover current paper with `git log --oneline -- scripts/dory-isolate-aoe5-flow-prd.sh`.
 
+## Paid flow taxi paper
+
+| Landing | Owner |
+|---|---|
+| Flow taxi paper `a87a12c` | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Paid desk chrome and parked waits
 
 Plan `260831-2119-desk-en-chrome-rpc-accept` is paid land. Cite land rust with `git show HEAD:rust/...`. Working-tree leftover `server.rs` is not the owner.
@@ -47,7 +53,7 @@ Plan `260831-2119-desk-en-chrome-rpc-accept` is paid land. Cite land rust with `
 - Fill `03-prd.md` / walk 04–05 / `card` / semantic `gate-rules.md`
 - Company Phase 5 (a real project completed *inside* Dory)
 - Leftover 5 fold / PATH retarget / leftover ELF rm
-- Founder `prompt --wait` / skill taxi paper
+- Founder `prompt --wait`
 - Desk GitHub release / cargo-dist (`curl | sh` ELF) — lamp doctor is not that
 
 ## Factory doors
