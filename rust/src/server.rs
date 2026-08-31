@@ -75,6 +75,44 @@ struct Workspace {
     tabs: Vec<Tab>,
 }
 
+const MAX_PARKED_WAITS: usize = 32;
+const PARKED_YIELD: Duration = Duration::from_millis(20);
+
+struct ParkedWait {
+    writer: UnixStream,
+    job: WaitJob,
+}
+
+#[derive(Clone)]
+enum WaitJob {
+    PaneWait {
+        pane_id: String,
+        needle: Option<String>,
+        regex: Option<CompiledRegex>,
+        deadline: Instant,
+    },
+    AgentClassify {
+        pane_id: String,
+        name: String,
+        deadline: Instant,
+    },
+    AgentPrompt {
+        pane_id: String,
+        name: String,
+        stall_from: Option<OccupantWord>,
+        stall_at: Option<Instant>,
+        wait: bool,
+        timeout_ms: u64,
+        wait_deadline: Option<Instant>,
+    },
+    AgentWait {
+        pane_id: String,
+        name: String,
+        until: Option<OccupantWord>,
+        deadline: Instant,
+    },
+}
+
 struct World {
     ids: Ids,
     workspaces: Vec<Workspace>,
@@ -82,6 +120,7 @@ struct World {
     bin: PathBuf,
     cwd: PathBuf,
     focused: String,
+    waits: Vec<ParkedWait>,
 }
 
 pub fn run_foreground() -> i32 {
@@ -147,6 +186,7 @@ fn serve_session(session: &str) -> Result<(), i32> {
         bin,
         cwd,
         focused: String::new(),
+        waits: Vec::new(),
     };
     create_workspace(&mut world, None).map_err(|err| {
         eprintln!("{err}");
@@ -157,25 +197,310 @@ fn serve_session(session: &str) -> Result<(), i32> {
 }
 
 fn serve_loop(listener: UnixListener, world: &mut World) -> Result<(), i32> {
+    let mut blocking = true;
     loop {
+        if world.waits.is_empty() {
+            if !blocking {
+                if let Err(err) = listener.set_nonblocking(false) {
+                    eprintln!("dory: {err}");
+                    fail_parked(world);
+                    kill_all(world);
+                    return Err(1);
+                }
+                blocking = true;
+            }
+        } else if blocking {
+            if let Err(err) = listener.set_nonblocking(true) {
+                eprintln!("dory: {err}");
+                fail_parked(world);
+                kill_all(world);
+                return Err(1);
+            }
+            blocking = false;
+        }
+
         let (stream, _) = match listener.accept() {
             Ok(pair) => pair,
             Err(err) if err.kind() == io::ErrorKind::Interrupted => continue,
+            Err(err) if !blocking && err.kind() == io::ErrorKind::WouldBlock => {
+                tick_waits(world);
+                thread::sleep(PARKED_YIELD);
+                continue;
+            }
             Err(err) => {
                 eprintln!("dory: {err}");
+                fail_parked(world);
                 kill_all(world);
                 return Err(1);
             }
         };
         match handle_client(stream, world) {
-            ClientAction::Continue => {}
+            ClientAction::Continue => {
+                if !world.waits.is_empty() {
+                    tick_waits(world);
+                }
+            }
             ClientAction::Stop => return Ok(()),
             ClientAction::Attach { stream, io } => {
                 thread::spawn(move || proxy_attach(stream, io));
+                if !world.waits.is_empty() {
+                    tick_waits(world);
+                }
             }
         }
     }
 }
+
+fn fail_parked(world: &mut World) {
+    let err = envelope::runtime_error("stopped");
+    for mut parked in world.waits.drain(..) {
+        write_parked_line(&mut parked.writer, &err);
+    }
+}
+
+fn write_parked_line(writer: &mut UnixStream, msg: &str) {
+    let mut line = String::with_capacity(msg.len() + 1);
+    line.push_str(msg);
+    line.push('\n');
+    match writer.write_all(line.as_bytes()) {
+        Ok(()) => {
+            let _ = writer.flush();
+        }
+        Err(_) => {}
+    }
+}
+
+fn tick_waits(world: &mut World) {
+    let mut i = 0;
+    while i < world.waits.len() {
+        if let Some(msg) = tick_wait_job(world, i) {
+            let mut parked = world.waits.remove(i);
+            write_parked_line(&mut parked.writer, &msg);
+        } else {
+            i += 1;
+        }
+    }
+}
+
+fn pane_mut<'a>(world: &'a mut World, pane_id: &str) -> Option<&'a mut Pane> {
+    for ws in &mut world.workspaces {
+        for tab in &mut ws.tabs {
+            if let Some(p) = tab.panes.iter_mut().find(|p| p.id == pane_id) {
+                return Some(p);
+            }
+        }
+    }
+    None
+}
+
+fn agent_pane_mut<'a>(
+    world: &'a mut World,
+    pane_id: &str,
+    name: &str,
+) -> Result<&'a mut Pane, String> {
+    let pane = pane_mut(world, pane_id).ok_or_else(|| format!("unknown pane {pane_id}"))?;
+    match pane.occupant.as_ref() {
+        Some(o) if o.name == name => Ok(pane),
+        _ => Err(format!("unknown agent {name}")),
+    }
+}
+
+fn tick_wait_job(world: &mut World, i: usize) -> Option<String> {
+    let job = world.waits[i].job.clone();
+    match job {
+        WaitJob::PaneWait {
+            pane_id,
+            needle,
+            regex,
+            deadline,
+        } => tick_pane_wait(world, &pane_id, needle.as_deref(), regex.as_ref(), deadline),
+        WaitJob::AgentClassify {
+            pane_id,
+            name,
+            deadline,
+        } => tick_agent_classify(world, &pane_id, &name, deadline),
+        WaitJob::AgentPrompt {
+            pane_id,
+            name,
+            stall_from,
+            stall_at,
+            wait,
+            timeout_ms,
+            wait_deadline,
+        } => tick_agent_prompt(
+            world,
+            i,
+            &pane_id,
+            &name,
+            stall_from,
+            stall_at,
+            wait,
+            timeout_ms,
+            wait_deadline,
+        ),
+        WaitJob::AgentWait {
+            pane_id,
+            name,
+            until,
+            deadline,
+        } => tick_agent_wait(world, &pane_id, &name, until, deadline),
+    }
+}
+
+fn tick_pane_wait(
+    world: &World,
+    pane_id: &str,
+    needle: Option<&str>,
+    regex: Option<&CompiledRegex>,
+    deadline: Instant,
+) -> Option<String> {
+    let Some(loc) = locate_pane(world, pane_id) else {
+        return Some(envelope::runtime_error(&format!("unknown pane {pane_id}")));
+    };
+    let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
+    let text = pane.held.recent_unwrapped();
+    let hit = if let Some(n) = needle {
+        text.contains(n)
+    } else if let Some(re) = regex {
+        regex_search(re, &text)
+    } else {
+        false
+    };
+    if hit {
+        Some(envelope::success(&format!(
+            "{{\"pane\":{{\"id\":{}}},\"matched\":true,\"text\":{}}}",
+            envelope::json_string(pane_id),
+            envelope::json_string(&text)
+        )))
+    } else if Instant::now() >= deadline {
+        Some(envelope::runtime_error("timeout"))
+    } else {
+        None
+    }
+}
+
+fn tick_agent_classify(
+    world: &mut World,
+    pane_id: &str,
+    name: &str,
+    deadline: Instant,
+) -> Option<String> {
+    let pane = match agent_pane_mut(world, pane_id, name) {
+        Ok(p) => p,
+        Err(err) => return Some(envelope::runtime_error(&err)),
+    };
+    refresh_occupant(pane);
+    let classified = pane.occupant.as_ref().is_some_and(|o| o.classified);
+    if classified || Instant::now() >= deadline {
+        Some(envelope::success(&agent_snapshot(pane)))
+    } else {
+        None
+    }
+}
+
+fn tick_agent_prompt(
+    world: &mut World,
+    i: usize,
+    pane_id: &str,
+    name: &str,
+    stall_from: Option<OccupantWord>,
+    stall_at: Option<Instant>,
+    wait: bool,
+    timeout_ms: u64,
+    wait_deadline: Option<Instant>,
+) -> Option<String> {
+    let word = {
+        let pane = match agent_pane_mut(world, pane_id, name) {
+            Ok(p) => p,
+            Err(err) => return Some(envelope::runtime_error(&err)),
+        };
+        refresh_occupant(pane);
+        match pane.occupant.as_ref() {
+            Some(o) => o.word,
+            None => return Some(envelope::runtime_error(&format!("unknown agent {name}"))),
+        }
+    };
+    if let Some(from) = stall_from {
+        if word != from {
+            if wait {
+                let deadline = Instant::now() + Duration::from_millis(timeout_ms);
+                world.waits[i].job = WaitJob::AgentPrompt {
+                    pane_id: pane_id.to_string(),
+                    name: name.to_string(),
+                    stall_from: None,
+                    stall_at: None,
+                    wait,
+                    timeout_ms,
+                    wait_deadline: Some(deadline),
+                };
+            } else {
+                return agent_snapshot_reply(world, pane_id, name);
+            }
+        } else if stall_at.is_some_and(|at| Instant::now() >= at) {
+            return Some(envelope::runtime_error("agent_prompt_stalled"));
+        } else {
+            return None;
+        }
+    }
+    if wait {
+        let deadline = match wait_deadline {
+            Some(d) => d,
+            None => {
+                let d = Instant::now() + Duration::from_millis(timeout_ms);
+                if let WaitJob::AgentPrompt {
+                    wait_deadline, ..
+                } = &mut world.waits[i].job
+                {
+                    *wait_deadline = Some(d);
+                }
+                d
+            }
+        };
+        if wait_hit(word, None) {
+            agent_snapshot_reply(world, pane_id, name)
+        } else if Instant::now() >= deadline {
+            Some(envelope::runtime_error("timeout"))
+        } else {
+            None
+        }
+    } else {
+        agent_snapshot_reply(world, pane_id, name)
+    }
+}
+
+fn tick_agent_wait(
+    world: &mut World,
+    pane_id: &str,
+    name: &str,
+    until: Option<OccupantWord>,
+    deadline: Instant,
+) -> Option<String> {
+    let pane = match agent_pane_mut(world, pane_id, name) {
+        Ok(p) => p,
+        Err(err) => return Some(envelope::runtime_error(&err)),
+    };
+    refresh_occupant(pane);
+    let word = match pane.occupant.as_ref() {
+        Some(o) => o.word,
+        None => return Some(envelope::runtime_error(&format!("unknown agent {name}"))),
+    };
+    if wait_hit(word, until) {
+        Some(envelope::success(&agent_snapshot(pane)))
+    } else if Instant::now() >= deadline {
+        Some(envelope::runtime_error("timeout"))
+    } else {
+        None
+    }
+}
+
+fn agent_snapshot_reply(world: &mut World, pane_id: &str, name: &str) -> Option<String> {
+    let pane = match agent_pane_mut(world, pane_id, name) {
+        Ok(p) => p,
+        Err(err) => return Some(envelope::runtime_error(&err)),
+    };
+    Some(envelope::success(&agent_snapshot(pane)))
+}
+
 
 enum ClientAction {
     Continue,
@@ -209,8 +534,10 @@ fn handle_client(stream: UnixStream, world: &mut World) -> ClientAction {
         }
 
         match dispatch_line(world, &line) {
-            LineReply::Stop(image) => {
-                let _ = writeln!(writer, "{image}");
+            LineReply::Stop(reply) => {
+                fail_parked(world);
+                kill_all(world);
+                let _ = writeln!(writer, "{reply}");
                 let _ = writer.flush();
                 return ClientAction::Stop;
             }
@@ -227,6 +554,19 @@ fn handle_client(stream: UnixStream, world: &mut World) -> ClientAction {
                 let stream = reader.into_inner();
                 return ClientAction::Attach { stream, io };
             }
+            LineReply::Pending(job) => {
+                if world.waits.len() >= MAX_PARKED_WAITS {
+                    let reply = envelope::runtime_error("too many waits");
+                    if writeln!(writer, "{reply}").is_err() {
+                        return ClientAction::Continue;
+                    }
+                    let _ = writer.flush();
+                    continue;
+                }
+                let _ = writer.set_nonblocking(true);
+                world.waits.push(ParkedWait { writer, job });
+                return ClientAction::Continue;
+            }
             LineReply::Msg(reply) => {
                 if writeln!(writer, "{reply}").is_err() {
                     return ClientAction::Continue;
@@ -241,6 +581,7 @@ enum LineReply {
     Msg(String),
     Stop(String),
     Attach { io: AttachIO, ack: String },
+    Pending(WaitJob),
 }
 
 fn dispatch_line(world: &mut World, line: &str) -> LineReply {
@@ -249,7 +590,6 @@ fn dispatch_line(world: &mut World, line: &str) -> LineReply {
         Some("snapshot") => LineReply::Msg(live_snapshot(world)),
         Some("stop") => {
             let pid = first_pid(world);
-            kill_all(world);
             LineReply::Stop(dead_snapshot(pid))
         }
         Some("workspace.create") => {
@@ -365,7 +705,7 @@ fn dispatch_line(world: &mut World, line: &str) -> LineReply {
             ),
             None => envelope::runtime_error("pane id required"),
         }),
-        Some("pane.wait") => LineReply::Msg(match json_str_field(line, "pane") {
+        Some("pane.wait") => match json_str_field(line, "pane") {
             Some(id) => wait_pane(
                 world,
                 id,
@@ -373,30 +713,30 @@ fn dispatch_line(world: &mut World, line: &str) -> LineReply {
                 json_decoded_str_field(line, "regex"),
                 json_u64_field(line, "timeout").unwrap_or(5000),
             ),
-            None => envelope::runtime_error("pane id required"),
-        }),
-        Some("agent.start") => LineReply::Msg(agent_start(
+            None => LineReply::Msg(envelope::runtime_error("pane id required")),
+        },
+        Some("agent.start") => agent_start(
             world,
             json_str_field(line, "name"),
             json_str_field(line, "pane"),
             json_str_array_field(line, "argv"),
             json_u64_field(line, "timeout"),
-        )),
-        Some("agent.prompt") => LineReply::Msg(agent_prompt(
+        ),
+        Some("agent.prompt") => agent_prompt(
             world,
             json_str_field(line, "name"),
             json_str_field(line, "pane"),
             json_decoded_str_field(line, "text"),
             json_bool_field(line, "wait").unwrap_or(false),
             json_u64_field(line, "timeout"),
-        )),
-        Some("agent.wait") => LineReply::Msg(agent_wait(
+        ),
+        Some("agent.wait") => agent_wait(
             world,
             json_str_field(line, "name"),
             json_str_field(line, "pane"),
             json_str_field(line, "until"),
             json_u64_field(line, "timeout"),
-        )),
+        ),
         Some("agent.get") => LineReply::Msg(agent_get(
             world,
             json_str_field(line, "name"),
@@ -1361,33 +1701,33 @@ fn agent_start(
     pane_id: Option<&str>,
     argv: Option<Vec<String>>,
     timeout_ms: Option<u64>,
-) -> String {
+) -> LineReply {
     let Some(name) = name else {
-        return envelope::runtime_error("name required");
+        return LineReply::Msg(envelope::runtime_error("name required"));
     };
     if !crate::agent::valid_occupant_name(name) {
-        return envelope::runtime_error("invalid occupant name");
+        return LineReply::Msg(envelope::runtime_error("invalid occupant name"));
     }
     let Some(pane_id) = pane_id else {
-        return envelope::runtime_error("pane id required");
+        return LineReply::Msg(envelope::runtime_error("pane id required"));
     };
     let Some(argv) = argv.filter(|a| !a.is_empty()) else {
-        return envelope::runtime_error("argv required");
+        return LineReply::Msg(envelope::runtime_error("argv required"));
     };
     if let Err(err) = pty::refuse_spawn_argv(&argv) {
-        return envelope::runtime_error(&err.to_string());
+        return LineReply::Msg(envelope::runtime_error(&err.to_string()));
     }
     let Some(loc) = locate_pane(world, pane_id) else {
-        return envelope::runtime_error(&format!("unknown pane {pane_id}"));
+        return LineReply::Msg(envelope::runtime_error(&format!("unknown pane {pane_id}")));
     };
     {
         let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
         if pane.occupant.is_some() {
-            return envelope::runtime_error(&format!("pane busy {pane_id}"));
+            return LineReply::Msg(envelope::runtime_error(&format!("pane busy {pane_id}")));
         }
     }
     if live_occupant_name(world, name).is_some() {
-        return envelope::runtime_error(&format!("occupant name in use {name}"));
+        return LineReply::Msg(envelope::runtime_error(&format!("occupant name in use {name}")));
     }
     let argv0 = argv[0].clone();
     let line = shell_join(&argv);
@@ -1396,7 +1736,7 @@ fn agent_start(
     {
         let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
         if let Err(err) = pane.held.write_all(&bytes) {
-            return envelope::runtime_error(&err.to_string());
+            return LineReply::Msg(envelope::runtime_error(&err.to_string()));
         }
     }
     world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi].occupant = Some(Occupant {
@@ -1415,23 +1755,18 @@ fn agent_start(
         let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
         argv0_comm(&pane.occupant.as_ref().unwrap().argv0).to_string()
     };
-    if comm_allowlisted(&comm) {
-        loop {
-            let pane = &mut world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
-            refresh_occupant(pane);
-            if pane.occupant.as_ref().is_some_and(|o| o.classified) {
-                break;
-            }
-            if Instant::now() >= deadline {
-                break;
-            }
-            thread::sleep(Duration::from_millis(20));
+    {
+        let pane = &mut world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
+        refresh_occupant(pane);
+        if !comm_allowlisted(&comm) || pane.occupant.as_ref().is_some_and(|o| o.classified) {
+            return LineReply::Msg(envelope::success(&agent_snapshot(pane)));
         }
-    } else {
-        refresh_occupant(&mut world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi]);
     }
-    let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
-    envelope::success(&agent_snapshot(pane))
+    LineReply::Pending(WaitJob::AgentClassify {
+        pane_id: pane_id.to_string(),
+        name: name.to_string(),
+        deadline,
+    })
 }
 
 fn live_bracketed_paste(drain: &str) -> bool {
@@ -1451,21 +1786,22 @@ fn agent_prompt(
     text: Option<String>,
     wait: bool,
     timeout_ms: Option<u64>,
-) -> String {
+) -> LineReply {
     let loc = match locate_agent(world, name, pane_id) {
         Ok(loc) => loc,
-        Err(err) => return envelope::runtime_error(&err),
+        Err(err) => return LineReply::Msg(envelope::runtime_error(&err)),
     };
     let Some(text) = text else {
-        return envelope::runtime_error("text required");
+        return LineReply::Msg(envelope::runtime_error("text required"));
     };
     refresh_occupant(&mut world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi]);
-    let before = {
+    let (before, pane_key, name_key) = {
         let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
-        pane.occupant.as_ref().unwrap().word
+        let occ = pane.occupant.as_ref().unwrap();
+        (occ.word, pane.id.clone(), occ.name.clone())
     };
     if before == OccupantWord::Blocked {
-        return envelope::runtime_error("agent_blocked");
+        return LineReply::Msg(envelope::runtime_error("agent_blocked"));
     }
     let bytes = {
         let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
@@ -1489,10 +1825,10 @@ fn agent_prompt(
     {
         let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
         if let Err(err) = pane.held.write_all(&bytes) {
-            return envelope::runtime_error(&err.to_string());
+            return LineReply::Msg(envelope::runtime_error(&err.to_string()));
         }
     }
-    {
+    let now_word = {
         let pane = &mut world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
         let mark = pane.held.recent_unwrapped().len();
         if let Some(occ) = pane.occupant.as_mut() {
@@ -1501,36 +1837,31 @@ fn agent_prompt(
             occ.report = None;
         }
         refresh_occupant(pane);
+        pane.occupant.as_ref().unwrap().word
+    };
+    let stall = matches!(before, OccupantWord::Idle | OccupantWord::Done) && now_word == before;
+    let timeout = timeout_ms.unwrap_or(DEFAULT_AGENT_TIMEOUT_MS);
+    if stall || wait {
+        return LineReply::Pending(WaitJob::AgentPrompt {
+            pane_id: pane_key,
+            name: name_key,
+            stall_from: if stall { Some(before) } else { None },
+            stall_at: if stall {
+                Some(Instant::now() + Duration::from_millis(PROMPT_STALL_MS))
+            } else {
+                None
+            },
+            wait,
+            timeout_ms: timeout,
+            wait_deadline: if wait && !stall {
+                Some(Instant::now() + Duration::from_millis(timeout))
+            } else {
+                None
+            },
+        });
     }
-    if matches!(before, OccupantWord::Idle | OccupantWord::Done) {
-        let stall_at = Instant::now() + Duration::from_millis(PROMPT_STALL_MS);
-        loop {
-            refresh_occupant(&mut world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi]);
-            let now = world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi]
-                .occupant
-                .as_ref()
-                .unwrap()
-                .word;
-            if now != before {
-                break;
-            }
-            if Instant::now() >= stall_at {
-                return envelope::runtime_error("agent_prompt_stalled");
-            }
-            thread::sleep(Duration::from_millis(20));
-        }
-    }
-    if wait {
-        agent_wait_loop(
-            world,
-            loc,
-            None,
-            timeout_ms.unwrap_or(DEFAULT_AGENT_TIMEOUT_MS),
-        )
-    } else {
-        let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
-        envelope::success(&agent_snapshot(pane))
-    }
+    let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
+    LineReply::Msg(envelope::success(&agent_snapshot(pane)))
 }
 
 fn wait_hit(word: OccupantWord, until: Option<OccupantWord>) -> bool {
@@ -1543,52 +1874,38 @@ fn wait_hit(word: OccupantWord, until: Option<OccupantWord>) -> bool {
     }
 }
 
-fn agent_wait_loop(
-    world: &mut World,
-    loc: PaneLoc,
-    until: Option<OccupantWord>,
-    timeout_ms: u64,
-) -> String {
-    let deadline = Instant::now() + Duration::from_millis(timeout_ms);
-    loop {
-        refresh_occupant(&mut world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi]);
-        let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
-        let word = pane.occupant.as_ref().unwrap().word;
-        if wait_hit(word, until) {
-            return envelope::success(&agent_snapshot(pane));
-        }
-        if Instant::now() >= deadline {
-            return envelope::runtime_error("timeout");
-        }
-        thread::sleep(Duration::from_millis(20));
-    }
-}
-
 fn agent_wait(
     world: &mut World,
     name: Option<&str>,
     pane_id: Option<&str>,
     until: Option<&str>,
     timeout_ms: Option<u64>,
-) -> String {
+) -> LineReply {
     let loc = match locate_agent(world, name, pane_id) {
         Ok(loc) => loc,
-        Err(err) => return envelope::runtime_error(&err),
+        Err(err) => return LineReply::Msg(envelope::runtime_error(&err)),
     };
     let until = match until {
         None => None,
         Some(s) => match OccupantWord::parse(s) {
             Some(w) => Some(w),
-            None => return envelope::runtime_error(&format!("unknown until {s}")),
+            None => return LineReply::Msg(envelope::runtime_error(&format!("unknown until {s}"))),
         },
     };
-    agent_wait_loop(
-        world,
-        loc,
+    let (pane_key, name_key) = {
+        let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
+        let occ = pane.occupant.as_ref().unwrap();
+        (pane.id.clone(), occ.name.clone())
+    };
+    LineReply::Pending(WaitJob::AgentWait {
+        pane_id: pane_key,
+        name: name_key,
         until,
-        timeout_ms.unwrap_or(DEFAULT_AGENT_TIMEOUT_MS),
-    )
+        deadline: Instant::now()
+            + Duration::from_millis(timeout_ms.unwrap_or(DEFAULT_AGENT_TIMEOUT_MS)),
+    })
 }
+
 
 fn agent_get(world: &mut World, name: Option<&str>, pane_id: Option<&str>) -> String {
     let loc = match locate_agent(world, name, pane_id) {
@@ -1724,46 +2041,29 @@ fn wait_pane(
     needle: Option<String>,
     regex: Option<String>,
     timeout_ms: u64,
-) -> String {
-    let Some(loc) = locate_pane(world, pane_id) else {
-        return envelope::runtime_error(&format!("unknown pane {pane_id}"));
-    };
+) -> LineReply {
+    if locate_pane(world, pane_id).is_none() {
+        return LineReply::Msg(envelope::runtime_error(&format!("unknown pane {pane_id}")));
+    }
     if needle.is_none() && regex.is_none() {
-        return envelope::runtime_error("match or regex required");
+        return LineReply::Msg(envelope::runtime_error("match or regex required"));
     }
     if needle.is_some() && regex.is_some() {
-        return envelope::runtime_error("match and regex are exclusive");
+        return LineReply::Msg(envelope::runtime_error("match and regex are exclusive"));
     }
     let compiled = match regex.as_deref() {
         Some(pat) => match compile_regex(pat) {
             Ok(re) => Some(re),
-            Err(err) => return envelope::runtime_error(&err),
+            Err(err) => return LineReply::Msg(envelope::runtime_error(&err)),
         },
         None => None,
     };
-    let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
-    let deadline = Instant::now() + Duration::from_millis(timeout_ms);
-    loop {
-        let text = pane.held.recent_unwrapped();
-        let hit = if let Some(n) = needle.as_deref() {
-            text.contains(n)
-        } else if let Some(re) = compiled.as_ref() {
-            regex_search(re, &text)
-        } else {
-            false
-        };
-        if hit {
-            return envelope::success(&format!(
-                "{{\"pane\":{{\"id\":{}}},\"matched\":true,\"text\":{}}}",
-                envelope::json_string(pane_id),
-                envelope::json_string(&text)
-            ));
-        }
-        if Instant::now() >= deadline {
-            return envelope::runtime_error("timeout");
-        }
-        thread::sleep(Duration::from_millis(20));
-    }
+    LineReply::Pending(WaitJob::PaneWait {
+        pane_id: pane_id.to_string(),
+        needle,
+        regex: compiled,
+        deadline: Instant::now() + Duration::from_millis(timeout_ms),
+    })
 }
 
 fn spawn_root(
@@ -2115,6 +2415,7 @@ enum ReOp {
     Ques(ReAtom),
 }
 
+#[derive(Clone)]
 struct CompiledRegex {
     start: bool,
     end: bool,
