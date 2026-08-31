@@ -56,13 +56,13 @@ Order is a gate. Do not skip.
 ```
 gh workflow run "Publish npm-wrapper to npm (trusted publishing)" \
   --repo manhquydev/dory --ref main \
-  -f version=0.1.1-next.0 -f dist_tag=next -f dry_run=true -f promote_to=none
+  -f version=0.1.1 -f dist_tag=latest -f dry_run=true -f promote_to=none
 ```
 
 4. Dry-run must print `Publishing … (dry-run)` and `+ @manhquy/dory@…`. Bin stays `dory-serve`.
 5. Dispatch the same inputs with `dry_run=false`. Approve `npm-publish` again (each run waits).
-6. Or push tag `npm@0.1.1-next.0` (pre-release → dist-tag `next`).
-7. After live: `npm view @manhquy/dory@0.1.1-next.0` and `npm view @manhquy/dory dist-tags --json`.
+6. Or push tag `npm@0.1.1` (no hyphen → dist-tag `latest`). Next preview after that is `0.1.2-next.0`.
+7. After live: `npm view @manhquy/dory@0.1.1` and `npm view @manhquy/dory dist-tags --json`.
 8. Promote `next` → `latest` only from your shell (`npm dist-tag add …`). Not GHA. Then revoke the token.
 
 Bump `npm-wrapper/package.json` version **before** the next live. Same SHA cannot republish the same semver.

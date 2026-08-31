@@ -25,7 +25,7 @@ npx @manhquy/dory
 
 The process prints a line that includes `http://127.0.0.1:7380/`. Open that URL **while the command is still running**. The page is not there until then. Stop with Ctrl-C. If the port stays open, end the Node process that owns `7380`.
 
-Another folder (absolute path): `--workspace /abs`. Pin this release: `npx @manhquy/dory@0.1.0`. Preview: `@next`.
+Another folder (absolute path): `--workspace /abs`. Pin this release: `npx @manhquy/dory@0.1.1`. Preview: `@next`.
 
 Need Node first? [nodejs.org](https://nodejs.org/en/download) or [fnm](https://github.com/Schniz/fnm).
 

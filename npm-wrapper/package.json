@@ -1,6 +1,6 @@
 {
   "name": "@manhquy/dory",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Dory journal lamp (Session OS). Desk SKU is the Rust binary, not this package.",
   "type": "module",
   "private": false,

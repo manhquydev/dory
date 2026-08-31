@@ -40,7 +40,7 @@ npx @manhquy/dory
 
 Lệnh in ra một dòng có `http://127.0.0.1:7380/`. Mở địa chỉ đó **khi lệnh vẫn đang chạy**. Chưa chạy thì trang không có. Dừng bằng Ctrl-C. Nếu cổng vẫn mở, tắt process Node đang giữ `7380`.
 
-Thư mục khác (đường dẫn tuyệt đối): `--workspace /abs`. Đúng bản này: `npx @manhquy/dory@0.1.0`. Bản thử: `@next`.
+Thư mục khác (đường dẫn tuyệt đối): `--workspace /abs`. Đúng bản này: `npx @manhquy/dory@0.1.1`. Bản thử: `@next`.
 
 Từ thư mục gốc bản clone (script này không nằm trong tarball npm):
 
@@ -115,7 +115,7 @@ Repo mới mở công khai. Desk viết bằng Rust. Lamp là gói npm `@manhquy
 |---|---|---|
 | Vì sao có sản phẩm | Đã chốt | [CHARTER.md](CHARTER.md) |
 | Skill / CLI / socket | Accepted | `skills/dory/` · `rust/` |
-| Nhật ký trên npm | `@manhquy/dory@0.1.0` | `npm-wrapper/` |
+| Nhật ký trên npm | `@manhquy/dory@0.1.1` | `npm-wrapper/` |
 | File tải desk | Chưa | build từ `rust/` |
 
 ## Đóng góp

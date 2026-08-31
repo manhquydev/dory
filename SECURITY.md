@@ -10,7 +10,7 @@
 | Desk built from `main` | Yes |
 | Unpublished / local forks | Best effort |
 
-There is no long-term support line yet. If a fix lands on `main`, it ships in the next lamp prerelease (`0.1.0-next.N`) and in the next desk source snapshot.
+There is no long-term support line yet. If a fix lands on `main`, it ships in the next lamp prerelease (`0.1.2-next.N`) and in the next desk source snapshot.
 
 ## Reporting a vulnerability
 

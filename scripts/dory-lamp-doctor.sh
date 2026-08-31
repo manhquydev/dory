@@ -4,7 +4,7 @@
 set -euo pipefail
 
 PKG="@manhquy/dory"
-PIN="0.1.0"
+PIN="0.1.1"
 BIN="dory-serve"
 NODE_MIN="22.14.0"
 UNSCOPED_TRAP="dory"
@@ -18,7 +18,7 @@ diagnose (default)
   prints the npx lamp command. does not install anything.
 
 --install
-  npm install -g @manhquy/dory@0.1.0  (lamp bin dory-serve only)
+  npm install -g @manhquy/dory@0.1.1  (lamp bin dory-serve only)
   refused if node is missing/old, or npm prefix looks like cursor-agent.
 
 --uninstall

@@ -9,7 +9,7 @@ on:
       version:
         description: 'Semver in npm-wrapper/package.json (not the environment name)'
         required: true
-        default: '0.1.1-next.0'
+        default: '0.1.2-next.0'
       dist_tag:
         description: 'npm dist-tag'
         required: true
