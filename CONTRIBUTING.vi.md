@@ -4,16 +4,20 @@ Cảm ơn bạn muốn giúp. **Tiếng Anh** là ngôn ngữ gốc của tài l
 
 Đọc [Code of Conduct](CODE_OF_CONDUCT.md). Lỗ hổng bảo mật gửi theo [SECURITY.md](SECURITY.md), không mở issue công khai.
 
-## Hai động cơ
+## Hai phần
 
-Dory là một sản phẩm, hai động cơ. Đừng gộp.
+Dory một sản phẩm, hai phần. Đừng gộp.
 
-| Động cơ | Người dùng gõ | Mã nguồn |
+| Phần | Người dùng gõ | Mã nguồn |
 |---|---|---|
-| **Desk** (Workplace OS) | `dory` | `rust/` — cửa sổ → thẻ → ô PTY sống |
-| **Lamp** (Session OS) | `dory-serve` | `npm-wrapper/` — nhật ký tại `http://127.0.0.1:7380/` |
+| **desk** (Workplace OS) | `dory` | `rust/` — cửa sổ → thẻ → ô terminal |
+| **lamp** (Session OS) | `dory-serve` | `npm-wrapper/` — nhật ký trên trình duyệt `http://127.0.0.1:7380/` |
 
-**Không** gắn bin `dory` vào gói npm. `@manhquy/dory` chỉ là đèn. Tên npm không scope `dory` là sản phẩm khác.
+**Không** gắn bin `dory` vào gói npm. `@manhquy/dory` chỉ là lamp (trang nhật ký). Tên npm `dory` không có `@manhquy` là sản phẩm khác.
+
+### Cách dịch (bản Việt)
+
+Học từ [Vue.js tiếng Việt](https://github.com/vuejs-vn/vuejs.org): không dịch sát từng chữ. Giữ `desk`, `lamp`, npm, PATH, Node, Rust. Lần đầu có thể chú thích trong ngoặc. Tiêu đề nói **việc người đọc làm** (`Nhật ký trên trình duyệt`), không dịch ẩn dụ (`Đèn`). Không Title Case (`Ủng hộ` chứ không `Ủng Hộ`).
 
 ## Bạn có thể giúp
 
