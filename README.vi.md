@@ -2,13 +2,13 @@
 
 [English](README.md) · [Tiếng Việt](README.vi.md)
 
-Môi trường làm việc trên máy bạn, cho phần mềm nhiều agent. Gõ `dory` để mở **desk** (giao diện terminal). Muốn xem nhật ký phiên trên trình duyệt thì dùng **lamp** — phần khác, lệnh khác.
+Môi trường làm việc trên máy bạn, khi bạn chạy nhiều agent. Lệnh **desk** (giao diện trong terminal) là `dory` — binary Rust, không phải gói npm. **lamp** (nhật ký trên trình duyệt) là lệnh khác.
 
 [![CI](https://github.com/manhquydev/dory/actions/workflows/ci.yml/badge.svg)](https://github.com/manhquydev/dory/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@manhquy/dory.svg)](https://www.npmjs.com/package/@manhquy/dory)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Dory không phải bản mới của [flow-skill](https://github.com/manhquydev/flow-skill) (người chấm) hay flow-deck (bảng treo tường). Mỗi thứ một việc. Dory là chỗ **làm**.
+Dory không phải bản mới của [flow-skill](https://github.com/manhquydev/flow-skill) (người chấm) hay flow-deck (bảng treo tường). Mỗi thứ một việc. Dory là chỗ **làm việc**.
 
 **Repo công khai, mời đóng góp.** Issue, bản dịch, test, patch nhỏ đều được. Đọc [CONTRIBUTING.vi.md](CONTRIBUTING.vi.md) và [Code of Conduct](CODE_OF_CONDUCT.md).
 
@@ -18,13 +18,13 @@ Bản tiếng Anh là bản gốc: [README.md](README.md).
 
 | Phần | Lệnh | Dùng để | Cần |
 |---|---|---|---|
-| **desk** (Workplace OS) | `dory` | Cửa sổ → thẻ → ô terminal đang chạy | Terminal thật, binary Rust |
-| **lamp** (Session OS) | `dory-serve` | Nhật ký phiên trên trình duyệt, `http://127.0.0.1:7380/` | Node `>=22.14.0` |
+| **desk** | `dory` | Cửa sổ → thẻ → ô terminal đang chạy | Terminal thật, binary Rust |
+| **lamp** | `dory-serve` | Nhật ký phiên trên trình duyệt | Node `>=22.14.0` |
 
-Gõ `dory` thì ra desk. Lamp không thay desk. Gói npm **không** thêm lệnh `dory` vào `PATH`.
+Lệnh desk là `dory`. Lamp không thay desk. Gói npm **không** thêm lệnh `dory` vào `PATH`.
 
 ```
-desk giữ process sống.   lamp chỉ chiếu nhật ký phiên.
+desk giữ process chạy khi bạn đóng giao diện.   lamp chỉ hiện nhật ký phiên.
 Đóng giao diện ≠ tắt việc.
 ```
 
@@ -32,20 +32,32 @@ desk giữ process sống.   lamp chỉ chiếu nhật ký phiên.
 
 ### Nhật ký trên trình duyệt (npm)
 
-Đã có trên [npm](https://www.npmjs.com/package/@manhquy/dory). Chạy trong thư mục phiên:
+Đã có trên [npm](https://www.npmjs.com/package/@manhquy/dory). Chạy **trong thư mục phiên**:
 
 ```bash
 npx @manhquy/dory
 ```
 
-Mở `http://127.0.0.1:7380/`. Thư mục khác: `--workspace /abs`. Cố định bản: `npx @manhquy/dory@0.1.0`. Bản thử: `@next`.
+Lệnh in ra một dòng có `http://127.0.0.1:7380/`. Mở địa chỉ đó **khi lệnh vẫn đang chạy**. Chưa chạy thì trang không có. Dừng bằng Ctrl-C. Nếu cổng vẫn mở, tắt process Node đang giữ `7380`.
+
+Thư mục khác (đường dẫn tuyệt đối): `--workspace /abs`. Đúng bản này: `npx @manhquy/dory@0.1.0`. Bản thử: `@next`.
+
+Từ thư mục gốc bản clone (script này không nằm trong tarball npm):
 
 ```bash
-# kiểm tra Node, registry, và lệnh trùng trên PATH — không cài Node
+# kiểm tra Node, registry, lệnh trùng trên PATH — không cài Node
 bash scripts/dory-lamp-doctor.sh
-
-npm uninstall -g @manhquy/dory    # chỉ gỡ lamp
 ```
+
+Cài global `@manhquy/dory` thì gõ `dory-serve`, không gõ `dory`.
+
+Nếu bạn từng cài gói global:
+
+```bash
+npm uninstall -g @manhquy/dory
+```
+
+Lệnh này chỉ gỡ bản cài global. Nó **không** tắt lamp đang chạy.
 
 **Đừng** chạy `npm i -g dory` (không có `@manhquy`). Tên đó là sản phẩm khác.
 
@@ -55,27 +67,27 @@ Tài liệu gói: [`npm-wrapper/README.md`](npm-wrapper/README.md) · [Tiếng V
 
 ### Desk (tự build)
 
-Chưa có file cài sẵn. Build từ Rust:
+Chưa có file tải sẵn. Cần Rust gần đây:
 
 ```bash
 git clone https://github.com/manhquydev/dory.git
 cd dory
 cargo build --manifest-path rust/Cargo.toml --release
-# thêm rust/target/release/dory vào PATH
-dory
 ```
 
-Chạy `dory server` rồi `dory` để mở desk: Spaces và Agents bên trái, hàng thẻ, nhiều ô bên phải. Ô trống dùng `$SHELL` (có rc). Thẻ mới theo thư mục của ô đang gõ; cửa sổ mới theo thư mục lúc bạn gõ `dory`. Server cũ còn `--norc`: `dory server stop` rồi `dory`.
+File ra ở `rust/target/release/dory`. **Chưa** có trên `PATH` trừ khi bạn tự thêm. Đừng gõ `dory` trước khi làm bước đó.
+
+Khi `dory` đã có trên `PATH`: `dory server` rồi `dory` mở desk: Spaces và Agents bên trái, hàng thẻ, nhiều ô bên phải. Ô trống dùng `$SHELL` (có rc). Thẻ mới theo thư mục của ô đang gõ; cửa sổ mới theo thư mục lúc bạn gõ `dory`. Server cũ còn `--norc`: `dory server stop` rồi `dory`.
 
 ## Phím desk
 
-Prefix là `Ctrl-b`. Không có phím trần `x` / `1` / `w`.
+Phím mở đầu là `Ctrl-b`. Không bấm `x` / `1` / `w` một mình.
 
 | Phím / chuột | Việc |
 |---|---|
 | Click card / agent / chip / ô | Đổi ô đang gõ |
 | Kéo vách | Đổi tỉ lệ |
-| Kéo chọn ≥ 2 ô trên tile | Copy OSC 52 (footer `copied` = đã gửi) |
+| Kéo chọn ≥ 2 ô trên một khối | Copy OSC 52 (footer `copied` = đã gửi) |
 | `Ctrl-b h/j/k/l` | Ô theo hướng |
 | `Ctrl-b n` / `p` / `1..9` | Thẻ cùng cửa sổ |
 | `Ctrl-b c` | Thẻ mới |
@@ -91,20 +103,20 @@ Prefix là `Ctrl-b`. Không có phím trần `x` / `1` / `w`.
 | `Ctrl-b q` hoặc `Ctrl-b d` | Rời giao diện; PTY vẫn chạy |
 | `Ctrl-b ?` | Bảng phím |
 
-`dory attach --plain` là client PTY thô (không sidebar). Trong ô (`DORY_ENV=1`) occupant gọi CLI, không mở desk. Muốn tắt việc thì `dory server stop`.
+`dory attach --plain` là client PTY không sidebar. Trong ô (`DORY_ENV=1`) agent gọi CLI; không mở giao diện desk. Muốn tắt việc thì `dory server stop`.
 
 Gõ `dory serve` trên binary Rust chỉ nhắc: nhật ký trình duyệt là Node, không phải desk.
 
 ## Tình trạng
 
-Repo mới mở công khai. Desk viết bằng Rust. Lamp là gói npm `@manhquy/dory` (chỉ có lệnh `dory-serve`). CI desk trên Windows chỉ là job thông báo; phân loại occupant `done`/`idle` trên Darwin chưa làm.
+Repo mới mở công khai. Desk viết bằng Rust. Lamp là gói npm `@manhquy/dory` (chỉ có lệnh `dory-serve`). CI desk trên Windows chỉ báo là chưa test, chưa chạy test thật. Phân loại occupant `done`/`idle` trên Darwin chưa làm.
 
 | Việc | Tình trạng | Owner |
 |---|---|---|
 | Vì sao có sản phẩm | Đã chốt | [CHARTER.md](CHARTER.md) |
 | Skill / CLI / socket | Accepted | `skills/dory/` · `rust/` |
-| Gói npm (lamp) | `@manhquy/dory@0.1.0` | `npm-wrapper/` |
-| File cài desk | Chưa | build từ `rust/` |
+| Nhật ký trên npm | `@manhquy/dory@0.1.0` | `npm-wrapper/` |
+| File tải desk | Chưa | build từ `rust/` |
 
 ## Đóng góp
 
@@ -114,7 +126,7 @@ Repo mới mở công khai. Desk viết bằng Rust. Lamp là gói npm `@manhquy
 - [Mở pull request](https://github.com/manhquydev/dory/pulls)
 - Bảo mật: [SECURITY.md](SECURITY.md) — báo cáo riêng, đừng mở issue công khai
 
-Khi đóng góp, bạn đồng ý phần việc thuộc giấy phép MIT.
+Khi đóng góp, bạn đồng ý phần việc của bạn thuộc giấy phép MIT.
 
 ## Người đóng góp
 

@@ -2,7 +2,7 @@
 
 [English](README.md) · [Tiếng Việt](README.vi.md)
 
-Local **Agent Operating Environment** for multi-agent software work. Type `dory` for the desk. The journal lamp is a separate engine.
+A local workplace for multi-agent software. The desk command is `dory` (Rust binary, not the npm package). The journal **lamp** is a different command.
 
 [![CI](https://github.com/manhquydev/dory/actions/workflows/ci.yml/badge.svg)](https://github.com/manhquydev/dory/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@manhquy/dory.svg)](https://www.npmjs.com/package/@manhquy/dory)
@@ -12,60 +12,74 @@ Dory is not a new version of [flow-skill](https://github.com/manhquydev/flow-ski
 
 **This project is public and open to contribution.** Issues, translations, tests, and small patches are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-## Two engines
+## Two parts
 
-| Engine | Command | For | Needs |
+| Part | Command | What it does | Needs |
 |---|---|---|---|
-| **Desk** (Workplace OS) | `dory` | Windows → tabs → live PTY panes | A real terminal, Rust binary |
-| **Lamp** (Session OS) | `dory-serve` | Journal in the browser at `http://127.0.0.1:7380/` | Node `>=22.14.0` |
+| **desk** | `dory` | Windows → tabs → live terminal panes | A real terminal and a Rust binary |
+| **lamp** | `dory-serve` | Session journal in the browser | Node `>=22.14.0` |
 
-The desk is the default when you type `dory`. The lamp is a different door. The npm package **does not** put `dory` on your `PATH`.
+The desk command is `dory`. The lamp does not replace the desk. The npm package **does not** put `dory` on your `PATH`.
 
 ```
-Desk keeps processes alive.   Lamp projects the session journal.
+desk keeps processes running when you close the UI.   lamp only shows the session journal.
 Leaving the UI ≠ stopping work.
 ```
 
 ## Install
 
-### Lamp (on npm today)
+### Journal in the browser (npm)
+
+Published as [`@manhquy/dory`](https://www.npmjs.com/package/@manhquy/dory). Run this **in the session folder**:
 
 ```bash
 npx @manhquy/dory
 ```
 
-Run from the session directory. Open `http://127.0.0.1:7380/`. Another folder: `--workspace /abs`. Pin: `npx @manhquy/dory@0.1.0`. Preview: `@next`.
+The process prints a line that includes `http://127.0.0.1:7380/`. Open that URL **while the command is still running**. The page is not there until then. Stop with Ctrl-C. If the port stays open, end the Node process that owns `7380`.
+
+Another folder (absolute path): `--workspace /abs`. Pin this release: `npx @manhquy/dory@0.1.0`. Preview: `@next`.
+
+From the repo root of a clone (this script is not inside the npm tarball):
 
 ```bash
-# check Node / registry / PATH collisions — does not install Node
+# checks Node, registry, and PATH collisions — does not install Node
 bash scripts/dory-lamp-doctor.sh
-
-npm uninstall -g @manhquy/dory    # lamp only
 ```
 
-Do **not** run `npm i -g dory` (unscoped). That name is another product.
+A global install of `@manhquy/dory` is typed as `dory-serve`, never `dory`.
 
-Missing Node: install it yourself from [nodejs.org](https://nodejs.org/en/download) or [fnm](https://github.com/Schniz/fnm). Dory will not bootstrap a toolchain.
+If you once installed the package globally:
+
+```bash
+npm uninstall -g @manhquy/dory
+```
+
+That only removes a global install. It does not stop a lamp that is already running.
+
+Do **not** run `npm i -g dory` (no `@manhquy`). That name is another product.
+
+Need Node first? Install it yourself from [nodejs.org](https://nodejs.org/en/download) or [fnm](https://github.com/Schniz/fnm). Dory does not install Node or Rust for you.
 
 Package docs: [`npm-wrapper/README.md`](npm-wrapper/README.md) · [Tiếng Việt](npm-wrapper/README.vi.md)
 
-### Desk (from source)
+### Desk (build from source)
 
-There is no binary release yet. Build the Rust crate:
+There is no binary download yet. You need a recent Rust toolchain.
 
 ```bash
 git clone https://github.com/manhquydev/dory.git
 cd dory
 cargo build --manifest-path rust/Cargo.toml --release
-# put rust/target/release/dory on your PATH
-dory
 ```
 
-`dory server` then `dory` opens the desk: Spaces and Agents on the left, tab chips, live panes on the right. Empty panes use `$SHELL` (with rc). A new tab follows the focused pane’s cwd; a new window follows the directory where you typed `dory`. If an old server still uses `--norc`: `dory server stop` then `dory`.
+The binary is `rust/target/release/dory`. It is **not** on `PATH` until you put it there. Do not type `dory` until that is done.
+
+Once `dory` is on your `PATH`: `dory server` then `dory` shows Spaces and Agents on the left, tab chips, and live panes on the right. Empty panes use `$SHELL` (with rc). A new tab follows the focused pane’s cwd; a new window follows the directory where you typed `dory`. If an old server still uses `--norc`: `dory server stop` then `dory`.
 
 ## Desk keys
 
-Prefix is `Ctrl-b`. There are no bare `x` / `1` / `w` keys.
+The prefix is `Ctrl-b`. Do not press `x` / `1` / `w` alone.
 
 | Key / mouse | Action |
 |---|---|
@@ -87,20 +101,20 @@ Prefix is `Ctrl-b`. There are no bare `x` / `1` / `w` keys.
 | `Ctrl-b q` or `Ctrl-b d` | Leave the UI; PTYs stay up |
 | `Ctrl-b ?` | Key chart |
 
-`dory attach --plain` is a raw PTY client (no sidebar). Inside a pane (`DORY_ENV=1`) the occupant uses the CLI; they do not sit the desk. `dory server stop` is what actually stops work.
+`dory attach --plain` is a PTY client with no sidebar. Inside a pane (`DORY_ENV=1`) the occupant CLI talks to the server; it does not open the desk UI. `dory server stop` is what actually stops work.
 
-The Rust binary treats `dory serve` as a reminder that the lamp is Node, not the desk.
+The Rust binary treats `dory serve` as a reminder that the browser journal is Node, not the desk.
 
 ## Status
 
-Early public tree. The desk stack is Rust. The lamp is the published npm package `@manhquy/dory` (`dory-serve` only). Windows desk CI is a notice job; Darwin occupant `done`/`idle` classification is still unpaid.
+Early public tree. The desk is Rust. The lamp is the npm package `@manhquy/dory` (`dory-serve` only). Windows desk CI only posts a notice; it does not test the desk. Darwin occupant `done`/`idle` classification is not implemented yet.
 
 | Area | State | Owner |
 |---|---|---|
 | Product why | Closed | [CHARTER.md](CHARTER.md) |
 | Skill / CLI / socket | Accepted | `skills/dory/` · `rust/` |
-| Lamp on npm | `@manhquy/dory@0.1.0` | `npm-wrapper/` |
-| Desk binary release | Not yet | build from `rust/` |
+| Journal on npm | `@manhquy/dory@0.1.0` | `npm-wrapper/` |
+| Desk binary download | Not yet | build from `rust/` |
 
 ## Contributing
 

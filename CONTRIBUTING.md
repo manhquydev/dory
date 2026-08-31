@@ -4,14 +4,14 @@ Thank you for wanting to help. English is the source language for new docs and c
 
 Please read the [Code of Conduct](CODE_OF_CONDUCT.md). Security issues go to [SECURITY.md](SECURITY.md), not public issues.
 
-## Two engines
+## Two parts
 
-Dory is one product with two engines. Keep them separate.
+Dory is one product with two parts. Keep them separate.
 
-| Engine | What users type | Source |
+| Part | What users type | Source |
 |---|---|---|
-| **Desk** (Workplace OS) | `dory` | `rust/` — windows → tabs → live PTY panes |
-| **Lamp** (Session OS) | `dory-serve` | `npm-wrapper/` — journal at `http://127.0.0.1:7380/` |
+| **desk** | `dory` | `rust/` — windows → tabs → live terminal panes |
+| **lamp** | `dory-serve` | `npm-wrapper/` — browser journal after you run the command |
 
 Do **not** add a `dory` bin to the npm package. `@manhquy/dory` is lamp-only. The unscoped npm name `dory` is someone else's package.
 

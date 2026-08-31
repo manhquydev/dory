@@ -2,45 +2,55 @@
 
 [English](README.md) · [Tiếng Việt](README.vi.md)
 
-Journal **lamp** for [Dory](https://github.com/manhquydev/dory) (Session OS). This package is **not** the desk.
+Browser journal for [Dory](https://github.com/manhquydev/dory). This package is the **lamp**. It is **not** the desk.
 
 [![npm](https://img.shields.io/npm/v/@manhquy/dory.svg)](https://www.npmjs.com/package/@manhquy/dory)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../LICENSE)
 
 | | |
 |---|---|
-| Bin | `dory-serve` only |
+| Command | `dory-serve` only |
 | Node | `>=22.14.0` (you install Node; this package does not) |
-| Desk command | `dory` — Rust binary, built from the repo, not this tarball |
+| Desk | `dory` — Rust binary, built from the GitHub repo, not this tarball |
 
-Typing `dory` after `npm install` will not open the desk. Do not install the unscoped npm name `dory`; that is a different product.
+After `npm install`, typing `dory` will not open the desk. Do not install the unscoped npm name `dory`; that is a different product.
 
-## Install
+## Run
+
+In the session folder:
 
 ```bash
 npx @manhquy/dory
 ```
 
-Run from the session directory. Open `http://127.0.0.1:7380/`. Another folder: `--workspace /abs`. Pin: `npx @manhquy/dory@0.1.0`. Preview: `@next`.
+The process prints a line that includes `http://127.0.0.1:7380/`. Open that URL **while the command is still running**. The page is not there until then. Stop with Ctrl-C. If the port stays open, end the Node process that owns `7380`.
+
+Another folder (absolute path): `--workspace /abs`. Pin this release: `npx @manhquy/dory@0.1.0`. Preview: `@next`.
 
 Need Node first? [nodejs.org](https://nodejs.org/en/download) or [fnm](https://github.com/Schniz/fnm).
 
-## Verify and uninstall
+## Check and uninstall
 
 ```bash
 npm view @manhquy/dory name version bin
 # bin must be { "dory-serve": "bin/dory-serve.js" } only
+```
 
+If you once installed the package globally:
+
+```bash
 npm uninstall -g @manhquy/dory
 ```
 
-From a clone of the repo:
+That only removes a global install. It does not stop a lamp that is already running.
+
+From the repo root of a clone (not this directory):
 
 ```bash
 bash scripts/dory-lamp-doctor.sh
 ```
 
-The doctor detects Node and PATH collisions. It never installs Node and never binds `dory`.
+The script checks Node and PATH collisions. It never installs Node and never binds `dory`. A global install of `@manhquy/dory` is typed as `dory-serve`, never `dory`.
 
 ## Repository
 

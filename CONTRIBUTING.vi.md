@@ -10,8 +10,8 @@ Dory một sản phẩm, hai phần. Đừng gộp.
 
 | Phần | Người dùng gõ | Mã nguồn |
 |---|---|---|
-| **desk** (Workplace OS) | `dory` | `rust/` — cửa sổ → thẻ → ô terminal |
-| **lamp** (Session OS) | `dory-serve` | `npm-wrapper/` — nhật ký trên trình duyệt `http://127.0.0.1:7380/` |
+| **desk** | `dory` | `rust/` — cửa sổ → thẻ → ô terminal |
+| **lamp** | `dory-serve` | `npm-wrapper/` — nhật ký trình duyệt sau khi bạn chạy lệnh |
 
 **Không** gắn bin `dory` vào gói npm. `@manhquy/dory` chỉ là lamp (trang nhật ký). Tên npm `dory` không có `@manhquy` là sản phẩm khác.
 
