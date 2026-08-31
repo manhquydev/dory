@@ -15,4 +15,4 @@
 - Do not `git remote add origin`. Push `git push https://github.com/manhquydev/dory.git main`.
 - Do not claim `npm i @manhquy/dory` is desk `dory`. Lamp bin is `dory-serve`.
 - Do not bootstrap Node (fnm/nvm/NodeSource/`curl | sh`) from a Dory script. Doctor detects and points at nodejs.org.
-- Do not `npm i -g dory` (unscoped; other product). Do not republish `0.1.0-next.0` / `0.1.0-next.1` / `0.1.0-next.2` / `0.1.0` (spent). Ship lamp `0.1.1` to `latest`. Next preview after that is `0.1.2-next.0`. Do not put a hyphenated semver on `latest`.
+- Do not `npm i -g dory` (unscoped; other product). Do not republish `0.1.0-next.0` / `0.1.0-next.1` / `0.1.0-next.2` / `0.1.0` / `0.1.1` (spent). `latest` = `0.1.1`. Next preview is `0.1.2-next.0`. Do not put a hyphenated semver on `latest`.

@@ -45,6 +45,8 @@ That semver is **spent**.
 
 **First stable lamp closed 2026-08-31:** run https://github.com/manhquydev/dory/actions/runs/33360595435 SHA `7eb5daa` → `+ @manhquy/dory@0.1.0` on dist-tag `latest`, provenance visible, tag `npm@0.1.0`. GitHub Latest: https://github.com/manhquydev/dory/releases/tag/npm%400.1.0 . Dist-tag `next` still `0.1.0-next.2`. User command: `npx @manhquy/dory`. Next preview bump is `0.1.1-next.0`.
 
+**Docs lamp 0.1.1 closed 2026-08-31:** run https://github.com/manhquydev/dory/actions/runs/33386592712 SHA `9e6c388` → `+ @manhquy/dory@0.1.1` on dist-tag `latest`, provenance visible, tag `npm@0.1.1`. GitHub Latest: https://github.com/manhquydev/dory/releases/tag/npm%400.1.1 . Dist-tag `next` still `0.1.0-next.2`. Same CLI as 0.1.0; tarball README is the proven journal copy. Next preview bump is `0.1.2-next.0`.
+
 ## Publish
 
 Order is a gate. Do not skip.
@@ -56,7 +58,7 @@ Order is a gate. Do not skip.
 ```
 gh workflow run "Publish npm-wrapper to npm (trusted publishing)" \
   --repo manhquydev/dory --ref main \
-  -f version=0.1.1 -f dist_tag=latest -f dry_run=true -f promote_to=none
+  -f version=0.1.2-next.0 -f dist_tag=next -f dry_run=true -f promote_to=none
 ```
 
 4. Dry-run must print `Publishing … (dry-run)` and `+ @manhquy/dory@…`. Bin stays `dory-serve`.
