@@ -51,6 +51,7 @@ Live `--help` ships:
 - `agent prompt [<name> | --current | --pane <id>] [--wait] [--timeout MS] [--] <text>`
 - `agent wait [<name> | --current | --pane <id>] [--until idle|done|blocked|working|unknown] [--timeout MS]`
 - `agent get [<name> | --current | --pane <id>]`
+- `agent read [<name> | --current | --pane <id>] [--source visible|recent|recent-unwrapped]`
 - `agent report [--current | --pane <id>] --state working|blocked|idle`
 - `flow -- <args>`
 - `tree`
@@ -252,6 +253,8 @@ dory agent get <name>
 dory agent get --current
 dory agent get --pane <id-from-split>
 dory agent read <name> --source recent-unwrapped
+dory agent read --current --source recent-unwrapped
+dory agent read --pane <id-from-split> --source recent-unwrapped
 dory agent focus <name>
 dory agent send-keys <name> enter
 dory agent report [--current | --pane <id>] --state working|blocked|idle
@@ -264,6 +267,8 @@ Exactly one of `<name>` or `--current` or `--pane <id>`. Both / neither / extra 
 Keep `dory agent get <name>` as inspect (no env). Exactly one of `<name>` or `--current` or `--pane <id>`. Both / neither / extra (including `--kind`) → usage 2. Named and `--pane` stay inspect (no env). `--current` reads `DORY_PANE_ID` and needs `DORY_ENV=1`. Named JSON stays land `{"op":"agent.get","name":"<name>"}`. Pane arms send `pane` and omit `name`. There is **no** `agent.list` RPC. No `--kind`. No `pane.zoom`.
 
 Keep `dory agent wait <name>`. Exactly one of `<name>` or `--current` or `--pane <id>`. Both / neither / extra (including `--kind`) → usage 2. Mutating: `DORY_ENV=1` on every arm. `--current` reads `DORY_PANE_ID`. `--pane <id>` keeps an explicit pane. Keep `<name>`. Named JSON stays land `{"op":"agent.wait","name":"<name>",…}`. Pane arms send `pane` and omit `name`. There is **no** `agent.list` RPC. `--until` / `--timeout` stay as they are. Do not teach a new wait farm. No `--kind`. No `pane.zoom`.
+
+Keep `dory agent read <name>` as inspect (no env). Exactly one of `<name>` or `--current` or `--pane <id>`. Both / neither / extra (including `--kind`) → usage 2. Named and `--pane` stay inspect (no env). `--current` reads `DORY_PANE_ID` and needs `DORY_ENV=1`. Keep `--source visible|recent|recent-unwrapped` (default `recent`). Named JSON stays land `{"op":"agent.read","name":"<name>","source":"…"}`. Pane arms send `pane` and omit `name`. There is **no** `agent.list` RPC. `agent read` does not mark seen. No `--kind`. No `pane.zoom`.
 
 Five words: `working` | `blocked` | `idle` | `done` | `unknown`. `idle` = ready and seen. `done` = ready, unseen. `unknown` is not completion. Focus marks seen. `agent read` / `pane read` do not. Refuse `prompt` when `blocked`. `--wait` settles first of `idle|done|blocked`. `--until` only for a specific state.
 
