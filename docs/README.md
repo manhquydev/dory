@@ -250,6 +250,15 @@ Cite land with `git show HEAD:rust/src/main.rs` and `git show HEAD:rust/src/agen
 | Occupant `agent report --current` | `git show HEAD:rust/src/agent.rs` + `git show HEAD:rust/src/main.rs` |
 | Skill pane `--current` + report contract | `git show HEAD:skills/dory/SKILL.md` (`34be95a`) |
 
+## Paid occupant pane close --current
+
+Cite land with `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs` is not the owner. Land RPC stays `pane.close`. Occupant fills `pane` from `--pane` or `--current`→`DORY_PANE_ID`. Closing the last live pane is refused. There is no `agent.list` RPC. Do not claim `pane.zoom`.
+
+| Landing | Owner |
+|---|---|
+| Occupant `pane close --current` | `git show HEAD:rust/src/main.rs` |
+| Skill pane close `--current` | `git show HEAD:skills/dory/SKILL.md` (`1f8a2c2`) |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
