@@ -44,7 +44,7 @@ Usage:
   dory pane divider [--a <id> | --current] --b <id> --ratio F
   dory agent start <name> [--pane <id> | --current] [--timeout MS] -- <argv>
   dory agent prompt [<name> | --current | --pane <id>] [--wait] [--timeout MS] [--] <text>
-  dory agent wait <name> [--until idle|done|blocked|working|unknown] [--timeout MS]
+  dory agent wait [<name> | --current | --pane <id>] [--until idle|done|blocked|working|unknown] [--timeout MS]
   dory agent get [<name> | --current | --pane <id>]
   dory agent read <name> [--source visible|recent|recent-unwrapped]
   dory agent focus <name>
