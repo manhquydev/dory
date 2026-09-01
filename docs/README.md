@@ -105,6 +105,14 @@ Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `mai
 | Occupant `tree` `dd60fd3` | `git show HEAD:rust/src/main.rs` |
 | Skill `tree` `3d03cac` | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant pane neighbor
+
+Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs` is not the owner. Land RPC is `desk.neighbor`. This is Dory neighbor, not `pane focus --direction`. Do not claim `pane.neighbor` RPC or `pane.zoom`.
+
+| Landing | Owner |
+|---|---|
+| Occupant `pane neighbor` `e4f51f9` | `git show HEAD:rust/src/main.rs` |
+| Skill `pane neighbor` `6d38e96` | `git show HEAD:skills/dory/SKILL.md` |
 
 ## Named unpaid
 
