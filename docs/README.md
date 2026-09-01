@@ -78,6 +78,15 @@ Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `mai
 | Occupant `pane focus` `73aacfa` | `git show HEAD:rust/src/main.rs` |
 | Skill `pane focus` `2c924df` | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant create `--cwd`
+
+Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs` is not the owner.
+
+| Landing | Owner |
+|---|---|
+| Occupant create `--cwd` `8b026ba` | `git show HEAD:rust/src/main.rs` |
+| Skill create `--cwd` `8afd97e` | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
