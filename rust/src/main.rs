@@ -48,6 +48,7 @@ Usage:
   dory agent send-keys <name> <key>
   dory agent report [--current | --pane <id>] --state working|blocked|idle
   dory flow -- <args>
+  dory tree
 
 Mutating workspace/tab/pane/agent/flow verbs require DORY_ENV=1.
 Bare `dory` opens the desk (sidebar + tiled live panes).
@@ -91,12 +92,21 @@ fn dispatch(args: &[String]) -> i32 {
         "agent" => agent::cmd(args),
 
         "flow" => flow::cmd(args),
+        "tree" => tree_cmd(args),
         other => {
             eprintln!("dory: unknown command '{other}'");
             eprintln!("{USAGE}");
             2
         }
     }
+}
+
+fn tree_cmd(args: &[String]) -> i32 {
+    if args.len() != 1 {
+        eprintln!("dory: usage: dory tree");
+        return 2;
+    }
+    print_rpc(r#"{"op":"desk.tree"}"#)
 }
 
 fn workspace_cmd(args: &[String]) -> i32 {
@@ -878,6 +888,10 @@ mod tests {
             dispatch(&args(&["tab", "create", "--workspace", "w1", "--no-focus"])),
             2
         );
+        assert_eq!(dispatch(&args(&["tree", "--workspace"])), 2);
+        assert_eq!(dispatch(&args(&["tree", "--kind"])), 2);
+        assert_eq!(dispatch(&args(&["tree", "--label"])), 2);
+        assert_eq!(dispatch(&args(&["tree", "extra"])), 2);
     }
 
     #[test]
@@ -907,6 +921,7 @@ mod tests {
         assert!(super::USAGE.contains("Ctrl-b"));
         assert!(super::USAGE.contains("n/p still walk panes"));
         assert!(super::USAGE.contains("dory flow --"));
+        assert!(super::USAGE.contains("dory tree"));
         assert!(super::USAGE.contains("dory agent start"));
         assert!(
             !super::USAGE.contains("Group agent is a stub"),
