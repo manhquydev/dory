@@ -42,6 +42,7 @@ Live `--help` ships:
 - `pane current [--current | --pane <id>]`
 - `pane close [--current | --pane <id>]`
 - `pane split|run|wait-output`
+- `pane send-keys [--current | --pane <id>] <key>`
 - `pane read [--current | --pane <id>] [--source visible|recent|recent-unwrapped] [--lines N]`
 - `pane resize [--current | --pane <id>] --cols N --rows N`
 - `pane focus [--current | --pane <id>]`
@@ -244,6 +245,13 @@ dory pane read --pane <id-from-split> --source recent-unwrapped --lines 120
 ```
 
 Keep `dory pane read --pane <id>`. `--lines N` optional, `N >= 1`. Omit → full land snapshot. Missing / `0` / extra (including `--kind` / `--format` / `detection`) → usage 2. Tails the land snapshot (`tail_lines`). Does not fetch more history than land holds. Does not mark seen. JSON adds `"lines":N` only when the flag is set. Land op stays `pane.read`. No `agent.list`. No `pane.zoom`. No `--kind`.
+
+```bash
+dory pane send-keys --pane <id-from-split> enter
+dory pane send-keys --current esc
+```
+
+Keep `dory pane send-keys --pane <id>`. Exactly one of `--current` or `--pane <id>`. Both / neither / extra (including `--kind` / a positional name) → usage 2. `<key>` required. Allowlist `enter` | `esc` | `ctrl+c` only. Mutating: `DORY_ENV=1` on every arm. `--current` reads `DORY_PANE_ID` (exit 1 outside env / empty / invalid). `--pane <id>` keeps an explicit pane. JSON stays land `{"op":"pane.write","pane":"<id>","text":"…","raw":true}` (no extra newline). There is **no** `pane.send-keys` RPC. Keep `dory pane run` as text + Enter. Keep `dory agent send-keys` as the occupant-named verb. Do not expand the allowlist. No `--kind`. No `pane.zoom`.
 
 ## Occupant
 
