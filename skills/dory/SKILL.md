@@ -41,7 +41,8 @@ Live `--help` ships:
 - `pane get [--current | --pane <id>]`
 - `pane current [--current | --pane <id>]`
 - `pane close [--current | --pane <id>]`
-- `pane split|run|wait-output`
+- `pane split|run`
+- `pane wait-output [--current | --pane <id>] [--match LIT | --regex RE] [--source visible|recent|recent-unwrapped] [--lines N] [--timeout MS]`
 - `pane send-keys [--current | --pane <id>] <key>`
 - `pane send-text [--current | --pane <id>] <text>`
 - `pane read [--current | --pane <id>] [--source visible|recent|recent-unwrapped] [--lines N]`
@@ -239,6 +240,13 @@ dory pane run --current "just test"
 dory pane wait-output --current --match "test result" --timeout 120000
 dory pane read --current --source recent-unwrapped
 ```
+
+```bash
+dory pane wait-output --pane <id-from-split> --match "test result" --source recent-unwrapped --lines 120 --timeout 120000
+dory pane wait-output --current --match "test result" --lines 80
+```
+
+Keep `dory pane wait-output --pane <id>`. Exactly one of `--current` or `--pane <id>`. Both / neither / extra (including `--kind`) → usage 2. Exactly one of `--match` or `--regex`. Both / neither / empty → usage 2. `--source` optional: `visible` | `recent` | `recent-unwrapped`. Omit `--source` → land still matches `recent_unwrapped` (not `pane read` default `recent`). `--lines N` optional, `N >= 1`. Tails that snapshot. Does not fetch more history than land holds. Missing / `0` → usage 2. `--timeout` milliseconds (default 5000). Mutating: `DORY_ENV=1` on every arm. `--current` reads `DORY_PANE_ID` (exit 1 outside env / empty / invalid). `--pane <id>` keeps an explicit pane. JSON stays land `{"op":"pane.wait","pane":"<id>","timeout":MS}` plus `"match"` or `"regex"`, plus `"source":"…"` only when set, plus `"lines":N` only when set. There is **no** new wait RPC. Keep match XOR regex. No `pane.zoom`.
 
 ```bash
 dory pane read --current --source recent-unwrapped --lines 120
