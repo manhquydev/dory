@@ -45,6 +45,7 @@ Live `--help` ships:
 - `pane resize [--current | --pane <id>] --cols N --rows N`
 - `pane focus [--current | --pane <id>]`
 - `pane neighbor [--current | --pane <id>] --direction left|right|up|down --cols N --rows N`
+- `pane layout [--tab <id> | --current] --cols N --rows N`
 - `agent start <name> [--pane <id> | --current] [--timeout MS] -- <argv>` / `prompt|wait|get|read|focus|send-keys|report`
 - `agent report [--current | --pane <id>] --state working|blocked|idle`
 - `flow -- <args>`
@@ -164,6 +165,14 @@ dory pane neighbor --current --direction left --cols N --rows N
 ```
 
 or `--pane <id>`. Omit target / omit `--direction` / `--cols` / `--rows` / extra flags including Herdr `--amount` → usage 2. Parse `.result.pane.id`. Land RPC is `desk.neighbor` with `from`, `step`, `cols`, `rows`. This is Dory neighbor, not Herdr `pane focus --direction`. Keep `dory pane focus` as id-only. No `pane.zoom`. No `--kind`.
+
+Occupants inspect this tab's tile geometry with
+
+```bash
+dory pane layout --current --cols 120 --rows 40
+```
+
+or `--tab <id>`. Exactly one of `--tab <id>` or `--current`. Both / neither / extra (including `--kind` / `--direction` / `--amount`) → usage 2. `--cols` and `--rows` required. `--tab <id>` is inspect (no env). `--current` requires `DORY_ENV=1` and reads `DORY_TAB_ID` (exit 1 outside env / empty / invalid). Parse `.result.tab` and `.result.cells[]` (`id`, `x`, `y`, `w`, `h`, `occ`, `st`). JSON stays land `{"op":"desk.layout","tab":"<id>","cols":N,"rows":N}`. There is no `pane.layout` RPC; occupant verb wraps `desk.layout`. This is Dory layout inspect, not Herdr implicit focused layout and not `pane.zoom`. Keep `dory pane resize` / `dory pane neighbor` as they are.
 
 ```bash
 dory tab create --workspace "$DORY_WORKSPACE_ID"
