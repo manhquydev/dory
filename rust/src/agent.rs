@@ -18,7 +18,8 @@ const USAGE_READ: &str =
     "dory: usage: dory agent read [<name> | --current | --pane <id>] [--source visible|recent|recent-unwrapped]";
 const USAGE_FOCUS: &str =
     "dory: usage: dory agent focus [<name> | --current | --pane <id>]";
-const USAGE_KEYS: &str = "dory: usage: dory agent send-keys <name> <key>";
+const USAGE_KEYS: &str =
+    "dory: usage: dory agent send-keys [<name> | --current | --pane <id>] <key>";
 const USAGE_REPORT: &str =
     "dory: usage: dory agent report [--current | --pane <id>] --state working|blocked|idle";
 
@@ -903,34 +904,130 @@ fn focus_cmd(args: &[String]) -> i32 {
 }
 
 fn send_keys_cmd(args: &[String]) -> i32 {
-    let Some(name) = args
-        .get(2)
-        .map(String::as_str)
-        .filter(|n| json_safe_token(n))
-    else {
-        eprintln!("{USAGE_KEYS}");
-        return 2;
-    };
-    let Some(key) = args.get(3).map(String::as_str) else {
-        eprintln!("{USAGE_KEYS}");
-        return 2;
-    };
-    if args.len() != 4 {
+    if args
+        .iter()
+        .any(|a| a == "--kind" || a.starts_with("--kind="))
+    {
         eprintln!("{USAGE_KEYS}");
         return 2;
     }
+
+    let mut pane: Option<&str> = None;
+    let mut current = false;
+    let mut positionals: Vec<&str> = Vec::new();
+    let mut i = 2;
+    while i < args.len() {
+        let a = args[i].as_str();
+        if a == "--pane" {
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_KEYS}");
+                return 2;
+            };
+            pane = Some(v);
+            i += 2;
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--pane=") {
+            pane = Some(v);
+            i += 1;
+            continue;
+        }
+        if a == "--current" {
+            if current {
+                eprintln!("{USAGE_KEYS}");
+                return 2;
+            }
+            current = true;
+            i += 1;
+            continue;
+        }
+        if a.starts_with("--") {
+            eprintln!("dory: unknown agent send-keys flag '{a}'");
+            return 2;
+        }
+        positionals.push(a);
+        i += 1;
+    }
+
+    let (name, key) = match (positionals.as_slice(), pane, current) {
+        ([n, k], None, false) => (Some(*n), *k),
+        ([k], Some(_), false) => (None, *k),
+        ([k], None, true) => (None, *k),
+        _ => {
+            eprintln!("{USAGE_KEYS}");
+            return 2;
+        }
+    };
     if !matches!(key, "enter" | "esc" | "ctrl+c") {
         eprintln!("{USAGE_KEYS}");
         return 2;
     }
-    if let Err(code) = require_skill_env() {
-        return code;
+
+    match (name, pane, current) {
+        (Some(n), None, false) => {
+            if !json_safe_token(n) {
+                eprintln!("{USAGE_KEYS}");
+                return 2;
+            }
+            if let Err(code) = require_skill_env() {
+                return code;
+            }
+            print_rpc(&format!(
+                r#"{{"op":"agent.send-keys","name":{},"key":{}}}"#,
+                envelope::json_string(n),
+                envelope::json_string(key)
+            ))
+        }
+        (None, Some(id), false) => {
+            let Some(id) = json_safe_id(id) else {
+                eprintln!("{}", envelope::runtime_error("invalid pane id"));
+                return 1;
+            };
+            if let Err(code) = require_skill_env() {
+                return code;
+            }
+            print_rpc(&format!(
+                r#"{{"op":"agent.send-keys","pane":"{id}","key":{}}}"#,
+                envelope::json_string(key)
+            ))
+        }
+        (None, None, true) => {
+            let pane = match current::pane_from_current_flag(args) {
+                Ok(id) => match json_safe_id(&id) {
+                    Some(_) => id,
+                    None => {
+                        eprintln!("{}", envelope::runtime_error("invalid pane id"));
+                        return 1;
+                    }
+                },
+                Err(err) => {
+                    match err {
+                        current::TargetError::OutsideEnv => {
+                            eprintln!(
+                                "{}",
+                                envelope::runtime_error(
+                                    "I am not running inside a Dory-managed pane"
+                                )
+                            );
+                        }
+                        current::TargetError::OmitTarget => eprintln!("{USAGE_KEYS}"),
+                    }
+                    return current::exit_code(err);
+                }
+            };
+            if let Err(code) = require_skill_env() {
+                return code;
+            }
+            print_rpc(&format!(
+                r#"{{"op":"agent.send-keys","pane":"{pane}","key":{}}}"#,
+                envelope::json_string(key)
+            ))
+        }
+        _ => {
+            eprintln!("{USAGE_KEYS}");
+            2
+        }
     }
-    print_rpc(&format!(
-        r#"{{"op":"agent.send-keys","name":{},"key":{}}}"#,
-        envelope::json_string(name),
-        envelope::json_string(key)
-    ))
 }
 
 fn report_cmd(args: &[String]) -> i32 {
@@ -1299,5 +1396,55 @@ mod tests {
             1
         );
         assert_eq!(cmd(&args(&["agent", "focus", "alice"])), 1);
+    }
+
+    #[test]
+    fn keys_usage_names_current() {
+        assert!(USAGE_KEYS.contains("[<name> | --current | --pane <id>]"));
+        assert!(USAGE_KEYS.contains("--current"));
+        assert!(USAGE_KEYS.contains("--pane"));
+        assert!(USAGE_KEYS.contains("<key>"));
+        assert!(!USAGE_KEYS.contains("--kind"));
+    }
+
+    #[test]
+    fn keys_neither_both_kind_extra_unknown_missing_is_usage() {
+        assert_eq!(cmd(&args(&["agent", "send-keys"])), 2);
+        assert_eq!(
+            cmd(&args(&["agent", "send-keys", "alice", "--current", "enter"])),
+            2
+        );
+        assert_eq!(
+            cmd(&args(&[
+                "agent",
+                "send-keys",
+                "--pane",
+                "w1:p1",
+                "--current",
+                "enter"
+            ])),
+            2
+        );
+        assert_eq!(cmd(&args(&["agent", "send-keys", "--kind"])), 2);
+        assert_eq!(
+            cmd(&args(&["agent", "send-keys", "alice", "enter", "extra"])),
+            2
+        );
+        assert_eq!(cmd(&args(&["agent", "send-keys", "alice", "tab"])), 2);
+        assert_eq!(cmd(&args(&["agent", "send-keys", "alice"])), 2);
+        assert_eq!(cmd(&args(&["agent", "send-keys", "--current"])), 2);
+    }
+
+    #[test]
+    fn keys_current_or_pane_or_named_without_env_is_runtime_error() {
+        assert_eq!(
+            cmd(&args(&["agent", "send-keys", "--current", "enter"])),
+            1
+        );
+        assert_eq!(
+            cmd(&args(&["agent", "send-keys", "--pane", "w1:p1", "enter"])),
+            1
+        );
+        assert_eq!(cmd(&args(&["agent", "send-keys", "alice", "enter"])), 1);
     }
 }

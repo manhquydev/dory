@@ -48,7 +48,7 @@ Usage:
   dory agent get [<name> | --current | --pane <id>]
   dory agent read [<name> | --current | --pane <id>] [--source visible|recent|recent-unwrapped]
   dory agent focus [<name> | --current | --pane <id>]
-  dory agent send-keys <name> <key>
+  dory agent send-keys [<name> | --current | --pane <id>] <key>
   dory agent report [--current | --pane <id>] --state working|blocked|idle
   dory flow -- <args>
   dory tree
