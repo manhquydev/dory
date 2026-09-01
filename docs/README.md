@@ -231,6 +231,15 @@ Cite land rust with `git show HEAD:rust/src/agent.rs` and `git show HEAD:rust/sr
 | Occupant `agent focus --current` `eed1dff` | `git show HEAD:rust/src/agent.rs` + `git show HEAD:rust/src/main.rs` |
 | Skill agent focus `--current` `9b421be` | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant agent send-keys --current
+
+Cite land rust with `git show HEAD:rust/src/agent.rs` and `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs` is not the owner. Land RPC stays `agent.send-keys`. Occupant fills `pane` from `--pane` or `--current`→`DORY_PANE_ID`, or keeps `name`. Every arm mutating (`DORY_ENV=1`). `<key>` required. Allowlist `enter` / `esc` / `ctrl+c` only. Named JSON keeps `name` + `key`. Pane arms send `pane` + `key` and omit `name`. There is no `agent.list` RPC. Do not claim `pane.zoom`.
+
+| Landing | Owner |
+|---|---|
+| Occupant `agent send-keys --current` `ebfe500` | `git show HEAD:rust/src/agent.rs` + `git show HEAD:rust/src/main.rs` |
+| Skill agent send-keys `--current` `a953635` | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
