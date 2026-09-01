@@ -60,6 +60,15 @@ Plan `260831-2119-desk-en-chrome-rpc-accept` is paid land. Cite land rust with `
 |---|---|
 | `wait_dead` without `/proc` `eb135be` | `git show HEAD:rust/tests/p_accept_wait.rs` |
 
+## Paid occupant pane resize
+
+Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs` is not the owner.
+
+| Landing | Owner |
+|---|---|
+| Occupant `pane resize` `6c4bfb8` | `git show HEAD:rust/src/main.rs` |
+| Skill `pane resize` `e591fe9` | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
