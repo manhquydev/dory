@@ -123,6 +123,15 @@ Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `mai
 | Occupant `pane`/`tab` list `--current` `b6999fe` | `git show HEAD:rust/src/main.rs` |
 | Skill list `--current` `72edb12` | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant tab/workspace close --current
+
+Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs` is not the owner. Land RPCs stay `tab.close` / `workspace.close`. This is Dory close-current, not implicit focused close. Do not claim a new close RPC. Do not claim `pane.zoom`.
+
+| Landing | Owner |
+|---|---|
+| Occupant `tab`/`workspace` close `--current` `2899ab4` | `git show HEAD:rust/src/main.rs` |
+| Skill close `--current` `f6c7dff` | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
