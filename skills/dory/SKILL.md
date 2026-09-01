@@ -41,6 +41,7 @@ Live `--help` ships:
 - `pane get [--current | --pane <id>]`
 - `pane close [--current | --pane <id>]`
 - `pane split|run|read|wait-output`
+- `pane resize [--current | --pane <id>] --cols N --rows N`
 - `agent start|prompt|wait|get|read|focus|send-keys|report`
 - `agent report [--current | --pane <id>] --state working|blocked|idle`
 - `flow -- <args>`
@@ -95,6 +96,14 @@ dory pane split --current --direction right --no-focus
 ```
 
 Replace `right` with `down` when appropriate. Read the new pane from `.result.pane.id`.
+
+Occupants resize with:
+
+```bash
+dory pane resize --current --cols N --rows N
+```
+
+or `--pane <id>`. Omit target → usage 2. Both `--cols` and `--rows` are required. Land RPC is `pane.resize`.
 
 ```bash
 dory tab create --workspace "$DORY_WORKSPACE_ID"
