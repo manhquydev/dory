@@ -26,7 +26,7 @@ Usage:
   dory workspace list
   dory workspace get <id>
   dory workspace close [<id> | --current]
-  dory tab create --workspace <id> [--cwd <path>]
+  dory tab create [--workspace <id> | --current] [--cwd <path>]
   dory tab list [--workspace <id> | --current]
   dory tab close [<id> | --current]
   dory pane list [--workspace <id> | --current]
@@ -200,13 +200,27 @@ fn tab_cmd(args: &[String]) -> i32 {
         }
         Some("create") => {
             const USAGE_CREATE: &str =
-                "dory: usage: dory tab create --workspace <id> [--cwd <path>]";
+                "dory: usage: dory tab create [--workspace <id> | --current] [--cwd <path>]";
             let mut workspace: Option<&str> = None;
             let mut cwd: Option<&str> = None;
+            let mut current = false;
             let mut i = 2;
             while i < args.len() {
                 let a = args[i].as_str();
+                if a == "--current" {
+                    if current {
+                        eprintln!("{USAGE_CREATE}");
+                        return 2;
+                    }
+                    current = true;
+                    i += 1;
+                    continue;
+                }
                 if a == "--workspace" {
+                    if workspace.is_some() {
+                        eprintln!("{USAGE_CREATE}");
+                        return 2;
+                    }
                     let Some(v) = args.get(i + 1).map(String::as_str) else {
                         eprintln!("{USAGE_CREATE}");
                         return 2;
@@ -216,6 +230,10 @@ fn tab_cmd(args: &[String]) -> i32 {
                     continue;
                 }
                 if let Some(v) = a.strip_prefix("--workspace=") {
+                    if workspace.is_some() {
+                        eprintln!("{USAGE_CREATE}");
+                        return 2;
+                    }
                     workspace = Some(v);
                     i += 1;
                     continue;
@@ -237,9 +255,45 @@ fn tab_cmd(args: &[String]) -> i32 {
                 eprintln!("{USAGE_CREATE}");
                 return 2;
             }
-            let Some(id) = workspace.and_then(json_safe_id) else {
-                eprintln!("{USAGE_CREATE}");
-                return 2;
+            let id = match (workspace, current) {
+                (Some(id), false) => {
+                    let Some(id) = json_safe_id(id) else {
+                        eprintln!("{USAGE_CREATE}");
+                        return 2;
+                    };
+                    id.to_string()
+                }
+                (None, true) => {
+                    if let Err(err) = current::require_env() {
+                        eprintln!(
+                            "{}",
+                            envelope::runtime_error("I am not running inside a Dory-managed pane")
+                        );
+                        return current::exit_code(err);
+                    }
+                    match env::var("DORY_WORKSPACE_ID") {
+                        Ok(id) if !id.is_empty() => match json_safe_id(&id) {
+                            Some(_) => id,
+                            None => {
+                                eprintln!("{}", envelope::runtime_error("invalid workspace id"));
+                                return 1;
+                            }
+                        },
+                        _ => {
+                            eprintln!(
+                                "{}",
+                                envelope::runtime_error(
+                                    "I am not running inside a Dory-managed pane"
+                                )
+                            );
+                            return 1;
+                        }
+                    }
+                }
+                _ => {
+                    eprintln!("{USAGE_CREATE}");
+                    return 2;
+                }
             };
             if let Err(code) = require_skill_env() {
                 return code;
@@ -1082,6 +1136,7 @@ mod tests {
         assert_eq!(dispatch(&args(&["workspace", "close", "w1"])), 1);
         assert_eq!(dispatch(&args(&["pane", "close", "--pane", "w1:p1"])), 1);
         assert_eq!(dispatch(&args(&["tab", "create", "--workspace", "w2"])), 1);
+        assert_eq!(dispatch(&args(&["tab", "create", "--current"])), 1);
         assert_eq!(dispatch(&args(&["pane", "split", "--current"])), 1);
         assert_eq!(dispatch(&args(&["pane", "split", "--pane", "w1:p1"])), 1);
         assert_eq!(
@@ -1290,6 +1345,24 @@ mod tests {
         );
         assert_eq!(dispatch(&args(&["tab", "create"])), 2);
         assert_eq!(
+            dispatch(&args(&["tab", "create", "--workspace", "w1", "--current"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["tab", "create", "--current", "--workspace", "w1"])),
+            2
+        );
+        assert_eq!(dispatch(&args(&["tab", "create", "--current", "--kind"])), 2);
+        assert_eq!(
+            dispatch(&args(&["tab", "create", "--current", "--label", "x"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["tab", "create", "--current", "--no-focus"])),
+            2
+        );
+        assert_eq!(dispatch(&args(&["tab", "create", "--current", "--cwd"])), 2);
+        assert_eq!(
             dispatch(&args(&["workspace", "create", "--label", "x"])),
             2
         );
@@ -1319,7 +1392,9 @@ mod tests {
         assert!(super::USAGE.contains("--plain"));
         assert!(super::USAGE.contains("dory workspace"));
         assert!(super::USAGE.contains("dory workspace create [--cwd <path>]"));
-        assert!(super::USAGE.contains("dory tab create --workspace <id> [--cwd <path>]"));
+        assert!(super::USAGE.contains(
+            "dory tab create [--workspace <id> | --current] [--cwd <path>]"
+        ));
         assert!(super::USAGE.contains("dory tab list [--workspace <id> | --current]"));
         assert!(super::USAGE.contains("dory pane list [--workspace <id> | --current]"));
         assert!(super::USAGE.contains("dory pane get [--current | --pane <id>]"));
