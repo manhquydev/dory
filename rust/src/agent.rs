@@ -11,7 +11,8 @@ const USAGE_START: &str =
 const USAGE_PROMPT: &str =
     "dory: usage: dory agent prompt [<name> | --current | --pane <id>] [--wait] [--timeout MS] [--] <text>";
 const USAGE_WAIT: &str = "dory: usage: dory agent wait <name> [--until idle|done|blocked|working|unknown] [--timeout MS]";
-const USAGE_GET: &str = "dory: usage: dory agent get <name>";
+const USAGE_GET: &str =
+    "dory: usage: dory agent get [<name> | --current | --pane <id>]";
 const USAGE_READ: &str =
     "dory: usage: dory agent read <name> [--source visible|recent|recent-unwrapped]";
 const USAGE_FOCUS: &str = "dory: usage: dory agent focus <name>";
@@ -468,22 +469,104 @@ fn wait_cmd(args: &[String]) -> i32 {
 }
 
 fn get_cmd(args: &[String]) -> i32 {
-    let Some(name) = args
-        .get(2)
-        .map(String::as_str)
-        .filter(|n| json_safe_token(n))
-    else {
-        eprintln!("{USAGE_GET}");
-        return 2;
-    };
-    if args.len() != 3 {
+    if args
+        .iter()
+        .any(|a| a == "--kind" || a.starts_with("--kind="))
+    {
         eprintln!("{USAGE_GET}");
         return 2;
     }
-    print_rpc(&format!(
-        r#"{{"op":"agent.get","name":{}}}"#,
-        envelope::json_string(name)
-    ))
+
+    let mut name: Option<&str> = None;
+    let mut pane: Option<&str> = None;
+    let mut current = false;
+    let mut i = 2;
+    while i < args.len() {
+        let a = args[i].as_str();
+        if a == "--pane" {
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_GET}");
+                return 2;
+            };
+            pane = Some(v);
+            i += 2;
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--pane=") {
+            pane = Some(v);
+            i += 1;
+            continue;
+        }
+        if a == "--current" {
+            if current {
+                eprintln!("{USAGE_GET}");
+                return 2;
+            }
+            current = true;
+            i += 1;
+            continue;
+        }
+        if a.starts_with("--") {
+            eprintln!("dory: unknown agent get flag '{a}'");
+            return 2;
+        }
+        if name.is_some() {
+            eprintln!("{USAGE_GET}");
+            return 2;
+        }
+        name = Some(a);
+        i += 1;
+    }
+
+    match (name, pane, current) {
+        (Some(n), None, false) => {
+            if !json_safe_token(n) {
+                eprintln!("{USAGE_GET}");
+                return 2;
+            }
+            print_rpc(&format!(
+                r#"{{"op":"agent.get","name":{}}}"#,
+                envelope::json_string(n)
+            ))
+        }
+        (None, Some(id), false) => {
+            let Some(id) = json_safe_id(id) else {
+                eprintln!("{}", envelope::runtime_error("invalid pane id"));
+                return 1;
+            };
+            print_rpc(&format!(r#"{{"op":"agent.get","pane":"{id}"}}"#))
+        }
+        (None, None, true) => {
+            let pane = match current::pane_from_current_flag(args) {
+                Ok(id) => match json_safe_id(&id) {
+                    Some(_) => id,
+                    None => {
+                        eprintln!("{}", envelope::runtime_error("invalid pane id"));
+                        return 1;
+                    }
+                },
+                Err(err) => {
+                    match err {
+                        current::TargetError::OutsideEnv => {
+                            eprintln!(
+                                "{}",
+                                envelope::runtime_error(
+                                    "I am not running inside a Dory-managed pane"
+                                )
+                            );
+                        }
+                        current::TargetError::OmitTarget => eprintln!("{USAGE_GET}"),
+                    }
+                    return current::exit_code(err);
+                }
+            };
+            print_rpc(&format!(r#"{{"op":"agent.get","pane":"{pane}"}}"#))
+        }
+        _ => {
+            eprintln!("{USAGE_GET}");
+            2
+        }
+    }
 }
 
 fn read_cmd(args: &[String]) -> i32 {
@@ -816,5 +899,33 @@ mod tests {
             ])),
             1
         );
+    }
+
+    #[test]
+    fn get_usage_names_current() {
+        assert!(USAGE_GET.contains("[<name> | --current | --pane <id>]"));
+        assert!(USAGE_GET.contains("--current"));
+        assert!(USAGE_GET.contains("--pane"));
+        assert!(!USAGE_GET.contains("--kind"));
+    }
+
+    #[test]
+    fn get_neither_both_kind_extra_is_usage() {
+        assert_eq!(cmd(&args(&["agent", "get"])), 2);
+        assert_eq!(
+            cmd(&args(&["agent", "get", "alice", "--current"])),
+            2
+        );
+        assert_eq!(
+            cmd(&args(&["agent", "get", "--pane", "w1:p1", "--current"])),
+            2
+        );
+        assert_eq!(cmd(&args(&["agent", "get", "--kind"])), 2);
+        assert_eq!(cmd(&args(&["agent", "get", "alice", "extra"])), 2);
+    }
+
+    #[test]
+    fn get_current_without_env_is_runtime_error() {
+        assert_eq!(cmd(&args(&["agent", "get", "--current"])), 1);
     }
 }

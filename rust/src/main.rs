@@ -45,7 +45,7 @@ Usage:
   dory agent start <name> [--pane <id> | --current] [--timeout MS] -- <argv>
   dory agent prompt [<name> | --current | --pane <id>] [--wait] [--timeout MS] [--] <text>
   dory agent wait <name> [--until idle|done|blocked|working|unknown] [--timeout MS]
-  dory agent get <name>
+  dory agent get [<name> | --current | --pane <id>]
   dory agent read <name> [--source visible|recent|recent-unwrapped]
   dory agent focus <name>
   dory agent send-keys <name> <key>
