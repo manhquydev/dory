@@ -159,6 +159,15 @@ Cite land with `git show HEAD:rust/src/agent.rs` and `git show HEAD:rust/src/mai
 | Occupant `agent start --current` `d48483f` | `git show HEAD:rust/src/agent.rs` + `git show HEAD:rust/src/main.rs` |
 | Skill agent start `--current` `3ce24c0` | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant pane layout
+
+Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs` is not the owner. Land RPC stays `desk.layout` with `tab` + `cols` + `rows`. Occupant verb wraps `desk.layout`. There is no `pane.layout` RPC. `--tab` inspects; `--current` fills `DORY_TAB_ID`. Do not claim `pane.zoom`. Do not claim `desk.divider`.
+
+| Landing | Owner |
+|---|---|
+| Occupant `pane layout` `b994985` | `git show HEAD:rust/src/main.rs` |
+| Skill pane layout `cc8733f` | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
