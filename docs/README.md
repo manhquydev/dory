@@ -96,6 +96,16 @@ Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `mai
 | Occupant `pane current` `363894d` | `git show HEAD:rust/src/main.rs` |
 | Skill `pane current` `0e16964` | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant tree
+
+Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs` is not the owner. Land RPC is `desk.tree`. This is Dory tree, not `agent list`. Do not claim `agent.list`. Do not claim `pane.zoom`.
+
+| Landing | Owner |
+|---|---|
+| Occupant `tree` `dd60fd3` | `git show HEAD:rust/src/main.rs` |
+| Skill `tree` `3d03cac` | `git show HEAD:skills/dory/SKILL.md` |
+
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
