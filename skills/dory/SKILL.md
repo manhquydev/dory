@@ -48,6 +48,7 @@ Live `--help` ships:
 - `pane layout [--tab <id> | --current] --cols N --rows N`
 - `pane divider [--a <id> | --current] --b <id> --ratio F`
 - `agent start <name> [--pane <id> | --current] [--timeout MS] -- <argv>` / `prompt|wait|get|read|focus|send-keys|report`
+- `agent prompt [<name> | --current | --pane <id>] [--wait] [--timeout MS] [--] <text>`
 - `agent report [--current | --pane <id>] --state working|blocked|idle`
 - `flow -- <args>`
 - `tree`
@@ -240,6 +241,8 @@ That self-report is how `wait` leaves `unknown`.
 dory agent start <name> --pane <id-from-split> -- <argv>
 dory agent start cook --current -- omp
 dory agent prompt <name> --wait -- <text>
+dory agent prompt --current -- hi
+dory agent prompt --pane <id-from-split> -- hi
 dory agent wait <name>
 dory agent get <name>
 dory agent read <name> --source recent-unwrapped
@@ -249,6 +252,8 @@ dory agent report [--current | --pane <id>] --state working|blocked|idle
 ```
 
 `start` / `prompt` / `wait` / `focus` / `send-keys` / `report` require `DORY_ENV=1`. `send-keys` allowlist: `enter`, `esc`, `ctrl+c`.
+
+Exactly one of `<name>` or `--current` or `--pane <id>`. Both / neither / extra (including `--kind`) → usage 2. Text required. Mutating: `DORY_ENV=1`. `--current` reads `DORY_PANE_ID`. `--pane <id>` keeps an explicit pane. Keep `<name>`. Named JSON stays land `{"op":"agent.prompt","name":"<name>",…}`. Pane arms send `pane` and omit `name`. There is **no** `agent.list` RPC. `--wait` / `--timeout` stay as they are. No `--kind`. No `pane.zoom`.
 
 Five words: `working` | `blocked` | `idle` | `done` | `unknown`. `idle` = ready and seen. `done` = ready, unseen. `unknown` is not completion. Focus marks seen. `agent read` / `pane read` do not. Refuse `prompt` when `blocked`. `--wait` settles first of `idle|done|blocked`. `--until` only for a specific state.
 
