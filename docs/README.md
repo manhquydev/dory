@@ -259,6 +259,15 @@ Cite land with `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs`
 | Occupant `pane close --current` | `git show HEAD:rust/src/main.rs` |
 | Skill pane close `--current` | `git show HEAD:skills/dory/SKILL.md` (`1f8a2c2`) |
 
+## Paid occupant read --lines
+
+Cite land with `git show HEAD:rust/src/main.rs` + `git show HEAD:rust/src/agent.rs` + `git show HEAD:rust/src/server.rs`. Working-tree leftover `main.rs` / `server.rs` are not the owner. Land ops stay `pane.read` / `agent.read`. `--lines` tails the land snapshot (`tail_lines`). There is no `agent.list` RPC. Do not claim `pane.zoom`. Do not claim `detection` / `--format`.
+
+| Landing | Owner |
+|---|---|
+| Occupant `pane read` / `agent read` `--lines` | `git show HEAD:rust/src/main.rs` + `git show HEAD:rust/src/agent.rs` + `git show HEAD:rust/src/server.rs` |
+| Skill read `--lines` | `git show HEAD:skills/dory/SKILL.md` (`eea19f1`) |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
