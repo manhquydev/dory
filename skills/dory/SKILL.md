@@ -43,6 +43,7 @@ Live `--help` ships:
 - `pane close [--current | --pane <id>]`
 - `pane split|run|wait-output`
 - `pane send-keys [--current | --pane <id>] <key>`
+- `pane send-text [--current | --pane <id>] <text>`
 - `pane read [--current | --pane <id>] [--source visible|recent|recent-unwrapped] [--lines N]`
 - `pane resize [--current | --pane <id>] --cols N --rows N`
 - `pane focus [--current | --pane <id>]`
@@ -252,6 +253,13 @@ dory pane send-keys --current esc
 ```
 
 Keep `dory pane send-keys --pane <id>`. Exactly one of `--current` or `--pane <id>`. Both / neither / extra (including `--kind` / a positional name) → usage 2. `<key>` required. Allowlist `enter` | `esc` | `ctrl+c` only. Mutating: `DORY_ENV=1` on every arm. `--current` reads `DORY_PANE_ID` (exit 1 outside env / empty / invalid). `--pane <id>` keeps an explicit pane. JSON stays land `{"op":"pane.write","pane":"<id>","text":"…","raw":true}` (no extra newline). There is **no** `pane.send-keys` RPC. Keep `dory pane run` as text + Enter. Keep `dory agent send-keys` as the occupant-named verb. Do not expand the allowlist. No `--kind`. No `pane.zoom`.
+
+```bash
+dory pane send-text --pane <id-from-split> hello
+dory pane send-text --current hi
+```
+
+Keep `dory pane send-text --pane <id>`. Exactly one of `--current` or `--pane <id>`. Both / neither / extra (including `--kind`) → usage 2. `<text>` required (join remaining argv with a space, same as `pane run`). Missing text → usage 2. Mutating: `DORY_ENV=1` on every arm. `--current` reads `DORY_PANE_ID` (exit 1 outside env / empty / invalid). `--pane <id>` keeps an explicit pane. JSON stays land `{"op":"pane.write","pane":"<id>","text":"…","raw":true}` (no extra newline). There is **no** `pane.send-text` RPC. Keep `dory pane run` as text + Enter. Keep `dory pane send-keys` as allowlist keys. Keep `dory agent send-keys` as the occupant-named verb. No `--kind`. No `pane.zoom`.
 
 ## Occupant
 
