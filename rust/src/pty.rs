@@ -494,7 +494,7 @@ fn drain_loop(fd: i32, drain: Arc<OutputDrain>, stop: Arc<AtomicBool>) {
     }
 }
 
-fn tail_lines(text: &str, rows: usize) -> String {
+pub(crate) fn tail_lines(text: &str, rows: usize) -> String {
     let mut parts: Vec<&str> = text.split_inclusive('\n').collect();
     if parts.len() <= rows {
         return text.to_string();

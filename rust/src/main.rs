@@ -35,7 +35,7 @@ Usage:
   dory pane current [--current | --pane <id>]
   dory pane split [--current | --pane <id>] [--direction right|down] [--no-focus]
   dory pane run [--current | --pane <id>] <text>
-  dory pane read [--current | --pane <id>] [--source visible|recent|recent-unwrapped]
+  dory pane read [--current | --pane <id>] [--source visible|recent|recent-unwrapped] [--lines N]
   dory pane wait-output [--current | --pane <id>] [--match LIT | --regex RE] [--timeout MS]
   dory pane resize [--current | --pane <id>] --cols N --rows N
   dory pane focus [--current | --pane <id>]
@@ -46,7 +46,7 @@ Usage:
   dory agent prompt [<name> | --current | --pane <id>] [--wait] [--timeout MS] [--] <text>
   dory agent wait [<name> | --current | --pane <id>] [--until idle|done|blocked|working|unknown] [--timeout MS]
   dory agent get [<name> | --current | --pane <id>]
-  dory agent read [<name> | --current | --pane <id>] [--source visible|recent|recent-unwrapped]
+  dory agent read [<name> | --current | --pane <id>] [--source visible|recent|recent-unwrapped] [--lines N]
   dory agent focus [<name> | --current | --pane <id>]
   dory agent send-keys [<name> | --current | --pane <id>] <key>
   dory agent report [--current | --pane <id>] --state working|blocked|idle
@@ -655,8 +655,22 @@ fn pane_run_cmd(args: &[String]) -> i32 {
 }
 
 fn pane_read_cmd(args: &[String]) -> i32 {
-    const USAGE_READ: &str = "dory: usage: dory pane read [--current | --pane <id>] [--source visible|recent|recent-unwrapped]";
+    const USAGE_READ: &str = "dory: usage: dory pane read [--current | --pane <id>] [--source visible|recent|recent-unwrapped] [--lines N]";
+    if args.iter().any(|a| {
+        a == "--kind"
+            || a.starts_with("--kind=")
+            || a == "--format"
+            || a.starts_with("--format=")
+            || a == "--ansi"
+            || a.starts_with("--ansi=")
+            || a == "--detection"
+            || a.starts_with("--detection=")
+    }) {
+        eprintln!("{USAGE_READ}");
+        return 2;
+    }
     let mut source = "recent";
+    let mut lines: Option<u64> = None;
     let mut i = 2;
     while i < args.len() {
         let a = args[i].as_str();
@@ -690,6 +704,40 @@ fn pane_read_cmd(args: &[String]) -> i32 {
             i += 1;
             continue;
         }
+        if a == "--lines" {
+            if lines.is_some() {
+                eprintln!("{USAGE_READ}");
+                return 2;
+            }
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_READ}");
+                return 2;
+            };
+            lines = match v.parse::<u64>() {
+                Ok(n) if n >= 1 => Some(n),
+                _ => {
+                    eprintln!("{USAGE_READ}");
+                    return 2;
+                }
+            };
+            i += 2;
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--lines=") {
+            if lines.is_some() {
+                eprintln!("{USAGE_READ}");
+                return 2;
+            }
+            lines = match v.parse::<u64>() {
+                Ok(n) if n >= 1 => Some(n),
+                _ => {
+                    eprintln!("{USAGE_READ}");
+                    return 2;
+                }
+            };
+            i += 1;
+            continue;
+        }
         eprintln!("dory: unknown pane read flag '{a}'");
         return 2;
     }
@@ -701,9 +749,14 @@ fn pane_read_cmd(args: &[String]) -> i32 {
         Ok(id) => id,
         Err(code) => return code,
     };
-    print_rpc(&format!(
-        r#"{{"op":"pane.read","pane":"{target}","source":"{source}"}}"#
-    ))
+    let mut line = format!(
+        r#"{{"op":"pane.read","pane":"{target}","source":"{source}""#
+    );
+    if let Some(n) = lines {
+        line.push_str(&format!(r#","lines":{n}"#));
+    }
+    line.push('}');
+    print_rpc(&line)
 }
 
 fn pane_wait_output_cmd(args: &[String]) -> i32 {
@@ -1568,6 +1621,43 @@ mod tests {
         );
         assert_eq!(dispatch(&args(&["pane", "run", "echo hi"])), 2);
         assert_eq!(dispatch(&args(&["pane", "read"])), 2);
+        assert_eq!(
+            dispatch(&args(&["pane", "read", "--pane", "w1:p1", "--lines"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["pane", "read", "--pane", "w1:p1", "--lines", "0"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["pane", "read", "--pane", "w1:p1", "--lines", "x"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "read",
+                "--pane",
+                "w1:p1",
+                "--lines",
+                "1",
+                "--lines",
+                "2"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["pane", "read", "--pane", "w1:p1", "--kind"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["pane", "read", "--pane", "w1:p1", "--format"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["pane", "read", "--pane", "w1:p1", "--ansi"])),
+            2
+        );
         assert_eq!(dispatch(&args(&["pane", "wait-output", "--match", "x"])), 2);
         assert_eq!(dispatch(&args(&["pane", "get"])), 2);
         assert_eq!(dispatch(&args(&["pane", "current"])), 2);
@@ -2227,7 +2317,9 @@ mod tests {
         assert!(super::USAGE.contains("dory pane get [--current | --pane <id>]"));
         assert!(super::USAGE.contains("dory pane current [--current | --pane <id>]"));
         assert!(super::USAGE.contains("dory pane run"));
-        assert!(super::USAGE.contains("dory pane read"));
+        assert!(super::USAGE.contains(
+            "dory pane read [--current | --pane <id>] [--source visible|recent|recent-unwrapped] [--lines N]"
+        ));
         assert!(super::USAGE.contains("dory pane wait-output"));
         assert!(super::USAGE.contains(
             "dory pane resize [--current | --pane <id>] --cols N --rows N"
@@ -2255,6 +2347,9 @@ mod tests {
         assert!(super::USAGE.contains("dory tree"));
         assert!(super::USAGE.contains(
             "dory agent start <name> [--pane <id> | --current] [--timeout MS] -- <argv>"
+        ));
+        assert!(super::USAGE.contains(
+            "dory agent read [<name> | --current | --pane <id>] [--source visible|recent|recent-unwrapped] [--lines N]"
         ));
         assert!(
             !super::USAGE.contains("Group agent is a stub"),

@@ -702,6 +702,7 @@ fn dispatch_line(world: &mut World, line: &str) -> LineReply {
                 world,
                 id,
                 json_str_field(line, "source").unwrap_or("recent"),
+                json_u64_field(line, "lines"),
             ),
             None => envelope::runtime_error("pane id required"),
         }),
@@ -747,6 +748,7 @@ fn dispatch_line(world: &mut World, line: &str) -> LineReply {
             json_str_field(line, "name"),
             json_str_field(line, "pane"),
             json_str_field(line, "source").unwrap_or("recent"),
+            json_u64_field(line, "lines"),
         )),
         Some("agent.focus") => LineReply::Msg(agent_focus(
             world,
@@ -1917,7 +1919,13 @@ fn agent_get(world: &mut World, name: Option<&str>, pane_id: Option<&str>) -> St
     envelope::success(&agent_snapshot(pane))
 }
 
-fn agent_read(world: &World, name: Option<&str>, pane_id: Option<&str>, source: &str) -> String {
+fn agent_read(
+    world: &World,
+    name: Option<&str>,
+    pane_id: Option<&str>,
+    source: &str,
+    lines: Option<u64>,
+) -> String {
     let loc = match locate_agent(world, name, pane_id) {
         Ok(loc) => loc,
         Err(err) => return envelope::runtime_error(&err),
@@ -1928,6 +1936,11 @@ fn agent_read(world: &World, name: Option<&str>, pane_id: Option<&str>, source: 
         "recent" => pane.held.recent(),
         "recent-unwrapped" => pane.held.recent_unwrapped(),
         other => return envelope::runtime_error(&format!("unknown source {other}")),
+    };
+    let text = match lines {
+        None => text,
+        Some(0) => return envelope::runtime_error("lines must be >= 1"),
+        Some(n) => crate::pty::tail_lines(&text, n as usize),
     };
     let mut result = agent_snapshot(pane);
     result.pop();
@@ -2016,7 +2029,7 @@ fn agent_report(world: &mut World, pane_id: Option<&str>, state: Option<&str>) -
     envelope::success(&agent_snapshot(pane))
 }
 
-fn read_pane(world: &World, pane_id: &str, source: &str) -> String {
+fn read_pane(world: &World, pane_id: &str, source: &str, lines: Option<u64>) -> String {
     let Some(loc) = locate_pane(world, pane_id) else {
         return envelope::runtime_error(&format!("unknown pane {pane_id}"));
     };
@@ -2026,6 +2039,11 @@ fn read_pane(world: &World, pane_id: &str, source: &str) -> String {
         "recent" => pane.held.recent(),
         "recent-unwrapped" => pane.held.recent_unwrapped(),
         other => return envelope::runtime_error(&format!("unknown source {other}")),
+    };
+    let text = match lines {
+        None => text,
+        Some(0) => return envelope::runtime_error("lines must be >= 1"),
+        Some(n) => crate::pty::tail_lines(&text, n as usize),
     };
     envelope::success(&format!(
         "{{\"pane\":{{\"id\":{}}},\"source\":{},\"text\":{}}}",

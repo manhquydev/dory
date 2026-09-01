@@ -15,7 +15,7 @@ const USAGE_WAIT: &str =
 const USAGE_GET: &str =
     "dory: usage: dory agent get [<name> | --current | --pane <id>]";
 const USAGE_READ: &str =
-    "dory: usage: dory agent read [<name> | --current | --pane <id>] [--source visible|recent|recent-unwrapped]";
+    "dory: usage: dory agent read [<name> | --current | --pane <id>] [--source visible|recent|recent-unwrapped] [--lines N]";
 const USAGE_FOCUS: &str =
     "dory: usage: dory agent focus [<name> | --current | --pane <id>]";
 const USAGE_KEYS: &str =
@@ -670,10 +670,16 @@ fn get_cmd(args: &[String]) -> i32 {
 }
 
 fn read_cmd(args: &[String]) -> i32 {
-    if args
-        .iter()
-        .any(|a| a == "--kind" || a.starts_with("--kind="))
-    {
+    if args.iter().any(|a| {
+        a == "--kind"
+            || a.starts_with("--kind=")
+            || a == "--format"
+            || a.starts_with("--format=")
+            || a == "--ansi"
+            || a.starts_with("--ansi=")
+            || a == "--detection"
+            || a.starts_with("--detection=")
+    }) {
         eprintln!("{USAGE_READ}");
         return 2;
     }
@@ -682,6 +688,7 @@ fn read_cmd(args: &[String]) -> i32 {
     let mut pane: Option<&str> = None;
     let mut current = false;
     let mut source = "recent";
+    let mut lines: Option<u64> = None;
     let mut i = 2;
     while i < args.len() {
         let a = args[i].as_str();
@@ -696,6 +703,40 @@ fn read_cmd(args: &[String]) -> i32 {
         }
         if let Some(v) = a.strip_prefix("--source=") {
             source = v;
+            i += 1;
+            continue;
+        }
+        if a == "--lines" {
+            if lines.is_some() {
+                eprintln!("{USAGE_READ}");
+                return 2;
+            }
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_READ}");
+                return 2;
+            };
+            lines = match v.parse::<u64>() {
+                Ok(n) if n >= 1 => Some(n),
+                _ => {
+                    eprintln!("{USAGE_READ}");
+                    return 2;
+                }
+            };
+            i += 2;
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--lines=") {
+            if lines.is_some() {
+                eprintln!("{USAGE_READ}");
+                return 2;
+            }
+            lines = match v.parse::<u64>() {
+                Ok(n) if n >= 1 => Some(n),
+                _ => {
+                    eprintln!("{USAGE_READ}");
+                    return 2;
+                }
+            };
             i += 1;
             continue;
         }
@@ -744,19 +785,27 @@ fn read_cmd(args: &[String]) -> i32 {
                 eprintln!("{USAGE_READ}");
                 return 2;
             }
-            print_rpc(&format!(
-                r#"{{"op":"agent.read","name":{},"source":"{source}"}}"#,
+            let mut line = format!(
+                r#"{{"op":"agent.read","name":{},"source":"{source}""#,
                 envelope::json_string(n)
-            ))
+            );
+            if let Some(count) = lines {
+                line.push_str(&format!(r#","lines":{count}"#));
+            }
+            line.push('}');
+            print_rpc(&line)
         }
         (None, Some(id), false) => {
             let Some(id) = json_safe_id(id) else {
                 eprintln!("{}", envelope::runtime_error("invalid pane id"));
                 return 1;
             };
-            print_rpc(&format!(
-                r#"{{"op":"agent.read","pane":"{id}","source":"{source}"}}"#
-            ))
+            let mut line = format!(r#"{{"op":"agent.read","pane":"{id}","source":"{source}""#);
+            if let Some(count) = lines {
+                line.push_str(&format!(r#","lines":{count}"#));
+            }
+            line.push('}');
+            print_rpc(&line)
         }
         (None, None, true) => {
             let pane = match current::pane_from_current_flag(args) {
@@ -782,9 +831,13 @@ fn read_cmd(args: &[String]) -> i32 {
                     return current::exit_code(err);
                 }
             };
-            print_rpc(&format!(
-                r#"{{"op":"agent.read","pane":"{pane}","source":"{source}"}}"#
-            ))
+            let mut line =
+                format!(r#"{{"op":"agent.read","pane":"{pane}","source":"{source}""#);
+            if let Some(count) = lines {
+                line.push_str(&format!(r#","lines":{count}"#));
+            }
+            line.push('}');
+            print_rpc(&line)
         }
         _ => {
             eprintln!("{USAGE_READ}");
@@ -1338,7 +1391,10 @@ mod tests {
         assert!(USAGE_READ.contains("[<name> | --current | --pane <id>]"));
         assert!(USAGE_READ.contains("--current"));
         assert!(USAGE_READ.contains("--pane"));
+        assert!(USAGE_READ.contains("[--lines N]"));
         assert!(!USAGE_READ.contains("--kind"));
+        assert!(!USAGE_READ.contains("--format"));
+        assert!(!USAGE_READ.contains("--ansi"));
     }
 
     #[test]
@@ -1358,11 +1414,36 @@ mod tests {
             cmd(&args(&["agent", "read", "alice", "--source", "nope"])),
             2
         );
+        assert_eq!(
+            cmd(&args(&["agent", "read", "alice", "--source", "detection"])),
+            2
+        );
+        assert_eq!(cmd(&args(&["agent", "read", "alice", "--format"])), 2);
+        assert_eq!(cmd(&args(&["agent", "read", "alice", "--ansi"])), 2);
+        assert_eq!(cmd(&args(&["agent", "read", "alice", "--lines"])), 2);
+        assert_eq!(cmd(&args(&["agent", "read", "alice", "--lines", "0"])), 2);
+        assert_eq!(cmd(&args(&["agent", "read", "alice", "--lines", "x"])), 2);
+        assert_eq!(
+            cmd(&args(&[
+                "agent",
+                "read",
+                "alice",
+                "--lines",
+                "1",
+                "--lines",
+                "2"
+            ])),
+            2
+        );
     }
 
     #[test]
     fn read_current_without_env_is_runtime_error() {
         assert_eq!(cmd(&args(&["agent", "read", "--current"])), 1);
+        assert_eq!(
+            cmd(&args(&["agent", "read", "--current", "--lines", "1"])),
+            1
+        );
     }
 
     #[test]
