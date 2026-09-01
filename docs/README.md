@@ -177,6 +177,15 @@ Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `mai
 | Occupant `pane divider` `018ebd6` | `git show HEAD:rust/src/main.rs` |
 | Skill pane divider `69fe3c9` | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant pane neighbor prev/next
+
+Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs` is not the owner. Land RPC stays `desk.neighbor`. Occupant verb wraps `desk.neighbor`. There is no `pane.neighbor` RPC. Spatial `left|right|up|down` still needs `cols`+`rows`. Ring `prev|next` omits cols/rows. `--pane` inspects; `--current` fills `DORY_PANE_ID`. This is the land global pane ring, not desk chrome tab n/p. Do not claim `pane.zoom`.
+
+| Landing | Owner |
+|---|---|
+| Occupant `pane neighbor` prev/next `bd0bf35` | `git show HEAD:rust/src/main.rs` |
+| Skill pane neighbor prev/next `7573d53` | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
