@@ -27,9 +27,9 @@ Usage:
   dory workspace get <id>
   dory workspace close <id>
   dory tab create --workspace <id> [--cwd <path>]
-  dory tab list --workspace <id>
+  dory tab list [--workspace <id> | --current]
   dory tab close <id>
-  dory pane list --workspace <id>
+  dory pane list [--workspace <id> | --current]
   dory pane close [--current | --pane <id>]
   dory pane get [--current | --pane <id>]
   dory pane current [--current | --pane <id>]
@@ -249,13 +249,7 @@ fn tab_cmd(args: &[String]) -> i32 {
                 )),
             }
         }
-        Some("list") => {
-            let Some(id) = flag_value(args, "--workspace").and_then(json_safe_id) else {
-                eprintln!("dory: usage: dory tab list --workspace <id>");
-                return 2;
-            };
-            print_rpc(&format!(r#"{{"op":"tab.list","workspace":"{id}"}}"#))
-        }
+        Some("list") => tab_list_cmd(args),
         Some("close") => {
             let Some(id) = args.get(2).map(String::as_str).and_then(json_safe_id) else {
                 eprintln!("dory: usage: dory tab close <id>");
@@ -300,12 +294,102 @@ fn pane_cmd(args: &[String]) -> i32 {
     }
 }
 
+fn tab_list_cmd(args: &[String]) -> i32 {
+    const USAGE_LIST: &str = "dory: usage: dory tab list [--workspace <id> | --current]";
+    let id = match workspace_list_id(args, USAGE_LIST) {
+        Ok(id) => id,
+        Err(code) => return code,
+    };
+    print_rpc(&format!(r#"{{"op":"tab.list","workspace":"{id}"}}"#))
+}
+
 fn pane_list_cmd(args: &[String]) -> i32 {
-    let Some(id) = flag_value(args, "--workspace").and_then(json_safe_id) else {
-        eprintln!("dory: usage: dory pane list --workspace <id>");
-        return 2;
+    const USAGE_LIST: &str = "dory: usage: dory pane list [--workspace <id> | --current]";
+    let id = match workspace_list_id(args, USAGE_LIST) {
+        Ok(id) => id,
+        Err(code) => return code,
     };
     print_rpc(&format!(r#"{{"op":"pane.list","workspace":"{id}"}}"#))
+}
+
+fn workspace_list_id(args: &[String], usage: &str) -> Result<String, i32> {
+    let mut workspace: Option<&str> = None;
+    let mut current = false;
+    let mut i = 2;
+    while i < args.len() {
+        let a = args[i].as_str();
+        if a == "--current" {
+            if current {
+                eprintln!("{usage}");
+                return Err(2);
+            }
+            current = true;
+            i += 1;
+            continue;
+        }
+        if a == "--workspace" {
+            if workspace.is_some() {
+                eprintln!("{usage}");
+                return Err(2);
+            }
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{usage}");
+                return Err(2);
+            };
+            workspace = Some(v);
+            i += 2;
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--workspace=") {
+            if workspace.is_some() {
+                eprintln!("{usage}");
+                return Err(2);
+            }
+            workspace = Some(v);
+            i += 1;
+            continue;
+        }
+        eprintln!("{usage}");
+        return Err(2);
+    }
+    match (workspace, current) {
+        (Some(id), false) => {
+            let Some(id) = json_safe_id(id) else {
+                eprintln!("{usage}");
+                return Err(2);
+            };
+            Ok(id.to_string())
+        }
+        (None, true) => {
+            if let Err(err) = current::require_env() {
+                eprintln!(
+                    "{}",
+                    envelope::runtime_error("I am not running inside a Dory-managed pane")
+                );
+                return Err(current::exit_code(err));
+            }
+            match env::var("DORY_WORKSPACE_ID") {
+                Ok(id) if !id.is_empty() => match json_safe_id(&id) {
+                    Some(_) => Ok(id),
+                    None => {
+                        eprintln!("{}", envelope::runtime_error("invalid workspace id"));
+                        Err(1)
+                    }
+                },
+                _ => {
+                    eprintln!(
+                        "{}",
+                        envelope::runtime_error("I am not running inside a Dory-managed pane")
+                    );
+                    Err(1)
+                }
+            }
+        }
+        _ => {
+            eprintln!("{usage}");
+            Err(2)
+        }
+    }
 }
 
 fn pane_close_cmd(args: &[String]) -> i32 {
@@ -880,20 +964,6 @@ pub(crate) fn print_rpc(line: &str) -> i32 {
     }
 }
 
-pub(crate) fn flag_value<'a>(args: &'a [String], flag: &str) -> Option<&'a str> {
-    let mut i = 2;
-    while i < args.len() {
-        if args[i] == flag {
-            return args.get(i + 1).map(String::as_str);
-        }
-        if let Some(rest) = args[i].strip_prefix(&format!("{flag}=")) {
-            return Some(rest);
-        }
-        i += 1;
-    }
-    None
-}
-
 pub(crate) fn json_safe_id(id: &str) -> Option<&str> {
     if id.is_empty()
         || id
@@ -961,6 +1031,8 @@ mod tests {
         assert_eq!(dispatch(&args(&["flow", "--"])), 1);
         assert_eq!(dispatch(&args(&["flow", "--", "status"])), 1);
         assert_eq!(dispatch(&args(&["pane", "get", "--current"])), 1);
+        assert_eq!(dispatch(&args(&["pane", "list", "--current"])), 1);
+        assert_eq!(dispatch(&args(&["tab", "list", "--current"])), 1);
     }
 
     #[test]
@@ -979,6 +1051,21 @@ mod tests {
         assert_eq!(dispatch(&args(&["workspace", "close"])), 2);
         assert_eq!(dispatch(&args(&["tab", "list"])), 2);
         assert_eq!(dispatch(&args(&["pane", "list"])), 2);
+        assert_eq!(
+            dispatch(&args(&["tab", "list", "--current", "--workspace", "w1"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["pane", "list", "--workspace", "w1", "--current"])),
+            2
+        );
+        assert_eq!(dispatch(&args(&["tab", "list", "--kind"])), 2);
+        assert_eq!(dispatch(&args(&["pane", "list", "--label", "x"])), 2);
+        assert_eq!(dispatch(&args(&["pane", "list", "--pane", "w1:p1"])), 2);
+        assert_eq!(
+            dispatch(&args(&["tab", "list", "--workspace", "w1", "extra"])),
+            2
+        );
         assert_eq!(
             dispatch(&args(&["pane", "resize", "--cols", "80", "--rows", "24"])),
             2
@@ -1139,8 +1226,8 @@ mod tests {
         assert!(super::USAGE.contains("dory workspace"));
         assert!(super::USAGE.contains("dory workspace create [--cwd <path>]"));
         assert!(super::USAGE.contains("dory tab create --workspace <id> [--cwd <path>]"));
-        assert!(super::USAGE.contains("dory tab list --workspace"));
-        assert!(super::USAGE.contains("dory pane list --workspace"));
+        assert!(super::USAGE.contains("dory tab list [--workspace <id> | --current]"));
+        assert!(super::USAGE.contains("dory pane list [--workspace <id> | --current]"));
         assert!(super::USAGE.contains("dory pane get [--current | --pane <id>]"));
         assert!(super::USAGE.contains("dory pane current [--current | --pane <id>]"));
         assert!(super::USAGE.contains("dory pane run"));
