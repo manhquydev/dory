@@ -268,6 +268,15 @@ Cite land with `git show HEAD:rust/src/main.rs` + `git show HEAD:rust/src/agent.
 | Occupant `pane read` / `agent read` `--lines` | `git show HEAD:rust/src/main.rs` + `git show HEAD:rust/src/agent.rs` + `git show HEAD:rust/src/server.rs` |
 | Skill read `--lines` | `git show HEAD:skills/dory/SKILL.md` (`eea19f1`) |
 
+## Paid occupant pane send-keys
+
+Cite land with `git show HEAD:rust/src/main.rs` + `git show HEAD:rust/src/server.rs`. Working-tree leftover `main.rs` / `server.rs` are not the owner. Land wrap stays `pane.write` + `"raw":true`. Occupant fills `pane` from `--pane` or `--current`→`DORY_PANE_ID`. `<key>` required. Allowlist `enter` / `esc` / `ctrl+c` only. There is no `pane.send-keys` RPC. Keep `dory pane run` as text + Enter. Keep `dory agent send-keys` as the occupant-named verb (`locate_agent`). There is no `agent.list` RPC. Do not claim `pane.zoom`.
+
+| Landing | Owner |
+|---|---|
+| Occupant `pane send-keys` | `git show HEAD:rust/src/main.rs` + `git show HEAD:rust/src/server.rs` |
+| Skill pane send-keys | `git show HEAD:skills/dory/SKILL.md` (`e21b722`) |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
