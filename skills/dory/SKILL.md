@@ -53,6 +53,7 @@ Live `--help` ships:
 - `agent get [<name> | --current | --pane <id>]`
 - `agent read [<name> | --current | --pane <id>] [--source visible|recent|recent-unwrapped]`
 - `agent focus [<name> | --current | --pane <id>]`
+- `agent send-keys [<name> | --current | --pane <id>] <key>`
 - `agent report [--current | --pane <id>] --state working|blocked|idle`
 - `flow -- <args>`
 - `tree`
@@ -260,6 +261,8 @@ dory agent focus <name>
 dory agent focus --current
 dory agent focus --pane <id-from-split>
 dory agent send-keys <name> enter
+dory agent send-keys --current enter
+dory agent send-keys --pane <id-from-split> esc
 dory agent report [--current | --pane <id>] --state working|blocked|idle
 ```
 
@@ -273,7 +276,9 @@ Keep `dory agent wait <name>`. Exactly one of `<name>` or `--current` or `--pane
 
 Keep `dory agent read <name>` as inspect (no env). Exactly one of `<name>` or `--current` or `--pane <id>`. Both / neither / extra (including `--kind`) → usage 2. Named and `--pane` stay inspect (no env). `--current` reads `DORY_PANE_ID` and needs `DORY_ENV=1`. Keep `--source visible|recent|recent-unwrapped` (default `recent`). Named JSON stays land `{"op":"agent.read","name":"<name>","source":"…"}`. Pane arms send `pane` and omit `name`. There is **no** `agent.list` RPC. `agent read` does not mark seen. No `--kind`. No `pane.zoom`.
 
-Keep `dory agent focus <name>`. Exactly one of `<name>` or `--current` or `--pane <id>`. Both / neither / extra (including `--kind`) → usage 2. Mutating: `DORY_ENV=1` on every arm. `--current` reads `DORY_PANE_ID`. `--pane <id>` keeps an explicit pane. Keep `<name>`. Named JSON stays land `{"op":"agent.focus","name":"<name>"}`. Pane arms send `pane` and omit `name`. There is **no** `agent.list` RPC. Focus marks seen. `agent read` / `pane read` do not. Keep `dory pane focus` as a different verb. Do not teach send-keys `--current` this slice. No `--kind`. No `pane.zoom`.
+Keep `dory agent focus <name>`. Exactly one of `<name>` or `--current` or `--pane <id>`. Both / neither / extra (including `--kind`) → usage 2. Mutating: `DORY_ENV=1` on every arm. `--current` reads `DORY_PANE_ID`. `--pane <id>` keeps an explicit pane. Keep `<name>`. Named JSON stays land `{"op":"agent.focus","name":"<name>"}`. Pane arms send `pane` and omit `name`. There is **no** `agent.list` RPC. Focus marks seen. `agent read` / `pane read` do not. Keep `dory pane focus` as a different verb. No `--kind`. No `pane.zoom`.
+
+Keep `dory agent send-keys <name>`. Exactly one of `<name>` or `--current` or `--pane <id>`. Both / neither / extra (including `--kind`) → usage 2. `<key>` required. Allowlist `enter` | `esc` | `ctrl+c` only. Mutating: `DORY_ENV=1` on every arm. `--current` reads `DORY_PANE_ID`. `--pane <id>` keeps an explicit pane. Keep `<name>`. Named JSON stays land `{"op":"agent.send-keys","name":"<name>","key":"<key>"}`. Pane arms send `pane` + `key` and omit `name`. There is **no** `agent.list` RPC. Do not expand the allowlist. Keep `dory pane focus` / `dory agent focus` as different verbs. No `--kind`. No `pane.zoom`.
 
 Five words: `working` | `blocked` | `idle` | `done` | `unknown`. `idle` = ready and seen. `done` = ready, unseen. `unknown` is not completion. Focus marks seen. `agent read` / `pane read` do not. Refuse `prompt` when `blocked`. `--wait` settles first of `idle|done|blocked`. `--until` only for a specific state.
 
