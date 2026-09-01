@@ -42,6 +42,7 @@ Live `--help` ships:
 - `pane close [--current | --pane <id>]`
 - `pane split|run|read|wait-output`
 - `pane resize [--current | --pane <id>] --cols N --rows N`
+- `pane focus [--current | --pane <id>]`
 - `agent start|prompt|wait|get|read|focus|send-keys|report`
 - `agent report [--current | --pane <id>] --state working|blocked|idle`
 - `flow -- <args>`
@@ -104,6 +105,14 @@ dory pane resize --current --cols N --rows N
 ```
 
 or `--pane <id>`. Omit target → usage 2. Both `--cols` and `--rows` are required. Land RPC is `pane.resize`.
+
+Occupants focus with:
+
+```bash
+dory pane focus --current
+```
+
+or `--pane <id>`. Omit target → usage 2. Land RPC is `pane.focus`. This is an id target, not Herdr `pane focus --direction left|right|up|down`. Keep `agent focus <name>` as a different verb. No `pane.zoom`. No `pane.neighbor`.
 
 ```bash
 dory tab create --workspace "$DORY_WORKSPACE_ID"
