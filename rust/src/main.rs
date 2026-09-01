@@ -25,10 +25,10 @@ Usage:
   dory workspace create [--cwd <path>]
   dory workspace list
   dory workspace get <id>
-  dory workspace close <id>
+  dory workspace close [<id> | --current]
   dory tab create --workspace <id> [--cwd <path>]
   dory tab list [--workspace <id> | --current]
-  dory tab close <id>
+  dory tab close [<id> | --current]
   dory pane list [--workspace <id> | --current]
   dory pane close [--current | --pane <id>]
   dory pane get [--current | --pane <id>]
@@ -169,14 +169,17 @@ fn workspace_cmd(args: &[String]) -> i32 {
             print_rpc(&format!(r#"{{"op":"workspace.get","workspace":"{id}"}}"#))
         }
         Some("close") => {
-            let Some(id) = args.get(2).map(String::as_str).and_then(json_safe_id) else {
-                eprintln!("dory: usage: dory workspace close <id>");
-                return 2;
+            const USAGE_CLOSE: &str =
+                "dory: usage: dory workspace close [<id> | --current]";
+            let id = match close_id(
+                args,
+                USAGE_CLOSE,
+                "DORY_WORKSPACE_ID",
+                "invalid workspace id",
+            ) {
+                Ok(id) => id,
+                Err(code) => return code,
             };
-            if args.len() != 3 {
-                eprintln!("dory: usage: dory workspace close <id>");
-                return 2;
-            }
             if let Err(code) = require_skill_env() {
                 return code;
             }
@@ -251,14 +254,11 @@ fn tab_cmd(args: &[String]) -> i32 {
         }
         Some("list") => tab_list_cmd(args),
         Some("close") => {
-            let Some(id) = args.get(2).map(String::as_str).and_then(json_safe_id) else {
-                eprintln!("dory: usage: dory tab close <id>");
-                return 2;
+            const USAGE_CLOSE: &str = "dory: usage: dory tab close [<id> | --current]";
+            let id = match close_id(args, USAGE_CLOSE, "DORY_TAB_ID", "invalid tab id") {
+                Ok(id) => id,
+                Err(code) => return code,
             };
-            if args.len() != 3 {
-                eprintln!("dory: usage: dory tab close <id>");
-                return 2;
-            }
             if let Err(code) = require_skill_env() {
                 return code;
             }
@@ -373,6 +373,77 @@ fn workspace_list_id(args: &[String], usage: &str) -> Result<String, i32> {
                     Some(_) => Ok(id),
                     None => {
                         eprintln!("{}", envelope::runtime_error("invalid workspace id"));
+                        Err(1)
+                    }
+                },
+                _ => {
+                    eprintln!(
+                        "{}",
+                        envelope::runtime_error("I am not running inside a Dory-managed pane")
+                    );
+                    Err(1)
+                }
+            }
+        }
+        _ => {
+            eprintln!("{usage}");
+            Err(2)
+        }
+    }
+}
+
+fn close_id(
+    args: &[String],
+    usage: &str,
+    env_key: &str,
+    invalid: &str,
+) -> Result<String, i32> {
+    let mut positional: Option<&str> = None;
+    let mut current = false;
+    let mut i = 2;
+    while i < args.len() {
+        let a = args[i].as_str();
+        if a == "--current" {
+            if current {
+                eprintln!("{usage}");
+                return Err(2);
+            }
+            current = true;
+            i += 1;
+            continue;
+        }
+        if a.starts_with('-') {
+            eprintln!("{usage}");
+            return Err(2);
+        }
+        if positional.is_some() {
+            eprintln!("{usage}");
+            return Err(2);
+        }
+        positional = Some(a);
+        i += 1;
+    }
+    match (positional, current) {
+        (Some(id), false) => {
+            let Some(id) = json_safe_id(id) else {
+                eprintln!("{usage}");
+                return Err(2);
+            };
+            Ok(id.to_string())
+        }
+        (None, true) => {
+            if let Err(err) = current::require_env() {
+                eprintln!(
+                    "{}",
+                    envelope::runtime_error("I am not running inside a Dory-managed pane")
+                );
+                return Err(current::exit_code(err));
+            }
+            match env::var(env_key) {
+                Ok(id) if !id.is_empty() => match json_safe_id(&id) {
+                    Some(_) => Ok(id),
+                    None => {
+                        eprintln!("{}", envelope::runtime_error(invalid));
                         Err(1)
                     }
                 },
@@ -1033,6 +1104,9 @@ mod tests {
         assert_eq!(dispatch(&args(&["pane", "get", "--current"])), 1);
         assert_eq!(dispatch(&args(&["pane", "list", "--current"])), 1);
         assert_eq!(dispatch(&args(&["tab", "list", "--current"])), 1);
+        assert_eq!(dispatch(&args(&["tab", "close", "--current"])), 1);
+        assert_eq!(dispatch(&args(&["workspace", "close", "--current"])), 1);
+        assert_eq!(dispatch(&args(&["tab", "close", "w1:t1"])), 1);
     }
 
     #[test]
@@ -1064,6 +1138,26 @@ mod tests {
         assert_eq!(dispatch(&args(&["pane", "list", "--pane", "w1:p1"])), 2);
         assert_eq!(
             dispatch(&args(&["tab", "list", "--workspace", "w1", "extra"])),
+            2
+        );
+        assert_eq!(dispatch(&args(&["tab", "close"])), 2);
+        assert_eq!(
+            dispatch(&args(&["tab", "close", "w1:t1", "--current"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["workspace", "close", "w1", "--current"])),
+            2
+        );
+        assert_eq!(dispatch(&args(&["tab", "close", "--kind"])), 2);
+        assert_eq!(dispatch(&args(&["tab", "close", "--tab", "w1:t1"])), 2);
+        assert_eq!(
+            dispatch(&args(&["tab", "close", "--workspace", "w1"])),
+            2
+        );
+        assert_eq!(dispatch(&args(&["workspace", "close", "--label", "x"])), 2);
+        assert_eq!(
+            dispatch(&args(&["tab", "close", "--current", "w1:t1"])),
             2
         );
         assert_eq!(
@@ -1242,7 +1336,8 @@ mod tests {
         ));
         assert!(super::USAGE.contains("dory pane"));
         assert!(super::USAGE.contains("dory pane close"));
-        assert!(super::USAGE.contains("dory workspace close"));
+        assert!(super::USAGE.contains("dory workspace close [<id> | --current]"));
+        assert!(super::USAGE.contains("dory tab close [<id> | --current]"));
         assert!(super::USAGE.contains("workspace picker"));
         assert!(super::USAGE.contains("Ctrl-b"));
         assert!(super::USAGE.contains("n/p still walk panes"));
