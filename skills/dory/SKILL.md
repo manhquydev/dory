@@ -36,7 +36,7 @@ A group with no subcommand prints usage and exits 2. That is discovery. Do not i
 Live `--help` ships:
 
 - `workspace create [--cwd <path>]` / `list` / `get <id>` / `close [<id> | --current]`
-- `tab create --workspace <id> [--cwd <path>]` / `list [--workspace <id> | --current]` / `close [<id> | --current]`
+- `tab create [--workspace <id> | --current] [--cwd <path>]` / `list [--workspace <id> | --current]` / `close [<id> | --current]`
 - `pane list [--workspace <id> | --current]`
 - `pane get [--current | --pane <id>]`
 - `pane current [--current | --pane <id>]`
@@ -131,9 +131,12 @@ Occupants may pin cwd only on create:
 ```bash
 dory workspace create --cwd /abs/path
 dory tab create --workspace "$DORY_WORKSPACE_ID" --cwd /abs/path
+dory tab create --current --cwd /abs/path
 ```
 
 Omit `--cwd` → land uses focused-pane cwd / desk cwd (`spawn_cwd`). This is Dory create-cwd (land `cwd` field), not Herdr `--label` / `--no-focus` on create. No `--kind`.
+
+Keep `dory tab create --workspace <id>` and optional `--cwd`. Exactly one of `--workspace <id>` or `--current`. Both / neither / extra (including Herdr `--label` / `--no-focus` / `--kind`) → usage 2. Mutating: `DORY_ENV=1`. `--current` reads injected `DORY_WORKSPACE_ID` (exit 1 outside env / empty / invalid). JSON stays land `{"op":"tab.create","workspace":"<id>"}` plus optional `cwd`. No `tab.current` RPC. No `pane.split --cwd`. This is Dory create-current, not Herdr `--label` / `--no-focus` on create.
 
 Occupants resize with:
 
@@ -161,6 +164,7 @@ or `--pane <id>`. Omit target / omit `--direction` / `--cols` / `--rows` / extra
 
 ```bash
 dory tab create --workspace "$DORY_WORKSPACE_ID"
+dory tab create --current
 dory tab close <id-from-create>
 dory pane close --pane <id>
 dory workspace close <id>
