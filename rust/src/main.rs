@@ -40,7 +40,7 @@ Usage:
   dory pane resize [--current | --pane <id>] --cols N --rows N
   dory pane focus [--current | --pane <id>]
   dory pane neighbor [--current | --pane <id>] --direction left|right|up|down --cols N --rows N
-  dory agent start <name> --pane <id> [--timeout MS] -- <argv>
+  dory agent start <name> [--pane <id> | --current] [--timeout MS] -- <argv>
   dory agent prompt <name> [--wait] [--timeout MS] [--] <text>
   dory agent wait <name> [--until idle|done|blocked|working|unknown] [--timeout MS]
   dory agent get <name>
@@ -1166,6 +1166,29 @@ mod tests {
         assert_eq!(dispatch(&args(&["workspace", "close", "--current"])), 1);
         assert_eq!(dispatch(&args(&["workspace", "get", "--current"])), 1);
         assert_eq!(dispatch(&args(&["tab", "close", "w1:t1"])), 1);
+        assert_eq!(
+            dispatch(&args(&[
+                "agent",
+                "start",
+                "alice",
+                "--current",
+                "--",
+                "echo"
+            ])),
+            1
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "agent",
+                "start",
+                "alice",
+                "--pane",
+                "w1:p1",
+                "--",
+                "echo"
+            ])),
+            1
+        );
     }
 
     #[test]
@@ -1398,6 +1421,52 @@ mod tests {
         assert_eq!(dispatch(&args(&["tree", "--kind"])), 2);
         assert_eq!(dispatch(&args(&["tree", "--label"])), 2);
         assert_eq!(dispatch(&args(&["tree", "extra"])), 2);
+        assert_eq!(
+            dispatch(&args(&["agent", "start", "alice", "--", "echo"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "agent",
+                "start",
+                "alice",
+                "--pane",
+                "w1:p1",
+                "--current",
+                "--",
+                "echo"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "agent",
+                "start",
+                "alice",
+                "--current",
+                "--pane",
+                "w1:p1",
+                "--",
+                "echo"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["agent", "start", "alice", "--kind", "--", "echo"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "agent",
+                "start",
+                "alice",
+                "--current",
+                "--kind",
+                "--",
+                "echo"
+            ])),
+            2
+        );
     }
 
     #[test]
@@ -1435,7 +1504,9 @@ mod tests {
         assert!(super::USAGE.contains("n/p still walk panes"));
         assert!(super::USAGE.contains("dory flow --"));
         assert!(super::USAGE.contains("dory tree"));
-        assert!(super::USAGE.contains("dory agent start"));
+        assert!(super::USAGE.contains(
+            "dory agent start <name> [--pane <id> | --current] [--timeout MS] -- <argv>"
+        ));
         assert!(
             !super::USAGE.contains("Group agent is a stub"),
             "agent is occupant wait, not a stub"

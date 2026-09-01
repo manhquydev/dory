@@ -7,7 +7,7 @@ use crate::pty;
 use crate::{current, json_safe_id, print_rpc, require_skill_env};
 
 const USAGE_START: &str =
-    "dory: usage: dory agent start <name> --pane <id> [--timeout MS] -- <argv>";
+    "dory: usage: dory agent start <name> [--pane <id> | --current] [--timeout MS] -- <argv>";
 const USAGE_PROMPT: &str =
     "dory: usage: dory agent prompt <name> [--wait] [--timeout MS] [--] <text>";
 const USAGE_WAIT: &str = "dory: usage: dory agent wait <name> [--until idle|done|blocked|working|unknown] [--timeout MS]";
@@ -65,6 +65,7 @@ fn start_cmd(args: &[String]) -> i32 {
 
     let mut name: Option<&str> = None;
     let mut pane: Option<&str> = None;
+    let mut current = false;
     let mut timeout: Option<u64> = None;
     let mut i = 2;
     let mut dash = None;
@@ -115,8 +116,13 @@ fn start_cmd(args: &[String]) -> i32 {
             continue;
         }
         if a == "--current" {
-            eprintln!("{USAGE_START}");
-            return 2;
+            if current {
+                eprintln!("{USAGE_START}");
+                return 2;
+            }
+            current = true;
+            i += 1;
+            continue;
         }
         if a.starts_with("--") {
             eprintln!("dory: unknown agent start flag '{a}'");
@@ -143,9 +149,39 @@ fn start_cmd(args: &[String]) -> i32 {
         eprintln!("{USAGE_START}");
         return 2;
     };
-    let Some(pane) = pane.and_then(json_safe_id) else {
-        eprintln!("{USAGE_START}");
-        return 2;
+    let pane = match (pane, current) {
+        (Some(id), false) => match json_safe_id(id) {
+            Some(id) => id.to_string(),
+            None => {
+                eprintln!("{USAGE_START}");
+                return 2;
+            }
+        },
+        (None, true) => match current::pane_from_current_flag(args) {
+            Ok(id) => match json_safe_id(&id) {
+                Some(_) => id,
+                None => {
+                    eprintln!("{}", envelope::runtime_error("invalid pane id"));
+                    return 1;
+                }
+            },
+            Err(err) => {
+                match err {
+                    current::TargetError::OutsideEnv => {
+                        eprintln!(
+                            "{}",
+                            envelope::runtime_error("I am not running inside a Dory-managed pane")
+                        );
+                    }
+                    current::TargetError::OmitTarget => eprintln!("{USAGE_START}"),
+                }
+                return current::exit_code(err);
+            }
+        },
+        _ => {
+            eprintln!("{USAGE_START}");
+            return 2;
+        }
     };
     if let Err(err) = pty::refuse_spawn_argv(argv) {
         eprintln!("{}", envelope::runtime_error(&err.to_string()));
@@ -561,5 +597,64 @@ mod tests {
         assert!(!valid_occupant_name("a@b"));
         assert!(!valid_occupant_name(&"a".repeat(33)));
         assert!(valid_occupant_name(&"a".repeat(32)));
+    }
+
+    fn args(parts: &[&str]) -> Vec<String> {
+        parts.iter().map(|s| (*s).to_string()).collect()
+    }
+
+    #[test]
+    fn start_usage_names_current() {
+        assert!(USAGE_START.contains("[--pane <id> | --current]"));
+        assert!(!USAGE_START.contains("--kind"));
+    }
+
+    #[test]
+    fn start_neither_both_kind_is_usage() {
+        assert_eq!(cmd(&args(&["agent", "start", "alice", "--", "echo"])), 2);
+        assert_eq!(
+            cmd(&args(&[
+                "agent",
+                "start",
+                "alice",
+                "--pane",
+                "w1:p1",
+                "--current",
+                "--",
+                "echo"
+            ])),
+            2
+        );
+        assert_eq!(
+            cmd(&args(&["agent", "start", "alice", "--kind", "--", "echo"])),
+            2
+        );
+        assert_eq!(
+            cmd(&args(&[
+                "agent",
+                "start",
+                "alice",
+                "--current",
+                "--kind",
+                "--",
+                "echo"
+            ])),
+            2
+        );
+    }
+
+    #[test]
+    fn start_current_without_env_is_runtime_error() {
+        assert_eq!(
+            cmd(&args(&[
+                "agent",
+                "start",
+                "alice",
+                "--current",
+                "--",
+                "echo"
+            ])),
+            1
+        );
     }
 }
