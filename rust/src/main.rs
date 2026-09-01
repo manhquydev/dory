@@ -22,11 +22,11 @@ Usage:
   dory --help
   dory server
   dory server stop
-  dory workspace create
+  dory workspace create [--cwd <path>]
   dory workspace list
   dory workspace get <id>
   dory workspace close <id>
-  dory tab create --workspace <id>
+  dory tab create --workspace <id> [--cwd <path>]
   dory tab list --workspace <id>
   dory tab close <id>
   dory pane list --workspace <id>
@@ -105,14 +105,38 @@ fn workspace_cmd(args: &[String]) -> i32 {
             2
         }
         Some("create") => {
-            if args.len() != 2 {
-                eprintln!("dory: usage: dory workspace create");
+            const USAGE_CREATE: &str = "dory: usage: dory workspace create [--cwd <path>]";
+            let mut cwd: Option<&str> = None;
+            let mut i = 2;
+            while i < args.len() {
+                let a = args[i].as_str();
+                if a == "--cwd" {
+                    let Some(v) = args.get(i + 1).map(String::as_str) else {
+                        eprintln!("{USAGE_CREATE}");
+                        return 2;
+                    };
+                    cwd = Some(v);
+                    i += 2;
+                    continue;
+                }
+                if let Some(v) = a.strip_prefix("--cwd=") {
+                    cwd = Some(v);
+                    i += 1;
+                    continue;
+                }
+                eprintln!("{USAGE_CREATE}");
                 return 2;
             }
             if let Err(code) = require_skill_env() {
                 return code;
             }
-            print_rpc(r#"{"op":"workspace.create"}"#)
+            match cwd {
+                None => print_rpc(r#"{"op":"workspace.create"}"#),
+                Some(path) => print_rpc(&format!(
+                    r#"{{"op":"workspace.create","cwd":{}}}"#,
+                    envelope::json_string(path)
+                )),
+            }
         }
         Some("list") => {
             if args.len() != 2 {
@@ -160,14 +184,58 @@ fn tab_cmd(args: &[String]) -> i32 {
             2
         }
         Some("create") => {
-            let Some(id) = flag_value(args, "--workspace").and_then(json_safe_id) else {
-                eprintln!("dory: usage: dory tab create --workspace <id>");
+            const USAGE_CREATE: &str =
+                "dory: usage: dory tab create --workspace <id> [--cwd <path>]";
+            let mut workspace: Option<&str> = None;
+            let mut cwd: Option<&str> = None;
+            let mut i = 2;
+            while i < args.len() {
+                let a = args[i].as_str();
+                if a == "--workspace" {
+                    let Some(v) = args.get(i + 1).map(String::as_str) else {
+                        eprintln!("{USAGE_CREATE}");
+                        return 2;
+                    };
+                    workspace = Some(v);
+                    i += 2;
+                    continue;
+                }
+                if let Some(v) = a.strip_prefix("--workspace=") {
+                    workspace = Some(v);
+                    i += 1;
+                    continue;
+                }
+                if a == "--cwd" {
+                    let Some(v) = args.get(i + 1).map(String::as_str) else {
+                        eprintln!("{USAGE_CREATE}");
+                        return 2;
+                    };
+                    cwd = Some(v);
+                    i += 2;
+                    continue;
+                }
+                if let Some(v) = a.strip_prefix("--cwd=") {
+                    cwd = Some(v);
+                    i += 1;
+                    continue;
+                }
+                eprintln!("{USAGE_CREATE}");
+                return 2;
+            }
+            let Some(id) = workspace.and_then(json_safe_id) else {
+                eprintln!("{USAGE_CREATE}");
                 return 2;
             };
             if let Err(code) = require_skill_env() {
                 return code;
             }
-            print_rpc(&format!(r#"{{"op":"tab.create","workspace":"{id}"}}"#))
+            match cwd {
+                None => print_rpc(&format!(r#"{{"op":"tab.create","workspace":"{id}"}}"#)),
+                Some(path) => print_rpc(&format!(
+                    r#"{{"op":"tab.create","workspace":"{id}","cwd":{}}}"#,
+                    envelope::json_string(path)
+                )),
+            }
         }
         Some("list") => {
             let Some(id) = flag_value(args, "--workspace").and_then(json_safe_id) else {
@@ -786,6 +854,28 @@ mod tests {
             2
         );
         assert_eq!(dispatch(&args(&["pane", "focus"])), 2);
+        assert_eq!(dispatch(&args(&["workspace", "create", "--cwd"])), 2);
+        assert_eq!(
+            dispatch(&args(&["tab", "create", "--workspace", "w1", "--cwd"])),
+            2
+        );
+        assert_eq!(dispatch(&args(&["tab", "create"])), 2);
+        assert_eq!(
+            dispatch(&args(&["workspace", "create", "--label", "x"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["tab", "create", "--workspace", "w1", "--label", "x"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["workspace", "create", "--no-focus"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["tab", "create", "--workspace", "w1", "--no-focus"])),
+            2
+        );
     }
 
     #[test]
@@ -795,6 +885,8 @@ mod tests {
         assert!(super::USAGE.contains("tiled live panes"));
         assert!(super::USAGE.contains("--plain"));
         assert!(super::USAGE.contains("dory workspace"));
+        assert!(super::USAGE.contains("dory workspace create [--cwd <path>]"));
+        assert!(super::USAGE.contains("dory tab create --workspace <id> [--cwd <path>]"));
         assert!(super::USAGE.contains("dory tab list --workspace"));
         assert!(super::USAGE.contains("dory pane list --workspace"));
         assert!(super::USAGE.contains("dory pane get [--current | --pane <id>]"));
