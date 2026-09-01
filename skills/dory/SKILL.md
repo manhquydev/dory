@@ -36,8 +36,8 @@ A group with no subcommand prints usage and exits 2. That is discovery. Do not i
 Live `--help` ships:
 
 - `workspace create [--cwd <path>]` / `list` / `get <id>` / `close <id>`
-- `tab create --workspace <id> [--cwd <path>]` / `list --workspace <id>` / `close <id>`
-- `pane list --workspace <id>`
+- `tab create --workspace <id> [--cwd <path>]` / `list [--workspace <id> | --current]` / `close <id>`
+- `pane list [--workspace <id> | --current]`
 - `pane get [--current | --pane <id>]`
 - `pane current [--current | --pane <id>]`
 - `pane close [--current | --pane <id>]`
@@ -74,7 +74,7 @@ printf '%s\n' "$DORY_WORKSPACE_ID" "$DORY_TAB_ID" "$DORY_PANE_ID"
 
 ## Discover
 
-Inspect. `list` / `get` do not require `DORY_ENV`. Mutating verbs still do.
+Inspect. `list --workspace` / `get` do not require `DORY_ENV`. `list --current` requires `DORY_ENV=1`. Mutating verbs still do.
 
 ```bash
 dory workspace list
@@ -94,6 +94,15 @@ dory pane current --current
 ```
 
 or `--pane <id>`. Omit target → usage 2. Same land RPC as `pane get`: `pane.get`. Keep `dory pane get`. This is an id target, not extra Herdr inspect flags. No `pane.zoom`. No `--kind`. There is no `pane.neighbor` RPC; the occupant verb is `dory pane neighbor` wrapping `desk.neighbor`.
+
+Occupants already inside a pane may
+
+```bash
+dory pane list --current
+dory tab list --current
+```
+
+`--current` reads injected `DORY_WORKSPACE_ID` and requires `DORY_ENV=1` (exit 1 outside env). `--workspace <id>` stays valid and does not require env. Exactly one of the two. Land RPCs stay `pane.list` / `tab.list` with `workspace`. This is Dory list-current, not Herdr implicit focused list and not `dory tree`. Keep `dory tree` for the live roster. No `--kind`. No `pane.zoom`.
 
 Occupants read the live roster with
 
