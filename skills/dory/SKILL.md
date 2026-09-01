@@ -35,7 +35,7 @@ A group with no subcommand prints usage and exits 2. That is discovery. Do not i
 
 Live `--help` ships:
 
-- `workspace create [--cwd <path>]` / `list` / `get <id>` / `close [<id> | --current]`
+- `workspace create [--cwd <path>]` / `list` / `get [<id> | --current]` / `close [<id> | --current]`
 - `tab create [--workspace <id> | --current] [--cwd <path>]` / `list [--workspace <id> | --current]` / `close [<id> | --current]`
 - `pane list [--workspace <id> | --current]`
 - `pane get [--current | --pane <id>]`
@@ -74,16 +74,19 @@ printf '%s\n' "$DORY_WORKSPACE_ID" "$DORY_TAB_ID" "$DORY_PANE_ID"
 
 ## Discover
 
-Inspect. `list --workspace` / `get` do not require `DORY_ENV`. `list --current` requires `DORY_ENV=1`. Mutating verbs still do.
+Inspect. `list --workspace` / `get <id>` do not require `DORY_ENV`. `list --current` / `get --current` require `DORY_ENV=1`. Mutating verbs still do.
 
 ```bash
 dory workspace list
 dory workspace get <id>
+dory workspace get --current
 dory tab list --workspace <id>
 dory pane list --workspace <id>
 dory pane get --current
 dory pane get --pane <id>
 ```
+
+Keep `dory workspace get <id>` as inspect (no env). Exactly one of positional `<id>` or `--current`. Both / neither / extra (including Herdr `--label` / `--kind`) → usage 2. `--current` requires `DORY_ENV=1` and reads `DORY_WORKSPACE_ID` (exit 1 outside env / empty / invalid). JSON stays land `{"op":"workspace.get","workspace":"<id>"}`. No `tab.get`. No new RPC. This is Dory get-current, not Herdr implicit focused get.
 
 Parse IDs from `.result`. Omit `pane get` target → exit 2, not the focused pane.
 
