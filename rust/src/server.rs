@@ -649,7 +649,12 @@ fn dispatch_line(world: &mut World, line: &str) -> LineReply {
         }),
         Some("pane.write") => LineReply::Msg(match json_str_field(line, "pane") {
             Some(id) => match json_decoded_str_field(line, "text") {
-                Some(text) => write_pane(world, id, &text),
+                Some(text) => write_pane(
+                    world,
+                    id,
+                    &text,
+                    json_bool_field(line, "raw").unwrap_or(false),
+                ),
                 None => envelope::runtime_error("text required"),
             },
             None => envelope::runtime_error("pane id required"),
@@ -1186,13 +1191,23 @@ fn resize_pane(world: &World, pane_id: &str, cols: u16, rows: u16) -> String {
     }
 }
 
-fn write_pane(world: &World, pane_id: &str, text: &str) -> String {
+fn write_pane(world: &mut World, pane_id: &str, text: &str, raw: bool) -> String {
     let Some(loc) = locate_pane(world, pane_id) else {
         return envelope::runtime_error(&format!("unknown pane {pane_id}"));
     };
+    if raw {
+        refresh_occupant(&mut world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi]);
+        if world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi]
+            .occupant
+            .as_ref()
+            .is_some_and(|o| o.word == OccupantWord::Blocked)
+        {
+            return envelope::runtime_error("agent_blocked");
+        }
+    }
     let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
     let mut bytes = text.as_bytes().to_vec();
-    if !bytes.ends_with(&[b'\n']) {
+    if !raw && !bytes.ends_with(&[b'\n']) {
         bytes.push(b'\n');
     }
 
