@@ -186,6 +186,15 @@ Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `mai
 | Occupant `pane neighbor` prev/next `bd0bf35` | `git show HEAD:rust/src/main.rs` |
 | Skill pane neighbor prev/next `7573d53` | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant agent prompt --current
+
+Cite land rust with `git show HEAD:rust/src/agent.rs` and `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs` is not the owner. Land RPC stays `agent.prompt`. Occupant fills `pane` from `--pane` or `--current`→`DORY_PANE_ID`, or keeps `name`. There is no `agent.list` RPC. `--wait` / `--timeout` stay as paid. Do not recook founder `--wait`. Do not claim `pane.zoom`.
+
+| Landing | Owner |
+|---|---|
+| Occupant `agent prompt --current` `951d89d` | `git show HEAD:rust/src/agent.rs` + `git show HEAD:rust/src/main.rs` |
+| Skill agent prompt `--current` `be058f0` | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
