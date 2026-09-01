@@ -39,6 +39,7 @@ Live `--help` ships:
 - `tab create --workspace <id> [--cwd <path>]` / `list --workspace <id>` / `close <id>`
 - `pane list --workspace <id>`
 - `pane get [--current | --pane <id>]`
+- `pane current [--current | --pane <id>]`
 - `pane close [--current | --pane <id>]`
 - `pane split|run|read|wait-output`
 - `pane resize [--current | --pane <id>] --cols N --rows N`
@@ -83,6 +84,14 @@ dory pane get --pane <id>
 ```
 
 Parse IDs from `.result`. Omit `pane get` target → exit 2, not the focused pane.
+
+Occupants inspect with:
+
+```bash
+dory pane current --current
+```
+
+or `--pane <id>`. Omit target → usage 2. Same land RPC as `pane get`: `pane.get`. Keep `dory pane get`. This is an id target, not extra Herdr inspect flags. No `pane.zoom`. No `pane.neighbor`. No `--kind`.
 
 Create a workspace or tab only when the user asked for that topology. Create does not start an occupant.
 
