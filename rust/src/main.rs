@@ -38,7 +38,7 @@ Usage:
   dory pane send-keys [--current | --pane <id>] <key>
   dory pane send-text [--current | --pane <id>] <text>
   dory pane read [--current | --pane <id>] [--source visible|recent|recent-unwrapped] [--lines N]
-  dory pane wait-output [--current | --pane <id>] [--match LIT | --regex RE] [--timeout MS]
+  dory pane wait-output [--current | --pane <id>] [--match LIT | --regex RE] [--source visible|recent|recent-unwrapped] [--lines N] [--timeout MS]
   dory pane resize [--current | --pane <id>] --cols N --rows N
   dory pane focus [--current | --pane <id>]
   dory pane neighbor [--current | --pane <id>] --direction left|right|up|down|prev|next [--cols N --rows N]
@@ -916,10 +916,27 @@ fn pane_read_cmd(args: &[String]) -> i32 {
 }
 
 fn pane_wait_output_cmd(args: &[String]) -> i32 {
-    const USAGE_WAIT: &str = "dory: usage: dory pane wait-output [--current | --pane <id>] [--match LIT | --regex RE] [--timeout MS]";
+    const USAGE_WAIT: &str = "dory: usage: dory pane wait-output [--current | --pane <id>] [--match LIT | --regex RE] [--source visible|recent|recent-unwrapped] [--lines N] [--timeout MS]";
+    if args.iter().any(|a| {
+        a == "--kind"
+            || a.starts_with("--kind=")
+            || a == "--format"
+            || a.starts_with("--format=")
+            || a == "--ansi"
+            || a.starts_with("--ansi=")
+            || a == "--raw"
+            || a.starts_with("--raw=")
+            || a == "--detection"
+            || a.starts_with("--detection=")
+    }) {
+        eprintln!("{USAGE_WAIT}");
+        return 2;
+    }
     let mut lit: Option<&str> = None;
     let mut regex: Option<&str> = None;
     let mut timeout: Option<u64> = None;
+    let mut source: Option<&str> = None;
+    let mut lines: Option<u64> = None;
     let mut i = 2;
     while i < args.len() {
         let a = args[i].as_str();
@@ -967,6 +984,54 @@ fn pane_wait_output_cmd(args: &[String]) -> i32 {
             i += 1;
             continue;
         }
+        if a == "--source" {
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_WAIT}");
+                return 2;
+            };
+            source = Some(v);
+            i += 2;
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--source=") {
+            source = Some(v);
+            i += 1;
+            continue;
+        }
+        if a == "--lines" {
+            if lines.is_some() {
+                eprintln!("{USAGE_WAIT}");
+                return 2;
+            }
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_WAIT}");
+                return 2;
+            };
+            lines = match v.parse::<u64>() {
+                Ok(n) if n >= 1 => Some(n),
+                _ => {
+                    eprintln!("{USAGE_WAIT}");
+                    return 2;
+                }
+            };
+            i += 2;
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--lines=") {
+            if lines.is_some() {
+                eprintln!("{USAGE_WAIT}");
+                return 2;
+            }
+            lines = match v.parse::<u64>() {
+                Ok(n) if n >= 1 => Some(n),
+                _ => {
+                    eprintln!("{USAGE_WAIT}");
+                    return 2;
+                }
+            };
+            i += 1;
+            continue;
+        }
         if a == "--timeout" {
             let Some(v) = args.get(i + 1).map(String::as_str) else {
                 eprintln!("{USAGE_WAIT}");
@@ -1005,6 +1070,12 @@ fn pane_wait_output_cmd(args: &[String]) -> i32 {
         }
         _ => {}
     }
+    if let Some(s) = source {
+        if s != "visible" && s != "recent" && s != "recent-unwrapped" {
+            eprintln!("{USAGE_WAIT}");
+            return 2;
+        }
+    }
     let target = match pane_target(args, USAGE_WAIT) {
         Ok(id) => id,
         Err(code) => return code,
@@ -1019,6 +1090,12 @@ fn pane_wait_output_cmd(args: &[String]) -> i32 {
     }
     if let Some(r) = regex {
         line.push_str(&format!(r#","regex":{}"#, envelope::json_string(r)));
+    }
+    if let Some(s) = source {
+        line.push_str(&format!(r#","source":"{s}""#));
+    }
+    if let Some(n) = lines {
+        line.push_str(&format!(r#","lines":{n}"#));
     }
     line.push('}');
     print_rpc(&line)
@@ -1703,6 +1780,21 @@ mod tests {
             ])),
             1
         );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "wait-output",
+                "--pane",
+                "w1:p1",
+                "--match",
+                "x",
+                "--source",
+                "recent",
+                "--lines",
+                "1"
+            ])),
+            1
+        );
         assert_eq!(dispatch(&args(&["flow", "--"])), 1);
         assert_eq!(dispatch(&args(&["flow", "--", "status"])), 1);
         assert_eq!(dispatch(&args(&["pane", "get", "--current"])), 1);
@@ -1904,6 +1996,120 @@ mod tests {
             2
         );
         assert_eq!(dispatch(&args(&["pane", "wait-output", "--match", "x"])), 2);
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "wait-output",
+                "--pane",
+                "w1:p1",
+                "--match",
+                "x",
+                "--lines"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "wait-output",
+                "--pane",
+                "w1:p1",
+                "--match",
+                "x",
+                "--lines",
+                "0"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "wait-output",
+                "--pane",
+                "w1:p1",
+                "--match",
+                "x",
+                "--lines",
+                "x"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "wait-output",
+                "--pane",
+                "w1:p1",
+                "--match",
+                "x",
+                "--lines",
+                "1",
+                "--lines",
+                "2"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "wait-output",
+                "--pane",
+                "w1:p1",
+                "--match",
+                "x",
+                "--source",
+                "scrollback"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "wait-output",
+                "--pane",
+                "w1:p1",
+                "--match",
+                "x",
+                "--kind"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "wait-output",
+                "--pane",
+                "w1:p1",
+                "--match",
+                "x",
+                "--format"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "wait-output",
+                "--pane",
+                "w1:p1",
+                "--match",
+                "x",
+                "--ansi"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "wait-output",
+                "--pane",
+                "w1:p1",
+                "--match",
+                "x",
+                "--raw"
+            ])),
+            2
+        );
         assert_eq!(dispatch(&args(&["pane", "get"])), 2);
         assert_eq!(dispatch(&args(&["pane", "current"])), 2);
         assert_eq!(dispatch(&args(&["pane", "close"])), 2);
@@ -2574,7 +2780,9 @@ mod tests {
         assert!(super::USAGE.contains(
             "dory pane read [--current | --pane <id>] [--source visible|recent|recent-unwrapped] [--lines N]"
         ));
-        assert!(super::USAGE.contains("dory pane wait-output"));
+        assert!(super::USAGE.contains(
+            "dory pane wait-output [--current | --pane <id>] [--match LIT | --regex RE] [--source visible|recent|recent-unwrapped] [--lines N] [--timeout MS]"
+        ));
         assert!(super::USAGE.contains(
             "dory pane resize [--current | --pane <id>] --cols N --rows N"
         ));

@@ -90,6 +90,8 @@ enum WaitJob {
         needle: Option<String>,
         regex: Option<CompiledRegex>,
         deadline: Instant,
+        source: Option<String>,
+        lines: Option<u64>,
     },
     AgentClassify {
         pane_id: String,
@@ -313,7 +315,17 @@ fn tick_wait_job(world: &mut World, i: usize) -> Option<String> {
             needle,
             regex,
             deadline,
-        } => tick_pane_wait(world, &pane_id, needle.as_deref(), regex.as_ref(), deadline),
+            source,
+            lines,
+        } => tick_pane_wait(
+            world,
+            &pane_id,
+            needle.as_deref(),
+            regex.as_ref(),
+            deadline,
+            source.as_deref(),
+            lines,
+        ),
         WaitJob::AgentClassify {
             pane_id,
             name,
@@ -353,12 +365,24 @@ fn tick_pane_wait(
     needle: Option<&str>,
     regex: Option<&CompiledRegex>,
     deadline: Instant,
+    source: Option<&str>,
+    lines: Option<u64>,
 ) -> Option<String> {
     let Some(loc) = locate_pane(world, pane_id) else {
         return Some(envelope::runtime_error(&format!("unknown pane {pane_id}")));
     };
     let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
-    let text = pane.held.recent_unwrapped();
+    let text = match source.unwrap_or("recent-unwrapped") {
+        "visible" => pane.held.visible(),
+        "recent" => pane.held.recent(),
+        "recent-unwrapped" => pane.held.recent_unwrapped(),
+        other => return Some(envelope::runtime_error(&format!("unknown source {other}"))),
+    };
+    let text = match lines {
+        None => text,
+        Some(0) => return Some(envelope::runtime_error("lines must be >= 1")),
+        Some(n) => crate::pty::tail_lines(&text, n as usize),
+    };
     let hit = if let Some(n) = needle {
         text.contains(n)
     } else if let Some(re) = regex {
@@ -367,10 +391,18 @@ fn tick_pane_wait(
         false
     };
     if hit {
+        let mut extra = String::new();
+        if let Some(s) = source {
+            extra.push_str(&format!(",\"source\":{}", envelope::json_string(s)));
+        }
+        if let Some(n) = lines {
+            extra.push_str(&format!(",\"lines\":{n}"));
+        }
         Some(envelope::success(&format!(
-            "{{\"pane\":{{\"id\":{}}},\"matched\":true,\"text\":{}}}",
+            "{{\"pane\":{{\"id\":{}}},\"matched\":true,\"text\":{}{}}}",
             envelope::json_string(pane_id),
-            envelope::json_string(&text)
+            envelope::json_string(&text),
+            extra
         )))
     } else if Instant::now() >= deadline {
         Some(envelope::runtime_error("timeout"))
@@ -718,6 +750,8 @@ fn dispatch_line(world: &mut World, line: &str) -> LineReply {
                 json_decoded_str_field(line, "match"),
                 json_decoded_str_field(line, "regex"),
                 json_u64_field(line, "timeout").unwrap_or(5000),
+                json_str_field(line, "source"),
+                json_u64_field(line, "lines"),
             ),
             None => LineReply::Msg(envelope::runtime_error("pane id required")),
         },
@@ -2074,6 +2108,8 @@ fn wait_pane(
     needle: Option<String>,
     regex: Option<String>,
     timeout_ms: u64,
+    source: Option<&str>,
+    lines: Option<u64>,
 ) -> LineReply {
     if locate_pane(world, pane_id).is_none() {
         return LineReply::Msg(envelope::runtime_error(&format!("unknown pane {pane_id}")));
@@ -2083,6 +2119,15 @@ fn wait_pane(
     }
     if needle.is_some() && regex.is_some() {
         return LineReply::Msg(envelope::runtime_error("match and regex are exclusive"));
+    }
+    if let Some(s) = source {
+        match s {
+            "visible" | "recent" | "recent-unwrapped" => {}
+            other => return LineReply::Msg(envelope::runtime_error(&format!("unknown source {other}"))),
+        }
+    }
+    if lines == Some(0) {
+        return LineReply::Msg(envelope::runtime_error("lines must be >= 1"));
     }
     let compiled = match regex.as_deref() {
         Some(pat) => match compile_regex(pat) {
@@ -2096,6 +2141,8 @@ fn wait_pane(
         needle,
         regex: compiled,
         deadline: Instant::now() + Duration::from_millis(timeout_ms),
+        source: source.map(str::to_string),
+        lines,
     })
 }
 
