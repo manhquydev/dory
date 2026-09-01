@@ -213,6 +213,15 @@ Cite land rust with `git show HEAD:rust/src/agent.rs` and `git show HEAD:rust/sr
 | Occupant `agent wait --current` `a71fd58` | `git show HEAD:rust/src/agent.rs` + `git show HEAD:rust/src/main.rs` |
 | Skill agent wait `--current` `eab2cce` | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant agent read --current
+
+Cite land rust with `git show HEAD:rust/src/agent.rs` and `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs` is not the owner. Land RPC stays `agent.read`. Occupant fills `pane` from `--pane` or `--current`→`DORY_PANE_ID`, or keeps `name`. Named and `--pane` stay inspect. `--current` needs `DORY_ENV=1`. Keep `--source`. `agent read` does not mark seen. There is no `agent.list` RPC. Do not claim `pane.zoom`.
+
+| Landing | Owner |
+|---|---|
+| Occupant `agent read --current` `e93878f` | `git show HEAD:rust/src/agent.rs` + `git show HEAD:rust/src/main.rs` |
+| Skill agent read `--current` `3bfc7b7` | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
