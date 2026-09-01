@@ -150,6 +150,15 @@ Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `mai
 | Occupant `workspace get --current` `f1b1008` | `git show HEAD:rust/src/main.rs` |
 | Skill workspace get `--current` `ce56706` | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant agent start --current
+
+Cite land with `git show HEAD:rust/src/agent.rs` and `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs` is not the owner. Land RPC stays `agent.start` with `pane`. `--current` fills `DORY_PANE_ID`. Keep `--pane <id>`. Start still never splits. No `--kind`. No `agent.list`. No `pane.zoom`.
+
+| Landing | Owner |
+|---|---|
+| Occupant `agent start --current` `d48483f` | `git show HEAD:rust/src/agent.rs` + `git show HEAD:rust/src/main.rs` |
+| Skill agent start `--current` `3ce24c0` | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
