@@ -36,6 +36,7 @@ Usage:
   dory pane split [--current | --pane <id>] [--direction right|down] [--no-focus]
   dory pane run [--current | --pane <id>] <text>
   dory pane send-keys [--current | --pane <id>] <key>
+  dory pane send-text [--current | --pane <id>] <text>
   dory pane read [--current | --pane <id>] [--source visible|recent|recent-unwrapped] [--lines N]
   dory pane wait-output [--current | --pane <id>] [--match LIT | --regex RE] [--timeout MS]
   dory pane resize [--current | --pane <id>] --cols N --rows N
@@ -343,6 +344,7 @@ fn pane_cmd(args: &[String]) -> i32 {
         Some("split") => pane_split_cmd(args),
         Some("run") => pane_run_cmd(args),
         Some("send-keys") => pane_send_keys_cmd(args),
+        Some("send-text") => pane_send_text_cmd(args),
         Some("read") => pane_read_cmd(args),
         Some("wait-output") => pane_wait_output_cmd(args),
         Some("resize") => pane_resize_cmd(args),
@@ -731,6 +733,80 @@ fn pane_send_keys_cmd(args: &[String]) -> i32 {
     print_rpc(&format!(
         r#"{{"op":"pane.write","pane":"{target}","text":{},"raw":true}}"#,
         envelope::json_string(text)
+    ))
+}
+
+fn pane_send_text_cmd(args: &[String]) -> i32 {
+    const USAGE_TEXT: &str =
+        "dory: usage: dory pane send-text [--current | --pane <id>] <text>";
+    if args
+        .iter()
+        .any(|a| a == "--kind" || a.starts_with("--kind="))
+    {
+        eprintln!("{USAGE_TEXT}");
+        return 2;
+    }
+
+    let mut pane: Option<&str> = None;
+    let mut current = false;
+    let mut text_parts: Vec<&str> = Vec::new();
+    let mut i = 2;
+    while i < args.len() {
+        let a = args[i].as_str();
+        if a == "--pane" {
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_TEXT}");
+                return 2;
+            };
+            pane = Some(v);
+            i += 2;
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--pane=") {
+            pane = Some(v);
+            i += 1;
+            continue;
+        }
+        if a == "--current" {
+            if current {
+                eprintln!("{USAGE_TEXT}");
+                return 2;
+            }
+            current = true;
+            i += 1;
+            continue;
+        }
+        if a.starts_with("--") {
+            eprintln!("dory: unknown pane send-text flag '{a}'");
+            return 2;
+        }
+        text_parts.push(a);
+        i += 1;
+    }
+
+    if text_parts.is_empty() {
+        eprintln!("{USAGE_TEXT}");
+        return 2;
+    }
+    match (pane, current) {
+        (Some(_), false) | (None, true) => {}
+        _ => {
+            eprintln!("{USAGE_TEXT}");
+            return 2;
+        }
+    }
+
+    let target = match pane_target(args, USAGE_TEXT) {
+        Ok(id) => id,
+        Err(code) => return code,
+    };
+    if let Err(code) = require_skill_env() {
+        return code;
+    }
+    let text = text_parts.join(" ");
+    print_rpc(&format!(
+        r#"{{"op":"pane.write","pane":"{target}","text":{},"raw":true}}"#,
+        envelope::json_string(&text)
     ))
 }
 
@@ -1598,6 +1674,25 @@ mod tests {
             1
         );
         assert_eq!(
+            dispatch(&args(&["pane", "send-text", "--pane", "w1:p1", "hi"])),
+            1
+        );
+        assert_eq!(
+            dispatch(&args(&["pane", "send-text", "--current", "hi"])),
+            1
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "send-text",
+                "--pane",
+                "w1:p1",
+                "hello",
+                "world"
+            ])),
+            1
+        );
+        assert_eq!(
             dispatch(&args(&[
                 "pane",
                 "wait-output",
@@ -1748,6 +1843,28 @@ mod tests {
             2
         );
         assert_eq!(dispatch(&args(&["pane", "send-keys", "--current"])), 2);
+        assert_eq!(dispatch(&args(&["pane", "send-text"])), 2);
+        assert_eq!(dispatch(&args(&["pane", "send-text", "hi"])), 2);
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "send-text",
+                "--pane",
+                "w1:p1",
+                "--current",
+                "hi"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["pane", "send-text", "--kind", "hi"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["pane", "send-text", "--pane", "w1:p1"])),
+            2
+        );
+        assert_eq!(dispatch(&args(&["pane", "send-text", "--current"])), 2);
         assert_eq!(dispatch(&args(&["pane", "read"])), 2);
         assert_eq!(
             dispatch(&args(&["pane", "read", "--pane", "w1:p1", "--lines"])),
@@ -2450,6 +2567,9 @@ mod tests {
         ));
         assert!(super::USAGE.contains(
             "dory agent send-keys [<name> | --current | --pane <id>] <key>"
+        ));
+        assert!(super::USAGE.contains(
+            "dory pane send-text [--current | --pane <id>] <text>"
         ));
         assert!(super::USAGE.contains(
             "dory pane read [--current | --pane <id>] [--source visible|recent|recent-unwrapped] [--lines N]"
