@@ -44,7 +44,7 @@ Live `--help` ships:
 - `pane split|run|read|wait-output`
 - `pane resize [--current | --pane <id>] --cols N --rows N`
 - `pane focus [--current | --pane <id>]`
-- `pane neighbor [--current | --pane <id>] --direction left|right|up|down --cols N --rows N`
+- `pane neighbor [--current | --pane <id>] --direction left|right|up|down|prev|next [--cols N --rows N]`
 - `pane layout [--tab <id> | --current] --cols N --rows N`
 - `pane divider [--a <id> | --current] --b <id> --ratio F`
 - `agent start <name> [--pane <id> | --current] [--timeout MS] -- <argv>` / `prompt|wait|get|read|focus|send-keys|report`
@@ -165,7 +165,15 @@ Occupants walk to a spatial neighbor with
 dory pane neighbor --current --direction left --cols N --rows N
 ```
 
-or `--pane <id>`. Omit target / omit `--direction` / `--cols` / `--rows` / extra flags including Herdr `--amount` → usage 2. Parse `.result.pane.id`. Land RPC is `desk.neighbor` with `from`, `step`, `cols`, `rows`. This is Dory neighbor, not Herdr `pane focus --direction`. Keep `dory pane focus` as id-only. No `pane.zoom`. No `--kind`.
+or `--pane <id>`. Spatial `left|right|up|down` still requires `--cols` and `--rows`. JSON stays land `desk.neighbor` with `from`, `step`, `cols`, `rows`.
+
+Occupants walk the land global pane ring with
+
+```bash
+dory pane neighbor --current --direction next
+```
+
+or `--pane <id>` / `--direction prev`. Ring `prev|next` forbids `--cols` / `--rows` (present → usage 2). JSON is land `{"op":"desk.neighbor","from":"<id>","step":"prev"}` or `"next"`. Exactly one of `--current` or `--pane <id>`. `--pane` inspects. `--current` reads `DORY_PANE_ID`. Omit target / omit `--direction` / extra (including `--kind` / `--amount`) → usage 2. Parse `.result.pane.id`. There is no `pane.neighbor` RPC; occupant verb wraps `desk.neighbor`. This is the land global pane ring, not desk chrome tab n/p and not attach sit. Keep `dory pane focus` as id-only. No `pane.zoom`. No `--kind`.
 
 Occupants inspect this tab's tile geometry with
 
