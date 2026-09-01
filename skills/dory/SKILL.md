@@ -46,6 +46,7 @@ Live `--help` ships:
 - `pane focus [--current | --pane <id>]`
 - `pane neighbor [--current | --pane <id>] --direction left|right|up|down --cols N --rows N`
 - `pane layout [--tab <id> | --current] --cols N --rows N`
+- `pane divider [--a <id> | --current] --b <id> --ratio F`
 - `agent start <name> [--pane <id> | --current] [--timeout MS] -- <argv>` / `prompt|wait|get|read|focus|send-keys|report`
 - `agent report [--current | --pane <id>] --state working|blocked|idle`
 - `flow -- <args>`
@@ -173,6 +174,14 @@ dory pane layout --current --cols 120 --rows 40
 ```
 
 or `--tab <id>`. Exactly one of `--tab <id>` or `--current`. Both / neither / extra (including `--kind` / `--direction` / `--amount`) → usage 2. `--cols` and `--rows` required. `--tab <id>` is inspect (no env). `--current` requires `DORY_ENV=1` and reads `DORY_TAB_ID` (exit 1 outside env / empty / invalid). Parse `.result.tab` and `.result.cells[]` (`id`, `x`, `y`, `w`, `h`, `occ`, `st`). JSON stays land `{"op":"desk.layout","tab":"<id>","cols":N,"rows":N}`. There is no `pane.layout` RPC; occupant verb wraps `desk.layout`. This is Dory layout inspect, not Herdr implicit focused layout and not `pane.zoom`. Keep `dory pane resize` / `dory pane neighbor` as they are.
+
+Occupants move a shared split with
+
+```bash
+dory pane divider --current --b <sibling-id> --ratio 0.4
+```
+
+or `--a <id>`. Exactly one of `--a <id>` or `--current`. Both / neither / extra (including `--kind` / `--direction` / `--amount` / `--cols` / `--rows` / `--tab`) → usage 2. `--b <id>` and `--ratio F` required. Bad number / omit → usage 2. Mutating: `DORY_ENV=1` (exit 1 outside env) for both `--a` and `--current`. `--current` reads `DORY_PANE_ID` for the first pane (exit 1 outside env / empty / invalid). Keep `--a <id>`. JSON stays land `{"op":"desk.divider","a":"<id>","b":"<id>","ratio":F}`. There is no `pane.divider` RPC; occupant verb wraps `desk.divider`. Land returns `"no shared split"` when panes do not share a split — print the envelope (exit 1). Do not invent sibling discovery. Land clamps ratio to `[0.05, 0.95]`. CLI parses `f32` and does not re-clamp. This is Dory divider, not Herdr `--direction` / `--amount`. Keep `dory pane resize` / `dory pane layout` as they are. No `pane.zoom`.
 
 ```bash
 dory tab create --workspace "$DORY_WORKSPACE_ID"
