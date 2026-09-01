@@ -132,6 +132,15 @@ Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `mai
 | Occupant `tab`/`workspace` close `--current` `2899ab4` | `git show HEAD:rust/src/main.rs` |
 | Skill close `--current` `f6c7dff` | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant tab create --current
+
+Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs` is not the owner. Land RPC stays `tab.create` with `workspace`. `--current` fills `DORY_WORKSPACE_ID`. This is Dory create-current, not Herdr `--label` / `--no-focus`. Do not claim a new create RPC. Do not claim `pane.split --cwd`. Do not claim `pane.zoom`.
+
+| Landing | Owner |
+|---|---|
+| Occupant `tab create --current` `a58db64` | `git show HEAD:rust/src/main.rs` |
+| Skill tab create `--current` `a60a968` | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
