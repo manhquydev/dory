@@ -9,7 +9,7 @@ use crate::{current, json_safe_id, print_rpc, require_skill_env};
 const USAGE_START: &str =
     "dory: usage: dory agent start <name> [--pane <id> | --current] [--timeout MS] -- <argv>";
 const USAGE_PROMPT: &str =
-    "dory: usage: dory agent prompt <name> [--wait] [--timeout MS] [--] <text>";
+    "dory: usage: dory agent prompt [<name> | --current | --pane <id>] [--wait] [--timeout MS] [--] <text>";
 const USAGE_WAIT: &str = "dory: usage: dory agent wait <name> [--until idle|done|blocked|working|unknown] [--timeout MS]";
 const USAGE_GET: &str = "dory: usage: dory agent get <name>";
 const USAGE_READ: &str =
@@ -204,7 +204,17 @@ fn start_cmd(args: &[String]) -> i32 {
 }
 
 fn prompt_cmd(args: &[String]) -> i32 {
+    if args
+        .iter()
+        .any(|a| a == "--kind" || a.starts_with("--kind="))
+    {
+        eprintln!("{USAGE_PROMPT}");
+        return 2;
+    }
+
     let mut name: Option<&str> = None;
+    let mut pane: Option<&str> = None;
+    let mut current = false;
     let mut wait = false;
     let mut timeout: Option<u64> = None;
     let mut text_parts: Vec<&str> = Vec::new();
@@ -246,6 +256,29 @@ fn prompt_cmd(args: &[String]) -> i32 {
             i += 1;
             continue;
         }
+        if a == "--pane" {
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_PROMPT}");
+                return 2;
+            };
+            pane = Some(v);
+            i += 2;
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--pane=") {
+            pane = Some(v);
+            i += 1;
+            continue;
+        }
+        if a == "--current" {
+            if current {
+                eprintln!("{USAGE_PROMPT}");
+                return 2;
+            }
+            current = true;
+            i += 1;
+            continue;
+        }
         if a.starts_with("--") {
             eprintln!("dory: unknown agent prompt flag '{a}'");
             return 2;
@@ -257,29 +290,96 @@ fn prompt_cmd(args: &[String]) -> i32 {
         }
         i += 1;
     }
-    let Some(name) = name.filter(|n| json_safe_token(n)) else {
-        eprintln!("{USAGE_PROMPT}");
-        return 2;
-    };
     if text_parts.is_empty() {
         eprintln!("{USAGE_PROMPT}");
         return 2;
     }
-    if let Err(code) = require_skill_env() {
-        return code;
-    }
     let text = text_parts.join(" ");
-    let mut line = format!(
-        r#"{{"op":"agent.prompt","name":{},"text":{},"wait":{}"#,
-        envelope::json_string(name),
-        envelope::json_string(&text),
-        if wait { "true" } else { "false" },
-    );
-    if let Some(ms) = timeout {
-        line.push_str(&format!(r#","timeout":{ms}"#));
+    let wait_json = if wait { "true" } else { "false" };
+
+    match (name, pane, current) {
+        (Some(n), None, false) => {
+            if !json_safe_token(n) {
+                eprintln!("{USAGE_PROMPT}");
+                return 2;
+            }
+            if let Err(code) = require_skill_env() {
+                return code;
+            }
+            let mut line = format!(
+                r#"{{"op":"agent.prompt","name":{},"text":{},"wait":{}"#,
+                envelope::json_string(n),
+                envelope::json_string(&text),
+                wait_json,
+            );
+            if let Some(ms) = timeout {
+                line.push_str(&format!(r#","timeout":{ms}"#));
+            }
+            line.push('}');
+            print_rpc(&line)
+        }
+        (None, Some(id), false) => {
+            let Some(id) = json_safe_id(id) else {
+                eprintln!("{}", envelope::runtime_error("invalid pane id"));
+                return 1;
+            };
+            if let Err(code) = require_skill_env() {
+                return code;
+            }
+            let mut line = format!(
+                r#"{{"op":"agent.prompt","pane":"{id}","text":{},"wait":{}"#,
+                envelope::json_string(&text),
+                wait_json,
+            );
+            if let Some(ms) = timeout {
+                line.push_str(&format!(r#","timeout":{ms}"#));
+            }
+            line.push('}');
+            print_rpc(&line)
+        }
+        (None, None, true) => {
+            let pane = match current::pane_from_current_flag(args) {
+                Ok(id) => match json_safe_id(&id) {
+                    Some(_) => id,
+                    None => {
+                        eprintln!("{}", envelope::runtime_error("invalid pane id"));
+                        return 1;
+                    }
+                },
+                Err(err) => {
+                    match err {
+                        current::TargetError::OutsideEnv => {
+                            eprintln!(
+                                "{}",
+                                envelope::runtime_error(
+                                    "I am not running inside a Dory-managed pane"
+                                )
+                            );
+                        }
+                        current::TargetError::OmitTarget => eprintln!("{USAGE_PROMPT}"),
+                    }
+                    return current::exit_code(err);
+                }
+            };
+            if let Err(code) = require_skill_env() {
+                return code;
+            }
+            let mut line = format!(
+                r#"{{"op":"agent.prompt","pane":"{pane}","text":{},"wait":{}"#,
+                envelope::json_string(&text),
+                wait_json,
+            );
+            if let Some(ms) = timeout {
+                line.push_str(&format!(r#","timeout":{ms}"#));
+            }
+            line.push('}');
+            print_rpc(&line)
+        }
+        _ => {
+            eprintln!("{USAGE_PROMPT}");
+            2
+        }
     }
-    line.push('}');
-    print_rpc(&line)
 }
 
 fn wait_cmd(args: &[String]) -> i32 {
@@ -653,6 +753,66 @@ mod tests {
                 "--current",
                 "--",
                 "echo"
+            ])),
+            1
+        );
+    }
+
+    #[test]
+    fn prompt_usage_names_current() {
+        assert!(USAGE_PROMPT.contains("[<name> | --current | --pane <id>]"));
+        assert!(USAGE_PROMPT.contains("--current"));
+        assert!(USAGE_PROMPT.contains("--pane"));
+        assert!(!USAGE_PROMPT.contains("--kind"));
+    }
+
+    #[test]
+    fn prompt_neither_both_kind_omit_text_is_usage() {
+        assert_eq!(cmd(&args(&["agent", "prompt", "--", "hello"])), 2);
+        assert_eq!(
+            cmd(&args(&["agent", "prompt", "alice", "--current", "hello"])),
+            2
+        );
+        assert_eq!(
+            cmd(&args(&[
+                "agent",
+                "prompt",
+                "--pane",
+                "w1:p1",
+                "--current",
+                "hello"
+            ])),
+            2
+        );
+        assert_eq!(
+            cmd(&args(&["agent", "prompt", "alice", "--kind", "hello"])),
+            2
+        );
+        assert_eq!(cmd(&args(&["agent", "prompt", "alice"])), 2);
+    }
+
+    #[test]
+    fn prompt_current_or_pane_without_env_is_runtime_error() {
+        assert_eq!(
+            cmd(&args(&["agent", "prompt", "--current", "--", "hello"])),
+            1
+        );
+        assert_eq!(
+            cmd(&args(&["agent", "prompt", "--pane", "w1:p1", "--", "hello"])),
+            1
+        );
+    }
+
+    #[test]
+    fn prompt_named_wait_still_parses() {
+        assert_eq!(
+            cmd(&args(&[
+                "agent",
+                "prompt",
+                "alice",
+                "--wait",
+                "--",
+                "hello"
             ])),
             1
         );

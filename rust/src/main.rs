@@ -43,7 +43,7 @@ Usage:
   dory pane layout [--tab <id> | --current] --cols N --rows N
   dory pane divider [--a <id> | --current] --b <id> --ratio F
   dory agent start <name> [--pane <id> | --current] [--timeout MS] -- <argv>
-  dory agent prompt <name> [--wait] [--timeout MS] [--] <text>
+  dory agent prompt [<name> | --current | --pane <id>] [--wait] [--timeout MS] [--] <text>
   dory agent wait <name> [--until idle|done|blocked|working|unknown] [--timeout MS]
   dory agent get <name>
   dory agent read <name> [--source visible|recent|recent-unwrapped]
