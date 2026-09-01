@@ -36,6 +36,7 @@ Usage:
   dory pane run [--current | --pane <id>] <text>
   dory pane read [--current | --pane <id>] [--source visible|recent|recent-unwrapped]
   dory pane wait-output [--current | --pane <id>] [--match LIT | --regex RE] [--timeout MS]
+  dory pane resize [--current | --pane <id>] --cols N --rows N
   dory agent start <name> --pane <id> [--timeout MS] -- <argv>
   dory agent prompt <name> [--wait] [--timeout MS] [--] <text>
   dory agent wait <name> [--until idle|done|blocked|working|unknown] [--timeout MS]
@@ -208,6 +209,7 @@ fn pane_cmd(args: &[String]) -> i32 {
         Some("run") => pane_run_cmd(args),
         Some("read") => pane_read_cmd(args),
         Some("wait-output") => pane_wait_output_cmd(args),
+        Some("resize") => pane_resize_cmd(args),
         Some(other) => {
             eprintln!("dory: unknown pane subcommand '{other}'");
             2
@@ -514,6 +516,101 @@ fn pane_wait_output_cmd(args: &[String]) -> i32 {
     print_rpc(&line)
 }
 
+fn pane_resize_cmd(args: &[String]) -> i32 {
+    const USAGE_RESIZE: &str =
+        "dory: usage: dory pane resize [--current | --pane <id>] --cols N --rows N";
+    let mut cols: Option<u16> = None;
+    let mut rows: Option<u16> = None;
+    let mut i = 2;
+    while i < args.len() {
+        let a = args[i].as_str();
+        if a == "--current" {
+            i += 1;
+            continue;
+        }
+        if a == "--pane" {
+            if args.get(i + 1).is_none() {
+                eprintln!("{USAGE_RESIZE}");
+                return 2;
+            }
+            i += 2;
+            continue;
+        }
+        if a.starts_with("--pane=") {
+            i += 1;
+            continue;
+        }
+        if a == "--cols" {
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_RESIZE}");
+                return 2;
+            };
+            cols = match v.parse() {
+                Ok(n) => Some(n),
+                Err(_) => {
+                    eprintln!("{USAGE_RESIZE}");
+                    return 2;
+                }
+            };
+            i += 2;
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--cols=") {
+            cols = match v.parse() {
+                Ok(n) => Some(n),
+                Err(_) => {
+                    eprintln!("{USAGE_RESIZE}");
+                    return 2;
+                }
+            };
+            i += 1;
+            continue;
+        }
+        if a == "--rows" {
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_RESIZE}");
+                return 2;
+            };
+            rows = match v.parse() {
+                Ok(n) => Some(n),
+                Err(_) => {
+                    eprintln!("{USAGE_RESIZE}");
+                    return 2;
+                }
+            };
+            i += 2;
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--rows=") {
+            rows = match v.parse() {
+                Ok(n) => Some(n),
+                Err(_) => {
+                    eprintln!("{USAGE_RESIZE}");
+                    return 2;
+                }
+            };
+            i += 1;
+            continue;
+        }
+        eprintln!("dory: unknown pane resize flag '{a}'");
+        return 2;
+    }
+    let (Some(cols), Some(rows)) = (cols, rows) else {
+        eprintln!("{USAGE_RESIZE}");
+        return 2;
+    };
+    let target = match pane_target(args, USAGE_RESIZE) {
+        Ok(id) => id,
+        Err(code) => return code,
+    };
+    if let Err(code) = require_skill_env() {
+        return code;
+    }
+    print_rpc(&format!(
+        r#"{{"op":"pane.resize","pane":"{target}","cols":{cols},"rows":{rows}}}"#
+    ))
+}
+
 fn pane_target(args: &[String], usage: &str) -> Result<String, i32> {
     let id = match current::pane_from_current_flag(args) {
         Ok(id) => id,
@@ -670,6 +767,10 @@ mod tests {
         assert_eq!(dispatch(&args(&["workspace", "close"])), 2);
         assert_eq!(dispatch(&args(&["tab", "list"])), 2);
         assert_eq!(dispatch(&args(&["pane", "list"])), 2);
+        assert_eq!(
+            dispatch(&args(&["pane", "resize", "--cols", "80", "--rows", "24"])),
+            2
+        );
     }
 
     #[test]
@@ -685,6 +786,9 @@ mod tests {
         assert!(super::USAGE.contains("dory pane run"));
         assert!(super::USAGE.contains("dory pane read"));
         assert!(super::USAGE.contains("dory pane wait-output"));
+        assert!(super::USAGE.contains(
+            "dory pane resize [--current | --pane <id>] --cols N --rows N"
+        ));
         assert!(super::USAGE.contains("dory pane"));
         assert!(super::USAGE.contains("dory pane close"));
         assert!(super::USAGE.contains("dory workspace close"));
