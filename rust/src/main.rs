@@ -24,7 +24,7 @@ Usage:
   dory server stop
   dory workspace create [--cwd <path>]
   dory workspace list
-  dory workspace get <id>
+  dory workspace get [<id> | --current]
   dory workspace close [<id> | --current]
   dory tab create [--workspace <id> | --current] [--cwd <path>]
   dory tab list [--workspace <id> | --current]
@@ -158,14 +158,17 @@ fn workspace_cmd(args: &[String]) -> i32 {
             print_rpc(r#"{"op":"workspace.list"}"#)
         }
         Some("get") => {
-            let Some(id) = args.get(2).map(String::as_str).and_then(json_safe_id) else {
-                eprintln!("dory: usage: dory workspace get <id>");
-                return 2;
+            const USAGE_GET: &str =
+                "dory: usage: dory workspace get [<id> | --current]";
+            let id = match close_id(
+                args,
+                USAGE_GET,
+                "DORY_WORKSPACE_ID",
+                "invalid workspace id",
+            ) {
+                Ok(id) => id,
+                Err(code) => return code,
             };
-            if args.len() != 3 {
-                eprintln!("dory: usage: dory workspace get <id>");
-                return 2;
-            }
             print_rpc(&format!(r#"{{"op":"workspace.get","workspace":"{id}"}}"#))
         }
         Some("close") => {
@@ -1161,6 +1164,7 @@ mod tests {
         assert_eq!(dispatch(&args(&["tab", "list", "--current"])), 1);
         assert_eq!(dispatch(&args(&["tab", "close", "--current"])), 1);
         assert_eq!(dispatch(&args(&["workspace", "close", "--current"])), 1);
+        assert_eq!(dispatch(&args(&["workspace", "get", "--current"])), 1);
         assert_eq!(dispatch(&args(&["tab", "close", "w1:t1"])), 1);
     }
 
@@ -1204,6 +1208,18 @@ mod tests {
             dispatch(&args(&["workspace", "close", "w1", "--current"])),
             2
         );
+        assert_eq!(dispatch(&args(&["workspace", "get"])), 2);
+        assert_eq!(
+            dispatch(&args(&["workspace", "get", "w1", "--current"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["workspace", "get", "--current", "w1"])),
+            2
+        );
+        assert_eq!(dispatch(&args(&["workspace", "get", "--kind"])), 2);
+        assert_eq!(dispatch(&args(&["workspace", "get", "--label", "x"])), 2);
+        assert_eq!(dispatch(&args(&["workspace", "get", "w1", "extra"])), 2);
         assert_eq!(dispatch(&args(&["tab", "close", "--kind"])), 2);
         assert_eq!(dispatch(&args(&["tab", "close", "--tab", "w1:t1"])), 2);
         assert_eq!(
@@ -1412,6 +1428,7 @@ mod tests {
         assert!(super::USAGE.contains("dory pane"));
         assert!(super::USAGE.contains("dory pane close"));
         assert!(super::USAGE.contains("dory workspace close [<id> | --current]"));
+        assert!(super::USAGE.contains("dory workspace get [<id> | --current]"));
         assert!(super::USAGE.contains("dory tab close [<id> | --current]"));
         assert!(super::USAGE.contains("workspace picker"));
         assert!(super::USAGE.contains("Ctrl-b"));
