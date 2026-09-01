@@ -39,6 +39,7 @@ Usage:
   dory pane wait-output [--current | --pane <id>] [--match LIT | --regex RE] [--timeout MS]
   dory pane resize [--current | --pane <id>] --cols N --rows N
   dory pane focus [--current | --pane <id>]
+  dory pane neighbor [--current | --pane <id>] --direction left|right|up|down --cols N --rows N
   dory agent start <name> --pane <id> [--timeout MS] -- <argv>
   dory agent prompt <name> [--wait] [--timeout MS] [--] <text>
   dory agent wait <name> [--until idle|done|blocked|working|unknown] [--timeout MS]
@@ -291,6 +292,7 @@ fn pane_cmd(args: &[String]) -> i32 {
         Some("wait-output") => pane_wait_output_cmd(args),
         Some("resize") => pane_resize_cmd(args),
         Some("focus") => pane_focus_cmd(args),
+        Some("neighbor") => pane_neighbor_cmd(args),
         Some(other) => {
             eprintln!("dory: unknown pane subcommand '{other}'");
             2
@@ -704,6 +706,122 @@ fn pane_focus_cmd(args: &[String]) -> i32 {
     print_rpc(&format!(r#"{{"op":"pane.focus","pane":"{target}"}}"#))
 }
 
+fn pane_neighbor_cmd(args: &[String]) -> i32 {
+    const USAGE_NEIGHBOR: &str =
+        "dory: usage: dory pane neighbor [--current | --pane <id>] --direction left|right|up|down --cols N --rows N";
+    let mut direction: Option<&str> = None;
+    let mut cols: Option<u16> = None;
+    let mut rows: Option<u16> = None;
+    let mut i = 2;
+    while i < args.len() {
+        let a = args[i].as_str();
+        if a == "--current" {
+            i += 1;
+            continue;
+        }
+        if a == "--pane" {
+            if args.get(i + 1).is_none() {
+                eprintln!("{USAGE_NEIGHBOR}");
+                return 2;
+            }
+            i += 2;
+            continue;
+        }
+        if a.starts_with("--pane=") {
+            i += 1;
+            continue;
+        }
+        if a == "--direction" {
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_NEIGHBOR}");
+                return 2;
+            };
+            direction = Some(v);
+            i += 2;
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--direction=") {
+            direction = Some(v);
+            i += 1;
+            continue;
+        }
+        if a == "--cols" {
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_NEIGHBOR}");
+                return 2;
+            };
+            cols = match v.parse() {
+                Ok(n) => Some(n),
+                Err(_) => {
+                    eprintln!("{USAGE_NEIGHBOR}");
+                    return 2;
+                }
+            };
+            i += 2;
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--cols=") {
+            cols = match v.parse() {
+                Ok(n) => Some(n),
+                Err(_) => {
+                    eprintln!("{USAGE_NEIGHBOR}");
+                    return 2;
+                }
+            };
+            i += 1;
+            continue;
+        }
+        if a == "--rows" {
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_NEIGHBOR}");
+                return 2;
+            };
+            rows = match v.parse() {
+                Ok(n) => Some(n),
+                Err(_) => {
+                    eprintln!("{USAGE_NEIGHBOR}");
+                    return 2;
+                }
+            };
+            i += 2;
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--rows=") {
+            rows = match v.parse() {
+                Ok(n) => Some(n),
+                Err(_) => {
+                    eprintln!("{USAGE_NEIGHBOR}");
+                    return 2;
+                }
+            };
+            i += 1;
+            continue;
+        }
+        eprintln!("dory: unknown pane neighbor flag '{a}'");
+        return 2;
+    }
+    let Some(step) = direction else {
+        eprintln!("{USAGE_NEIGHBOR}");
+        return 2;
+    };
+    if step != "left" && step != "right" && step != "up" && step != "down" {
+        eprintln!("{USAGE_NEIGHBOR}");
+        return 2;
+    }
+    let (Some(cols), Some(rows)) = (cols, rows) else {
+        eprintln!("{USAGE_NEIGHBOR}");
+        return 2;
+    };
+    let target = match pane_target(args, USAGE_NEIGHBOR) {
+        Ok(id) => id,
+        Err(code) => return code,
+    };
+    print_rpc(&format!(
+        r#"{{"op":"desk.neighbor","from":{},"step":"{step}","cols":{cols},"rows":{rows}}}"#,
+        envelope::json_string(&target)
+    ))
+}
+
 fn pane_target(args: &[String], usage: &str) -> Result<String, i32> {
     let id = match current::pane_from_current_flag(args) {
         Ok(id) => id,
@@ -866,6 +984,124 @@ mod tests {
             2
         );
         assert_eq!(dispatch(&args(&["pane", "focus"])), 2);
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "neighbor",
+                "--direction",
+                "left",
+                "--cols",
+                "80",
+                "--rows",
+                "24"
+            ])),
+            2
+        );
+        assert_eq!(dispatch(&args(&["pane", "neighbor"])), 2);
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "neighbor",
+                "--pane",
+                "w1:p1",
+                "--cols",
+                "80",
+                "--rows",
+                "24"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "neighbor",
+                "--pane",
+                "w1:p1",
+                "--direction",
+                "left",
+                "--rows",
+                "24"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "neighbor",
+                "--pane",
+                "w1:p1",
+                "--direction",
+                "left",
+                "--cols",
+                "80"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "neighbor",
+                "--pane",
+                "w1:p1",
+                "--direction",
+                "left",
+                "--cols",
+                "x",
+                "--rows",
+                "24"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "neighbor",
+                "--pane",
+                "w1:p1",
+                "--direction",
+                "left",
+                "--cols",
+                "80",
+                "--rows",
+                "24",
+                "--amount",
+                "1"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "neighbor",
+                "--pane",
+                "w1:p1",
+                "--direction",
+                "left",
+                "--cols",
+                "80",
+                "--rows",
+                "24",
+                "--kind"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "neighbor",
+                "--pane",
+                "w1:p1",
+                "--direction",
+                "left",
+                "--cols",
+                "80",
+                "--rows",
+                "24",
+                "--label",
+                "x"
+            ])),
+            2
+        );
         assert_eq!(dispatch(&args(&["workspace", "create", "--cwd"])), 2);
         assert_eq!(
             dispatch(&args(&["tab", "create", "--workspace", "w1", "--cwd"])),
@@ -914,6 +1150,9 @@ mod tests {
             "dory pane resize [--current | --pane <id>] --cols N --rows N"
         ));
         assert!(super::USAGE.contains("dory pane focus [--current | --pane <id>]"));
+        assert!(super::USAGE.contains(
+            "dory pane neighbor [--current | --pane <id>] --direction left|right|up|down --cols N --rows N"
+        ));
         assert!(super::USAGE.contains("dory pane"));
         assert!(super::USAGE.contains("dory pane close"));
         assert!(super::USAGE.contains("dory workspace close"));
