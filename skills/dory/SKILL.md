@@ -35,8 +35,8 @@ A group with no subcommand prints usage and exits 2. That is discovery. Do not i
 
 Live `--help` ships:
 
-- `workspace create [--cwd <path>]` / `list` / `get <id>` / `close <id>`
-- `tab create --workspace <id> [--cwd <path>]` / `list [--workspace <id> | --current]` / `close <id>`
+- `workspace create [--cwd <path>]` / `list` / `get <id>` / `close [<id> | --current]`
+- `tab create --workspace <id> [--cwd <path>]` / `list [--workspace <id> | --current]` / `close [<id> | --current]`
 - `pane list [--workspace <id> | --current]`
 - `pane get [--current | --pane <id>]`
 - `pane current [--current | --pane <id>]`
@@ -166,7 +166,14 @@ dory pane close --pane <id>
 dory workspace close <id>
 ```
 
-Do not close tabs, panes, or workspaces you did not create unless the user asked. Closing the last live pane is refused. Occupants use these CLI verbs; do not sit the human desk.
+Occupants may
+
+```bash
+dory tab close --current
+dory workspace close --current
+```
+
+Keep `dory tab close <id>` and `dory workspace close <id>`. Exactly one of positional `<id>` or `--current`. Both / neither / extra → usage 2. Mutating: `DORY_ENV=1`. `--current` reads `DORY_TAB_ID` / `DORY_WORKSPACE_ID` (exit 1 outside env / empty id). Land RPCs stay `tab.close` / `workspace.close`. Do not close tabs, panes, or workspaces you did not create unless the user asked. Do not close the factory chair. Closing the last live pane is refused. Occupants use these CLI verbs; do not sit the human desk. This is Dory close-current, not Herdr implicit focused close. No `--kind`. No `pane.zoom`.
 
 ## Run a command in another pane
 
