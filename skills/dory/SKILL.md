@@ -47,6 +47,7 @@ Live `--help` ships:
 - `agent start|prompt|wait|get|read|focus|send-keys|report`
 - `agent report [--current | --pane <id>] --state working|blocked|idle`
 - `flow -- <args>`
+- `tree`
 
 `dory flow -- <args>` is a taxi: exec `FLOW_BIN` or `flow.sh`, cwd = the workspace directory (`DORY_WORKSPACE_DIR` or the pane cwd). Timeout **15000 ms**, then SIGTERM / 1s / SIGKILL. Preserve the judge exit; timeout or missing code exits 1. Occupant must not wait forever. No `next` / `card` / `check` inside Dory. Refuse `herdr`, `dsh`, `@deepseek-ai/dsh`.
 
@@ -92,6 +93,14 @@ dory pane current --current
 ```
 
 or `--pane <id>`. Omit target → usage 2. Same land RPC as `pane get`: `pane.get`. Keep `dory pane get`. This is an id target, not extra Herdr inspect flags. No `pane.zoom`. No `pane.neighbor`. No `--kind`.
+
+Occupants read the live roster with
+
+```bash
+dory tree
+```
+
+Parse `.result.focused` and `.result.items[]`. Each item has `k` = `w` | `t` | `p`. Workspace rows may include `cwd`. Pane rows may include `occ` (name) and `st` (five words). Extra args → usage 2. Land RPC is `desk.tree`. This is Dory tree, not Herdr `agent list`. No `--kind`. No `pane.zoom`.
 
 Create a workspace or tab only when the user asked for that topology. Create does not start an occupant.
 
