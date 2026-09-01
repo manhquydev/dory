@@ -210,9 +210,12 @@ Occupants may
 ```bash
 dory tab close --current
 dory workspace close --current
+dory pane close --current
 ```
 
 Keep `dory tab close <id>` and `dory workspace close <id>`. Exactly one of positional `<id>` or `--current`. Both / neither / extra → usage 2. Mutating: `DORY_ENV=1`. `--current` reads `DORY_TAB_ID` / `DORY_WORKSPACE_ID` (exit 1 outside env / empty id). Land RPCs stay `tab.close` / `workspace.close`. Do not close tabs, panes, or workspaces you did not create unless the user asked. Do not close the factory chair. Closing the last live pane is refused. Occupants use these CLI verbs; do not sit the human desk. This is Dory close-current, not Herdr implicit focused close. No `--kind`. No `pane.zoom`.
+
+Keep `dory pane close --pane <id>`. Exactly one of `--current` or `--pane <id>`. Both / neither / extra (including `--kind`) → usage 2. Mutating: `DORY_ENV=1`. `--current` reads `DORY_PANE_ID` (exit 1 outside env / empty / invalid). `--pane <id>` keeps an explicit pane. JSON stays land `{"op":"pane.close","pane":"<id>"}`. Closing the last live pane is refused. Do not close the factory chair. Do not close panes you did not create unless the user asked. Occupants use this CLI; do not sit the human desk. This is Dory close-current, not implicit focused close. No `--kind`. No `pane.zoom`. Keep `dory tab close` / `dory workspace close` as they are.
 
 ## Run a command in another pane
 
