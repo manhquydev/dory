@@ -49,6 +49,7 @@ Live `--help` ships:
 - `pane divider [--a <id> | --current] --b <id> --ratio F`
 - `agent start <name> [--pane <id> | --current] [--timeout MS] -- <argv>` / `prompt|wait|get|read|focus|send-keys|report`
 - `agent prompt [<name> | --current | --pane <id>] [--wait] [--timeout MS] [--] <text>`
+- `agent wait [<name> | --current | --pane <id>] [--until idle|done|blocked|working|unknown] [--timeout MS]`
 - `agent get [<name> | --current | --pane <id>]`
 - `agent report [--current | --pane <id>] --state working|blocked|idle`
 - `flow -- <args>`
@@ -245,6 +246,8 @@ dory agent prompt <name> --wait -- <text>
 dory agent prompt --current -- hi
 dory agent prompt --pane <id-from-split> -- hi
 dory agent wait <name>
+dory agent wait --current
+dory agent wait --pane <id-from-split>
 dory agent get <name>
 dory agent get --current
 dory agent get --pane <id-from-split>
@@ -259,6 +262,8 @@ dory agent report [--current | --pane <id>] --state working|blocked|idle
 Exactly one of `<name>` or `--current` or `--pane <id>`. Both / neither / extra (including `--kind`) → usage 2. Text required. Mutating: `DORY_ENV=1`. `--current` reads `DORY_PANE_ID`. `--pane <id>` keeps an explicit pane. Keep `<name>`. Named JSON stays land `{"op":"agent.prompt","name":"<name>",…}`. Pane arms send `pane` and omit `name`. There is **no** `agent.list` RPC. `--wait` / `--timeout` stay as they are. No `--kind`. No `pane.zoom`.
 
 Keep `dory agent get <name>` as inspect (no env). Exactly one of `<name>` or `--current` or `--pane <id>`. Both / neither / extra (including `--kind`) → usage 2. Named and `--pane` stay inspect (no env). `--current` reads `DORY_PANE_ID` and needs `DORY_ENV=1`. Named JSON stays land `{"op":"agent.get","name":"<name>"}`. Pane arms send `pane` and omit `name`. There is **no** `agent.list` RPC. No `--kind`. No `pane.zoom`.
+
+Keep `dory agent wait <name>`. Exactly one of `<name>` or `--current` or `--pane <id>`. Both / neither / extra (including `--kind`) → usage 2. Mutating: `DORY_ENV=1` on every arm. `--current` reads `DORY_PANE_ID`. `--pane <id>` keeps an explicit pane. Keep `<name>`. Named JSON stays land `{"op":"agent.wait","name":"<name>",…}`. Pane arms send `pane` and omit `name`. There is **no** `agent.list` RPC. `--until` / `--timeout` stay as they are. Do not teach a new wait farm. No `--kind`. No `pane.zoom`.
 
 Five words: `working` | `blocked` | `idle` | `done` | `unknown`. `idle` = ready and seen. `done` = ready, unseen. `unknown` is not completion. Focus marks seen. `agent read` / `pane read` do not. Refuse `prompt` when `blocked`. `--wait` settles first of `idle|done|blocked`. `--until` only for a specific state.
 
