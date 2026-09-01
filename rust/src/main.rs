@@ -37,6 +37,7 @@ Usage:
   dory pane read [--current | --pane <id>] [--source visible|recent|recent-unwrapped]
   dory pane wait-output [--current | --pane <id>] [--match LIT | --regex RE] [--timeout MS]
   dory pane resize [--current | --pane <id>] --cols N --rows N
+  dory pane focus [--current | --pane <id>]
   dory agent start <name> --pane <id> [--timeout MS] -- <argv>
   dory agent prompt <name> [--wait] [--timeout MS] [--] <text>
   dory agent wait <name> [--until idle|done|blocked|working|unknown] [--timeout MS]
@@ -210,6 +211,7 @@ fn pane_cmd(args: &[String]) -> i32 {
         Some("read") => pane_read_cmd(args),
         Some("wait-output") => pane_wait_output_cmd(args),
         Some("resize") => pane_resize_cmd(args),
+        Some("focus") => pane_focus_cmd(args),
         Some(other) => {
             eprintln!("dory: unknown pane subcommand '{other}'");
             2
@@ -611,6 +613,18 @@ fn pane_resize_cmd(args: &[String]) -> i32 {
     ))
 }
 
+fn pane_focus_cmd(args: &[String]) -> i32 {
+    const USAGE_FOCUS: &str = "dory: usage: dory pane focus [--current | --pane <id>]";
+    let target = match pane_target(args, USAGE_FOCUS) {
+        Ok(id) => id,
+        Err(code) => return code,
+    };
+    if let Err(code) = require_skill_env() {
+        return code;
+    }
+    print_rpc(&format!(r#"{{"op":"pane.focus","pane":"{target}"}}"#))
+}
+
 fn pane_target(args: &[String], usage: &str) -> Result<String, i32> {
     let id = match current::pane_from_current_flag(args) {
         Ok(id) => id,
@@ -771,6 +785,7 @@ mod tests {
             dispatch(&args(&["pane", "resize", "--cols", "80", "--rows", "24"])),
             2
         );
+        assert_eq!(dispatch(&args(&["pane", "focus"])), 2);
     }
 
     #[test]
@@ -789,6 +804,7 @@ mod tests {
         assert!(super::USAGE.contains(
             "dory pane resize [--current | --pane <id>] --cols N --rows N"
         ));
+        assert!(super::USAGE.contains("dory pane focus [--current | --pane <id>]"));
         assert!(super::USAGE.contains("dory pane"));
         assert!(super::USAGE.contains("dory pane close"));
         assert!(super::USAGE.contains("dory workspace close"));
