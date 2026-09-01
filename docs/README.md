@@ -114,6 +114,15 @@ Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `mai
 | Occupant `pane neighbor` `e4f51f9` | `git show HEAD:rust/src/main.rs` |
 | Skill `pane neighbor` `6d38e96` | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant list --current
+
+Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs` is not the owner. Land RPCs stay `pane.list` / `tab.list`. This is Dory list-current, not implicit focused list. Do not claim a new list RPC. Do not claim `pane.zoom`.
+
+| Landing | Owner |
+|---|---|
+| Occupant `pane`/`tab` list `--current` `b6999fe` | `git show HEAD:rust/src/main.rs` |
+| Skill list `--current` `72edb12` | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
