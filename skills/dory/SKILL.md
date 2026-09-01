@@ -45,7 +45,7 @@ Live `--help` ships:
 - `pane resize [--current | --pane <id>] --cols N --rows N`
 - `pane focus [--current | --pane <id>]`
 - `pane neighbor [--current | --pane <id>] --direction left|right|up|down --cols N --rows N`
-- `agent start|prompt|wait|get|read|focus|send-keys|report`
+- `agent start <name> [--pane <id> | --current] [--timeout MS] -- <argv>` / `prompt|wait|get|read|focus|send-keys|report`
 - `agent report [--current | --pane <id>] --state working|blocked|idle`
 - `flow -- <args>`
 - `tree`
@@ -198,7 +198,7 @@ To target the calling pane, pass `--current`. Do not omit the target.
 
 ## Occupant
 
-Layout stays a pane verb. Occupant start never creates, splits, or moves a pane. Two occupants = `pane split` (parse `.result.pane.id`) then `agent start --pane <id> -- <argv>`.
+Layout stays a pane verb. Occupant start never creates, splits, or moves a pane. Two occupants = `pane split` (parse `.result.pane.id`) then `agent start --pane <id> -- <argv>`. Keep `dory agent start <name> --pane <id>` after split. Exactly one of `--pane <id>` or `--current`. Both / neither / extra (including `--kind`) → usage 2. Mutating: `DORY_ENV=1`. `--current` reads injected `DORY_PANE_ID` (exit 1 outside env / empty / invalid). `--` + argv still required. `--current` occupies the **calling** pane. After split, start the sibling with `--pane <id-from-split>`, not `--current`. JSON stays land `{"op":"agent.start",…,"pane":"<id>"}`. No `agent.list`. No `--kind`. This is Dory start-current, not implicit focused start and not a PATH farm.
 
 Name: `[a-z][a-z0-9_-]{0,31}`, unique among live occupants. No `--kind`. Coding occupants start as argv after `--`, never `--kind`.
 
@@ -212,6 +212,7 @@ That self-report is how `wait` leaves `unknown`.
 
 ```bash
 dory agent start <name> --pane <id-from-split> -- <argv>
+dory agent start cook --current -- omp
 dory agent prompt <name> --wait -- <text>
 dory agent wait <name>
 dory agent get <name>
