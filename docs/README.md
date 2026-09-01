@@ -141,6 +141,15 @@ Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `mai
 | Occupant `tab create --current` `a58db64` | `git show HEAD:rust/src/main.rs` |
 | Skill tab create `--current` `a60a968` | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant workspace get --current
+
+Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs` is not the owner. Land RPC stays `workspace.get` with `workspace`. Positional `<id>` stays inspect (no env). `--current` fills `DORY_WORKSPACE_ID` after `DORY_ENV=1`. This is Dory get-current, not implicit focused get. Do not claim a new get RPC. Do not claim `tab.get`. Do not claim `pane.zoom`.
+
+| Landing | Owner |
+|---|---|
+| Occupant `workspace get --current` `f1b1008` | `git show HEAD:rust/src/main.rs` |
+| Skill workspace get `--current` `ce56706` | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
