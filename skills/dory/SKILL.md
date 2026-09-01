@@ -44,6 +44,7 @@ Live `--help` ships:
 - `pane split|run|read|wait-output`
 - `pane resize [--current | --pane <id>] --cols N --rows N`
 - `pane focus [--current | --pane <id>]`
+- `pane neighbor [--current | --pane <id>] --direction left|right|up|down --cols N --rows N`
 - `agent start|prompt|wait|get|read|focus|send-keys|report`
 - `agent report [--current | --pane <id>] --state working|blocked|idle`
 - `flow -- <args>`
@@ -92,7 +93,7 @@ Occupants inspect with:
 dory pane current --current
 ```
 
-or `--pane <id>`. Omit target → usage 2. Same land RPC as `pane get`: `pane.get`. Keep `dory pane get`. This is an id target, not extra Herdr inspect flags. No `pane.zoom`. No `pane.neighbor`. No `--kind`.
+or `--pane <id>`. Omit target → usage 2. Same land RPC as `pane get`: `pane.get`. Keep `dory pane get`. This is an id target, not extra Herdr inspect flags. No `pane.zoom`. No `--kind`. There is no `pane.neighbor` RPC; the occupant verb is `dory pane neighbor` wrapping `desk.neighbor`.
 
 Occupants read the live roster with
 
@@ -139,7 +140,15 @@ Occupants focus with:
 dory pane focus --current
 ```
 
-or `--pane <id>`. Omit target → usage 2. Land RPC is `pane.focus`. This is an id target, not Herdr `pane focus --direction left|right|up|down`. Keep `agent focus <name>` as a different verb. No `pane.zoom`. No `pane.neighbor`.
+or `--pane <id>`. Omit target → usage 2. Land RPC is `pane.focus`. This is an id target, not Herdr `pane focus --direction left|right|up|down`. Keep `agent focus <name>` as a different verb. No `pane.zoom`. There is no `pane.neighbor` RPC; the occupant verb is `dory pane neighbor` wrapping `desk.neighbor`.
+
+Occupants walk to a spatial neighbor with
+
+```bash
+dory pane neighbor --current --direction left --cols N --rows N
+```
+
+or `--pane <id>`. Omit target / omit `--direction` / `--cols` / `--rows` / extra flags including Herdr `--amount` → usage 2. Parse `.result.pane.id`. Land RPC is `desk.neighbor` with `from`, `step`, `cols`, `rows`. This is Dory neighbor, not Herdr `pane focus --direction`. Keep `dory pane focus` as id-only. No `pane.zoom`. No `--kind`.
 
 ```bash
 dory tab create --workspace "$DORY_WORKSPACE_ID"
