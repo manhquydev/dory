@@ -39,7 +39,7 @@ Usage:
   dory pane wait-output [--current | --pane <id>] [--match LIT | --regex RE] [--timeout MS]
   dory pane resize [--current | --pane <id>] --cols N --rows N
   dory pane focus [--current | --pane <id>]
-  dory pane neighbor [--current | --pane <id>] --direction left|right|up|down --cols N --rows N
+  dory pane neighbor [--current | --pane <id>] --direction left|right|up|down|prev|next [--cols N --rows N]
   dory pane layout [--tab <id> | --current] --cols N --rows N
   dory pane divider [--a <id> | --current] --b <id> --ratio F
   dory agent start <name> [--pane <id> | --current] [--timeout MS] -- <argv>
@@ -924,7 +924,7 @@ fn pane_focus_cmd(args: &[String]) -> i32 {
 
 fn pane_neighbor_cmd(args: &[String]) -> i32 {
     const USAGE_NEIGHBOR: &str =
-        "dory: usage: dory pane neighbor [--current | --pane <id>] --direction left|right|up|down --cols N --rows N";
+        "dory: usage: dory pane neighbor [--current | --pane <id>] --direction left|right|up|down|prev|next [--cols N --rows N]";
     let mut direction: Option<&str> = None;
     let mut cols: Option<u16> = None;
     let mut rows: Option<u16> = None;
@@ -1020,6 +1020,20 @@ fn pane_neighbor_cmd(args: &[String]) -> i32 {
         eprintln!("{USAGE_NEIGHBOR}");
         return 2;
     };
+    if step == "prev" || step == "next" {
+        if cols.is_some() || rows.is_some() {
+            eprintln!("{USAGE_NEIGHBOR}");
+            return 2;
+        }
+        let target = match pane_target(args, USAGE_NEIGHBOR) {
+            Ok(id) => id,
+            Err(code) => return code,
+        };
+        return print_rpc(&format!(
+            r#"{{"op":"desk.neighbor","from":{},"step":"{step}"}}"#,
+            envelope::json_string(&target)
+        ));
+    }
     if step != "left" && step != "right" && step != "up" && step != "down" {
         eprintln!("{USAGE_NEIGHBOR}");
         return 2;
@@ -1456,6 +1470,14 @@ mod tests {
         assert_eq!(dispatch(&args(&["flow", "--"])), 1);
         assert_eq!(dispatch(&args(&["flow", "--", "status"])), 1);
         assert_eq!(dispatch(&args(&["pane", "get", "--current"])), 1);
+        assert_eq!(
+            dispatch(&args(&["pane", "neighbor", "--current", "--direction", "next"])),
+            1
+        );
+        assert_eq!(
+            dispatch(&args(&["pane", "neighbor", "--current", "--direction", "prev"])),
+            1
+        );
         assert_eq!(dispatch(&args(&["pane", "list", "--current"])), 1);
         assert_eq!(dispatch(&args(&["tab", "list", "--current"])), 1);
         assert_eq!(dispatch(&args(&["tab", "close", "--current"])), 1);
@@ -1720,6 +1742,97 @@ mod tests {
                 "24",
                 "--label",
                 "x"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "neighbor",
+                "--pane",
+                "w1:p1",
+                "--direction",
+                "foo"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "neighbor",
+                "--pane",
+                "w1:p1",
+                "--direction",
+                "next",
+                "--cols",
+                "80"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "neighbor",
+                "--pane",
+                "w1:p1",
+                "--direction",
+                "prev",
+                "--rows",
+                "24"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "neighbor",
+                "--pane",
+                "w1:p1",
+                "--direction",
+                "next",
+                "--cols",
+                "80",
+                "--rows",
+                "24"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "neighbor",
+                "--pane",
+                "w1:p1",
+                "--direction",
+                "next",
+                "--tab",
+                "w1:t1"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "neighbor",
+                "--pane",
+                "w1:p1",
+                "--direction",
+                "next",
+                "--a",
+                "w1:p1"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "neighbor",
+                "--pane",
+                "w1:p1",
+                "--direction",
+                "next",
+                "--b",
+                "w1:p2"
             ])),
             2
         );
@@ -2121,7 +2234,7 @@ mod tests {
         ));
         assert!(super::USAGE.contains("dory pane focus [--current | --pane <id>]"));
         assert!(super::USAGE.contains(
-            "dory pane neighbor [--current | --pane <id>] --direction left|right|up|down --cols N --rows N"
+            "dory pane neighbor [--current | --pane <id>] --direction left|right|up|down|prev|next [--cols N --rows N]"
         ));
         assert!(super::USAGE.contains(
             "dory pane layout [--tab <id> | --current] --cols N --rows N"
