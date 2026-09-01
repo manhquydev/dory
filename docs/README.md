@@ -47,11 +47,12 @@ Plan `260831-2119-desk-en-chrome-rpc-accept` is paid land. Cite land rust with `
 | English operator chrome (`ec69608`) | `git show HEAD:rust/src/desk.rs` |
 | Park wait RPCs off accept (`d8b8fb2`) | `git show HEAD:rust/src/server.rs` + `git show HEAD:rust/tests/p_accept_wait.rs` |
 
-## Paid Linux CI `p_accept_wait`
+## Paid CI `p_accept_wait`
 
 | Landing | Owner |
 |---|---|
 | Linux CI `p_accept_wait` `e3defcf` | `git show HEAD:.github/workflows/ci.yml` |
+| Darwin CI `p_accept_wait` `16e266b` | `git show HEAD:.github/workflows/ci.yml` |
 
 ## Paid `wait_dead` without `/proc`
 
