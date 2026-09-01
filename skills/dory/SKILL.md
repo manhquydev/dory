@@ -41,7 +41,8 @@ Live `--help` ships:
 - `pane get [--current | --pane <id>]`
 - `pane current [--current | --pane <id>]`
 - `pane close [--current | --pane <id>]`
-- `pane split|run|read|wait-output`
+- `pane split|run|wait-output`
+- `pane read [--current | --pane <id>] [--source visible|recent|recent-unwrapped] [--lines N]`
 - `pane resize [--current | --pane <id>] --cols N --rows N`
 - `pane focus [--current | --pane <id>]`
 - `pane neighbor [--current | --pane <id>] --direction left|right|up|down|prev|next [--cols N --rows N]`
@@ -51,7 +52,7 @@ Live `--help` ships:
 - `agent prompt [<name> | --current | --pane <id>] [--wait] [--timeout MS] [--] <text>`
 - `agent wait [<name> | --current | --pane <id>] [--until idle|done|blocked|working|unknown] [--timeout MS]`
 - `agent get [<name> | --current | --pane <id>]`
-- `agent read [<name> | --current | --pane <id>] [--source visible|recent|recent-unwrapped]`
+- `agent read [<name> | --current | --pane <id>] [--source visible|recent|recent-unwrapped] [--lines N]`
 - `agent focus [<name> | --current | --pane <id>]`
 - `agent send-keys [<name> | --current | --pane <id>] <key>`
 - `agent report [--current | --pane <id>] --state working|blocked|idle`
@@ -237,6 +238,13 @@ dory pane wait-output --current --match "test result" --timeout 120000
 dory pane read --current --source recent-unwrapped
 ```
 
+```bash
+dory pane read --current --source recent-unwrapped --lines 120
+dory pane read --pane <id-from-split> --source recent-unwrapped --lines 120
+```
+
+Keep `dory pane read --pane <id>`. `--lines N` optional, `N >= 1`. Omit → full land snapshot. Missing / `0` / extra (including `--kind` / `--format` / `detection`) → usage 2. Tails the land snapshot (`tail_lines`). Does not fetch more history than land holds. Does not mark seen. JSON adds `"lines":N` only when the flag is set. Land op stays `pane.read`. No `agent.list`. No `pane.zoom`. No `--kind`.
+
 ## Occupant
 
 Layout stays a pane verb. Occupant start never creates, splits, or moves a pane. Two occupants = `pane split` (parse `.result.pane.id`) then `agent start --pane <id> -- <argv>`. Keep `dory agent start <name> --pane <id>` after split. Exactly one of `--pane <id>` or `--current`. Both / neither / extra (including `--kind`) → usage 2. Mutating: `DORY_ENV=1`. `--current` reads injected `DORY_PANE_ID` (exit 1 outside env / empty / invalid). `--` + argv still required. `--current` occupies the **calling** pane. After split, start the sibling with `--pane <id-from-split>`, not `--current`. JSON stays land `{"op":"agent.start",…,"pane":"<id>"}`. No `agent.list`. No `--kind`. This is Dory start-current, not implicit focused start and not a PATH farm.
@@ -266,6 +274,8 @@ dory agent get --pane <id-from-split>
 dory agent read <name> --source recent-unwrapped
 dory agent read --current --source recent-unwrapped
 dory agent read --pane <id-from-split> --source recent-unwrapped
+dory agent read --current --source recent-unwrapped --lines 120
+dory agent read --pane <id-from-split> --source recent-unwrapped --lines 120
 dory agent focus <name>
 dory agent focus --current
 dory agent focus --pane <id-from-split>
@@ -283,7 +293,7 @@ Keep `dory agent get <name>` as inspect (no env). Exactly one of `<name>` or `--
 
 Keep `dory agent wait <name>`. Exactly one of `<name>` or `--current` or `--pane <id>`. Both / neither / extra (including `--kind`) → usage 2. Mutating: `DORY_ENV=1` on every arm. `--current` reads `DORY_PANE_ID`. `--pane <id>` keeps an explicit pane. Keep `<name>`. Named JSON stays land `{"op":"agent.wait","name":"<name>",…}`. Pane arms send `pane` and omit `name`. There is **no** `agent.list` RPC. `--until` / `--timeout` stay as they are. Do not teach a new wait farm. No `--kind`. No `pane.zoom`.
 
-Keep `dory agent read <name>` as inspect (no env). Exactly one of `<name>` or `--current` or `--pane <id>`. Both / neither / extra (including `--kind`) → usage 2. Named and `--pane` stay inspect (no env). `--current` reads `DORY_PANE_ID` and needs `DORY_ENV=1`. Keep `--source visible|recent|recent-unwrapped` (default `recent`). Named JSON stays land `{"op":"agent.read","name":"<name>","source":"…"}`. Pane arms send `pane` and omit `name`. There is **no** `agent.list` RPC. `agent read` does not mark seen. No `--kind`. No `pane.zoom`.
+Keep `dory agent read <name>` as inspect (no env). Exactly one of `<name>` or `--current` or `--pane <id>`. Both / neither / extra (including `--kind`) → usage 2. Named and `--pane` stay inspect (no env). `--current` reads `DORY_PANE_ID` and needs `DORY_ENV=1`. Keep `--source visible|recent|recent-unwrapped` (default `recent`). `--lines N` optional, `N >= 1`. Omit → full land snapshot. Missing / `0` / extra (including `--kind` / `--format` / `detection`) → usage 2. Tails the land snapshot (`tail_lines`). Does not fetch more history than land holds. Does not mark seen. Named JSON stays land `{"op":"agent.read","name":"<name>","source":"…"}`. JSON adds `"lines":N` only when the flag is set. Pane arms send `pane` and omit `name`. There is **no** `agent.list` RPC. `agent read` does not mark seen. No `--kind`. No `pane.zoom`.
 
 Keep `dory agent focus <name>`. Exactly one of `<name>` or `--current` or `--pane <id>`. Both / neither / extra (including `--kind`) → usage 2. Mutating: `DORY_ENV=1` on every arm. `--current` reads `DORY_PANE_ID`. `--pane <id>` keeps an explicit pane. Keep `<name>`. Named JSON stays land `{"op":"agent.focus","name":"<name>"}`. Pane arms send `pane` and omit `name`. There is **no** `agent.list` RPC. Focus marks seen. `agent read` / `pane read` do not. Keep `dory pane focus` as a different verb. No `--kind`. No `pane.zoom`.
 
