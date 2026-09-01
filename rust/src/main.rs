@@ -32,6 +32,7 @@ Usage:
   dory pane list --workspace <id>
   dory pane close [--current | --pane <id>]
   dory pane get [--current | --pane <id>]
+  dory pane current [--current | --pane <id>]
   dory pane split [--current | --pane <id>] [--direction right|down] [--no-focus]
   dory pane run [--current | --pane <id>] <text>
   dory pane read [--current | --pane <id>] [--source visible|recent|recent-unwrapped]
@@ -272,7 +273,7 @@ fn pane_cmd(args: &[String]) -> i32 {
             2
         }
         Some("list") => pane_list_cmd(args),
-        Some("get") => pane_get_cmd(args),
+        Some("get") | Some("current") => pane_get_cmd(args),
         Some("close") => pane_close_cmd(args),
         Some("split") => pane_split_cmd(args),
         Some("run") => pane_run_cmd(args),
@@ -845,6 +846,7 @@ mod tests {
         assert_eq!(dispatch(&args(&["pane", "read"])), 2);
         assert_eq!(dispatch(&args(&["pane", "wait-output", "--match", "x"])), 2);
         assert_eq!(dispatch(&args(&["pane", "get"])), 2);
+        assert_eq!(dispatch(&args(&["pane", "current"])), 2);
         assert_eq!(dispatch(&args(&["pane", "close"])), 2);
         assert_eq!(dispatch(&args(&["workspace", "close"])), 2);
         assert_eq!(dispatch(&args(&["tab", "list"])), 2);
@@ -890,6 +892,7 @@ mod tests {
         assert!(super::USAGE.contains("dory tab list --workspace"));
         assert!(super::USAGE.contains("dory pane list --workspace"));
         assert!(super::USAGE.contains("dory pane get [--current | --pane <id>]"));
+        assert!(super::USAGE.contains("dory pane current [--current | --pane <id>]"));
         assert!(super::USAGE.contains("dory pane run"));
         assert!(super::USAGE.contains("dory pane read"));
         assert!(super::USAGE.contains("dory pane wait-output"));
