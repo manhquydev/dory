@@ -11,7 +11,7 @@
 - Do not fill `flow/03-prd.md` or walk 04–05 unless a new cook names that hunk.
 - Do not type the GitHub environment name (`npm-publish`) into publish `version`. Semver only (`0.1.2-next.0`).
 - Do not `dry_run=false` until CI `all-checks-passed` is green on that SHA and a dry-run publish on that SHA is green.
-- Do not spawn `ps` or libproc from the desk server. Darwin occupant `done`/`idle` stays unpaid; CI skips those tests.
+- Do not spawn `ps` or libproc from the desk server. Darwin occupant `done`/`idle` stays unpaid; CI still `--skip`s those `/proc` tests. `p_accept_wait` is land CI on Linux and Darwin (`git show HEAD:.github/workflows/ci.yml`).
 - Do not `git remote add origin`. Push `git push https://github.com/manhquydev/dory.git main`.
 - Do not claim `npm i @manhquy/dory` is desk `dory`. Lamp bin is `dory-serve`.
 - Do not bootstrap Node (fnm/nvm/NodeSource/`curl | sh`) from a Dory script. Doctor detects and points at nodejs.org.
