@@ -40,6 +40,7 @@ Usage:
   dory pane resize [--current | --pane <id>] --cols N --rows N
   dory pane focus [--current | --pane <id>]
   dory pane neighbor [--current | --pane <id>] --direction left|right|up|down --cols N --rows N
+  dory pane layout [--tab <id> | --current] --cols N --rows N
   dory agent start <name> [--pane <id> | --current] [--timeout MS] -- <argv>
   dory agent prompt <name> [--wait] [--timeout MS] [--] <text>
   dory agent wait <name> [--until idle|done|blocked|working|unknown] [--timeout MS]
@@ -344,6 +345,7 @@ fn pane_cmd(args: &[String]) -> i32 {
         Some("resize") => pane_resize_cmd(args),
         Some("focus") => pane_focus_cmd(args),
         Some("neighbor") => pane_neighbor_cmd(args),
+        Some("layout") => pane_layout_cmd(args),
         Some(other) => {
             eprintln!("dory: unknown pane subcommand '{other}'");
             2
@@ -1034,6 +1036,150 @@ fn pane_neighbor_cmd(args: &[String]) -> i32 {
     ))
 }
 
+fn pane_layout_cmd(args: &[String]) -> i32 {
+    const USAGE_LAYOUT: &str =
+        "dory: usage: dory pane layout [--tab <id> | --current] --cols N --rows N";
+    let mut tab: Option<&str> = None;
+    let mut current = false;
+    let mut cols: Option<u16> = None;
+    let mut rows: Option<u16> = None;
+    let mut i = 2;
+    while i < args.len() {
+        let a = args[i].as_str();
+        if a == "--current" {
+            if current {
+                eprintln!("{USAGE_LAYOUT}");
+                return 2;
+            }
+            current = true;
+            i += 1;
+            continue;
+        }
+        if a == "--tab" {
+            if tab.is_some() {
+                eprintln!("{USAGE_LAYOUT}");
+                return 2;
+            }
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_LAYOUT}");
+                return 2;
+            };
+            tab = Some(v);
+            i += 2;
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--tab=") {
+            if tab.is_some() {
+                eprintln!("{USAGE_LAYOUT}");
+                return 2;
+            }
+            tab = Some(v);
+            i += 1;
+            continue;
+        }
+        if a == "--cols" {
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_LAYOUT}");
+                return 2;
+            };
+            cols = match v.parse() {
+                Ok(n) => Some(n),
+                Err(_) => {
+                    eprintln!("{USAGE_LAYOUT}");
+                    return 2;
+                }
+            };
+            i += 2;
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--cols=") {
+            cols = match v.parse() {
+                Ok(n) => Some(n),
+                Err(_) => {
+                    eprintln!("{USAGE_LAYOUT}");
+                    return 2;
+                }
+            };
+            i += 1;
+            continue;
+        }
+        if a == "--rows" {
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_LAYOUT}");
+                return 2;
+            };
+            rows = match v.parse() {
+                Ok(n) => Some(n),
+                Err(_) => {
+                    eprintln!("{USAGE_LAYOUT}");
+                    return 2;
+                }
+            };
+            i += 2;
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--rows=") {
+            rows = match v.parse() {
+                Ok(n) => Some(n),
+                Err(_) => {
+                    eprintln!("{USAGE_LAYOUT}");
+                    return 2;
+                }
+            };
+            i += 1;
+            continue;
+        }
+        eprintln!("{USAGE_LAYOUT}");
+        return 2;
+    }
+    let (Some(cols), Some(rows)) = (cols, rows) else {
+        eprintln!("{USAGE_LAYOUT}");
+        return 2;
+    };
+    let id = match (tab, current) {
+        (Some(id), false) => {
+            let Some(id) = json_safe_id(id) else {
+                eprintln!("{USAGE_LAYOUT}");
+                return 2;
+            };
+            id.to_string()
+        }
+        (None, true) => {
+            if let Err(err) = current::require_env() {
+                eprintln!(
+                    "{}",
+                    envelope::runtime_error("I am not running inside a Dory-managed pane")
+                );
+                return current::exit_code(err);
+            }
+            match env::var("DORY_TAB_ID") {
+                Ok(id) if !id.is_empty() => match json_safe_id(&id) {
+                    Some(_) => id,
+                    None => {
+                        eprintln!("{}", envelope::runtime_error("invalid tab id"));
+                        return 1;
+                    }
+                },
+                _ => {
+                    eprintln!(
+                        "{}",
+                        envelope::runtime_error("I am not running inside a Dory-managed pane")
+                    );
+                    return 1;
+                }
+            }
+        }
+        _ => {
+            eprintln!("{USAGE_LAYOUT}");
+            return 2;
+        }
+    };
+    print_rpc(&format!(
+        r#"{{"op":"desk.layout","tab":{},"cols":{cols},"rows":{rows}}}"#,
+        envelope::json_string(&id)
+    ))
+}
+
 fn pane_target(args: &[String], usage: &str) -> Result<String, i32> {
     let id = match current::pane_from_current_flag(args) {
         Ok(id) => id,
@@ -1174,6 +1320,31 @@ mod tests {
                 "--current",
                 "--",
                 "echo"
+            ])),
+            1
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "layout",
+                "--current",
+                "--cols",
+                "80",
+                "--rows",
+                "24"
+            ])),
+            1
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "layout",
+                "--tab",
+                "w1:t1",
+                "--cols",
+                "80",
+                "--rows",
+                "24"
             ])),
             1
         );
@@ -1377,6 +1548,139 @@ mod tests {
             ])),
             2
         );
+        assert_eq!(dispatch(&args(&["pane", "layout"])), 2);
+        assert_eq!(
+            dispatch(&args(&["pane", "layout", "--cols", "80", "--rows", "24"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "layout",
+                "--tab",
+                "w1:t1",
+                "--current",
+                "--cols",
+                "80",
+                "--rows",
+                "24"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "layout",
+                "--current",
+                "--tab",
+                "w1:t1",
+                "--cols",
+                "80",
+                "--rows",
+                "24"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["pane", "layout", "--tab", "w1:t1"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "layout",
+                "--tab",
+                "w1:t1",
+                "--cols",
+                "80"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "layout",
+                "--tab",
+                "w1:t1",
+                "--rows",
+                "24"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "layout",
+                "--tab",
+                "w1:t1",
+                "--cols",
+                "80",
+                "--rows",
+                "24",
+                "--kind"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "layout",
+                "--tab",
+                "w1:t1",
+                "--cols",
+                "80",
+                "--rows",
+                "24",
+                "--direction",
+                "left"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "layout",
+                "--tab",
+                "w1:t1",
+                "--cols",
+                "80",
+                "--rows",
+                "24",
+                "--amount",
+                "1"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "layout",
+                "--tab",
+                "w1:t1",
+                "--cols",
+                "80",
+                "--rows",
+                "24",
+                "--pane",
+                "w1:p1"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "layout",
+                "--tab",
+                "w1:t1",
+                "--cols",
+                "80",
+                "--rows",
+                "24",
+                "--workspace",
+                "w1"
+            ])),
+            2
+        );
         assert_eq!(dispatch(&args(&["workspace", "create", "--cwd"])), 2);
         assert_eq!(
             dispatch(&args(&["tab", "create", "--workspace", "w1", "--cwd"])),
@@ -1493,6 +1797,9 @@ mod tests {
         assert!(super::USAGE.contains("dory pane focus [--current | --pane <id>]"));
         assert!(super::USAGE.contains(
             "dory pane neighbor [--current | --pane <id>] --direction left|right|up|down --cols N --rows N"
+        ));
+        assert!(super::USAGE.contains(
+            "dory pane layout [--tab <id> | --current] --cols N --rows N"
         ));
         assert!(super::USAGE.contains("dory pane"));
         assert!(super::USAGE.contains("dory pane close"));
