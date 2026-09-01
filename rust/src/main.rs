@@ -41,6 +41,7 @@ Usage:
   dory pane focus [--current | --pane <id>]
   dory pane neighbor [--current | --pane <id>] --direction left|right|up|down --cols N --rows N
   dory pane layout [--tab <id> | --current] --cols N --rows N
+  dory pane divider [--a <id> | --current] --b <id> --ratio F
   dory agent start <name> [--pane <id> | --current] [--timeout MS] -- <argv>
   dory agent prompt <name> [--wait] [--timeout MS] [--] <text>
   dory agent wait <name> [--until idle|done|blocked|working|unknown] [--timeout MS]
@@ -346,6 +347,7 @@ fn pane_cmd(args: &[String]) -> i32 {
         Some("focus") => pane_focus_cmd(args),
         Some("neighbor") => pane_neighbor_cmd(args),
         Some("layout") => pane_layout_cmd(args),
+        Some("divider") => pane_divider_cmd(args),
         Some(other) => {
             eprintln!("dory: unknown pane subcommand '{other}'");
             2
@@ -1180,6 +1182,154 @@ fn pane_layout_cmd(args: &[String]) -> i32 {
     ))
 }
 
+fn pane_divider_cmd(args: &[String]) -> i32 {
+    const USAGE_DIVIDER: &str =
+        "dory: usage: dory pane divider [--a <id> | --current] --b <id> --ratio F";
+    let mut a: Option<&str> = None;
+    let mut b: Option<&str> = None;
+    let mut current = false;
+    let mut ratio: Option<f32> = None;
+    let mut i = 2;
+    while i < args.len() {
+        let arg = args[i].as_str();
+        if arg == "--current" {
+            if current {
+                eprintln!("{USAGE_DIVIDER}");
+                return 2;
+            }
+            current = true;
+            i += 1;
+            continue;
+        }
+        if arg == "--a" {
+            if a.is_some() {
+                eprintln!("{USAGE_DIVIDER}");
+                return 2;
+            }
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_DIVIDER}");
+                return 2;
+            };
+            a = Some(v);
+            i += 2;
+            continue;
+        }
+        if let Some(v) = arg.strip_prefix("--a=") {
+            if a.is_some() {
+                eprintln!("{USAGE_DIVIDER}");
+                return 2;
+            }
+            a = Some(v);
+            i += 1;
+            continue;
+        }
+        if arg == "--b" {
+            if b.is_some() {
+                eprintln!("{USAGE_DIVIDER}");
+                return 2;
+            }
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_DIVIDER}");
+                return 2;
+            };
+            b = Some(v);
+            i += 2;
+            continue;
+        }
+        if let Some(v) = arg.strip_prefix("--b=") {
+            if b.is_some() {
+                eprintln!("{USAGE_DIVIDER}");
+                return 2;
+            }
+            b = Some(v);
+            i += 1;
+            continue;
+        }
+        if arg == "--ratio" {
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_DIVIDER}");
+                return 2;
+            };
+            ratio = match v.parse() {
+                Ok(n) => Some(n),
+                Err(_) => {
+                    eprintln!("{USAGE_DIVIDER}");
+                    return 2;
+                }
+            };
+            i += 2;
+            continue;
+        }
+        if let Some(v) = arg.strip_prefix("--ratio=") {
+            ratio = match v.parse() {
+                Ok(n) => Some(n),
+                Err(_) => {
+                    eprintln!("{USAGE_DIVIDER}");
+                    return 2;
+                }
+            };
+            i += 1;
+            continue;
+        }
+        eprintln!("{USAGE_DIVIDER}");
+        return 2;
+    }
+    let (Some(b), Some(ratio)) = (b, ratio) else {
+        eprintln!("{USAGE_DIVIDER}");
+        return 2;
+    };
+    let Some(b) = json_safe_id(b) else {
+        eprintln!("{USAGE_DIVIDER}");
+        return 2;
+    };
+    let a_id = match (a, current) {
+        (Some(id), false) => {
+            let Some(id) = json_safe_id(id) else {
+                eprintln!("{USAGE_DIVIDER}");
+                return 2;
+            };
+            id.to_string()
+        }
+        (None, true) => {
+            if let Err(err) = current::require_env() {
+                eprintln!(
+                    "{}",
+                    envelope::runtime_error("I am not running inside a Dory-managed pane")
+                );
+                return current::exit_code(err);
+            }
+            match env::var("DORY_PANE_ID") {
+                Ok(id) if !id.is_empty() => match json_safe_id(&id) {
+                    Some(_) => id,
+                    None => {
+                        eprintln!("{}", envelope::runtime_error("invalid pane id"));
+                        return 1;
+                    }
+                },
+                _ => {
+                    eprintln!(
+                        "{}",
+                        envelope::runtime_error("I am not running inside a Dory-managed pane")
+                    );
+                    return 1;
+                }
+            }
+        }
+        _ => {
+            eprintln!("{USAGE_DIVIDER}");
+            return 2;
+        }
+    };
+    if let Err(code) = require_skill_env() {
+        return code;
+    }
+    print_rpc(&format!(
+        r#"{{"op":"desk.divider","a":{},"b":{},"ratio":{ratio}}}"#,
+        envelope::json_string(&a_id),
+        envelope::json_string(b)
+    ))
+}
+
 fn pane_target(args: &[String], usage: &str) -> Result<String, i32> {
     let id = match current::pane_from_current_flag(args) {
         Ok(id) => id,
@@ -1357,6 +1507,31 @@ mod tests {
                 "w1:p1",
                 "--",
                 "echo"
+            ])),
+            1
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "divider",
+                "--current",
+                "--b",
+                "w1:p2",
+                "--ratio",
+                "0.5"
+            ])),
+            1
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "divider",
+                "--a",
+                "w1:p1",
+                "--b",
+                "w1:p2",
+                "--ratio",
+                "0.5"
             ])),
             1
         );
@@ -1681,6 +1856,156 @@ mod tests {
             ])),
             2
         );
+        assert_eq!(dispatch(&args(&["pane", "divider"])), 2);
+        assert_eq!(
+            dispatch(&args(&["pane", "divider", "--b", "w1:p2", "--ratio", "0.5"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "divider",
+                "--a",
+                "w1:p1",
+                "--current",
+                "--b",
+                "w1:p2",
+                "--ratio",
+                "0.5"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "divider",
+                "--current",
+                "--a",
+                "w1:p1",
+                "--b",
+                "w1:p2",
+                "--ratio",
+                "0.5"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "divider",
+                "--a",
+                "w1:p1",
+                "--ratio",
+                "0.5"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["pane", "divider", "--a", "w1:p1", "--b", "w1:p2"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "divider",
+                "--a",
+                "w1:p1",
+                "--b",
+                "w1:p2",
+                "--ratio",
+                "x"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "divider",
+                "--a",
+                "w1:p1",
+                "--b",
+                "w1:p2",
+                "--ratio",
+                "0.5",
+                "--kind"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "divider",
+                "--a",
+                "w1:p1",
+                "--b",
+                "w1:p2",
+                "--ratio",
+                "0.5",
+                "--direction",
+                "left"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "divider",
+                "--a",
+                "w1:p1",
+                "--b",
+                "w1:p2",
+                "--ratio",
+                "0.5",
+                "--amount",
+                "1"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "divider",
+                "--a",
+                "w1:p1",
+                "--b",
+                "w1:p2",
+                "--ratio",
+                "0.5",
+                "--cols",
+                "80"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "divider",
+                "--a",
+                "w1:p1",
+                "--b",
+                "w1:p2",
+                "--ratio",
+                "0.5",
+                "--rows",
+                "24"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "divider",
+                "--a",
+                "w1:p1",
+                "--b",
+                "w1:p2",
+                "--ratio",
+                "0.5",
+                "--tab",
+                "w1:t1"
+            ])),
+            2
+        );
         assert_eq!(dispatch(&args(&["workspace", "create", "--cwd"])), 2);
         assert_eq!(
             dispatch(&args(&["tab", "create", "--workspace", "w1", "--cwd"])),
@@ -1801,6 +2126,10 @@ mod tests {
         assert!(super::USAGE.contains(
             "dory pane layout [--tab <id> | --current] --cols N --rows N"
         ));
+        assert!(super::USAGE.contains(
+            "dory pane divider [--a <id> | --current] --b <id> --ratio F"
+        ));
+        assert!(super::USAGE.contains("--current"));
         assert!(super::USAGE.contains("dory pane"));
         assert!(super::USAGE.contains("dory pane close"));
         assert!(super::USAGE.contains("dory workspace close [<id> | --current]"));
