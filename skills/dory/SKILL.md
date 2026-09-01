@@ -35,8 +35,8 @@ A group with no subcommand prints usage and exits 2. That is discovery. Do not i
 
 Live `--help` ships:
 
-- `workspace create` / `list` / `get <id>` / `close <id>`
-- `tab create --workspace <id>` / `list --workspace <id>` / `close <id>`
+- `workspace create [--cwd <path>]` / `list` / `get <id>` / `close <id>`
+- `tab create --workspace <id> [--cwd <path>]` / `list --workspace <id>` / `close <id>`
 - `pane list --workspace <id>`
 - `pane get [--current | --pane <id>]`
 - `pane close [--current | --pane <id>]`
@@ -88,7 +88,7 @@ Create a workspace or tab only when the user asked for that topology. Create doe
 
 ## Layout
 
-Honor a requested `--direction`. Otherwise omit it: a wide pane splits right, a tall/narrow pane splits down. New panes inherit the caller cwd. There is no `--cwd` flag. Humans sitting at the desk see the new pane tiled on the same face; occupants already inside a pane still use these CLI verbs and do not re-attach.
+Honor a requested `--direction`. Otherwise omit it: a wide pane splits right, a tall/narrow pane splits down. New panes inherit the caller cwd. Pane split still has no `--cwd`. Humans sitting at the desk see the new pane tiled on the same face; occupants already inside a pane still use these CLI verbs and do not re-attach.
 
 Default: sibling in the current tab, keep user focus:
 
@@ -97,6 +97,15 @@ dory pane split --current --direction right --no-focus
 ```
 
 Replace `right` with `down` when appropriate. Read the new pane from `.result.pane.id`.
+
+Occupants may pin cwd only on create:
+
+```bash
+dory workspace create --cwd /abs/path
+dory tab create --workspace "$DORY_WORKSPACE_ID" --cwd /abs/path
+```
+
+Omit `--cwd` → land uses focused-pane cwd / desk cwd (`spawn_cwd`). This is Dory create-cwd (land `cwd` field), not Herdr `--label` / `--no-focus` on create. No `--kind`.
 
 Occupants resize with:
 
