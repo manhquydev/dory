@@ -168,6 +168,15 @@ Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `mai
 | Occupant `pane layout` `b994985` | `git show HEAD:rust/src/main.rs` |
 | Skill pane layout `cc8733f` | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant pane divider
+
+Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs` is not the owner. Land RPC stays `desk.divider` with `a` + `b` + `ratio`. Occupant verb wraps `desk.divider`. There is no `pane.divider` RPC. `--a` inspects an id after `DORY_ENV=1`. `--current` fills `DORY_PANE_ID` for the first pane. Keep `--b` and `--ratio`. Do not claim `pane.zoom`. Do not claim `--direction` / `--amount`.
+
+| Landing | Owner |
+|---|---|
+| Occupant `pane divider` `018ebd6` | `git show HEAD:rust/src/main.rs` |
+| Skill pane divider `69fe3c9` | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
