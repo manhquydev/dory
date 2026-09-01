@@ -15,7 +15,7 @@ const USAGE_WAIT: &str =
 const USAGE_GET: &str =
     "dory: usage: dory agent get [<name> | --current | --pane <id>]";
 const USAGE_READ: &str =
-    "dory: usage: dory agent read <name> [--source visible|recent|recent-unwrapped]";
+    "dory: usage: dory agent read [<name> | --current | --pane <id>] [--source visible|recent|recent-unwrapped]";
 const USAGE_FOCUS: &str = "dory: usage: dory agent focus <name>";
 const USAGE_KEYS: &str = "dory: usage: dory agent send-keys <name> <key>";
 const USAGE_REPORT: &str =
@@ -668,7 +668,17 @@ fn get_cmd(args: &[String]) -> i32 {
 }
 
 fn read_cmd(args: &[String]) -> i32 {
+    if args
+        .iter()
+        .any(|a| a == "--kind" || a.starts_with("--kind="))
+    {
+        eprintln!("{USAGE_READ}");
+        return 2;
+    }
+
     let mut name: Option<&str> = None;
+    let mut pane: Option<&str> = None;
+    let mut current = false;
     let mut source = "recent";
     let mut i = 2;
     while i < args.len() {
@@ -687,6 +697,29 @@ fn read_cmd(args: &[String]) -> i32 {
             i += 1;
             continue;
         }
+        if a == "--pane" {
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_READ}");
+                return 2;
+            };
+            pane = Some(v);
+            i += 2;
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--pane=") {
+            pane = Some(v);
+            i += 1;
+            continue;
+        }
+        if a == "--current" {
+            if current {
+                eprintln!("{USAGE_READ}");
+                return 2;
+            }
+            current = true;
+            i += 1;
+            continue;
+        }
         if a.starts_with("--") {
             eprintln!("dory: unknown agent read flag '{a}'");
             return 2;
@@ -702,14 +735,60 @@ fn read_cmd(args: &[String]) -> i32 {
         eprintln!("{USAGE_READ}");
         return 2;
     }
-    let Some(name) = name.filter(|n| json_safe_token(n)) else {
-        eprintln!("{USAGE_READ}");
-        return 2;
-    };
-    print_rpc(&format!(
-        r#"{{"op":"agent.read","name":{},"source":"{source}"}}"#,
-        envelope::json_string(name)
-    ))
+
+    match (name, pane, current) {
+        (Some(n), None, false) => {
+            if !json_safe_token(n) {
+                eprintln!("{USAGE_READ}");
+                return 2;
+            }
+            print_rpc(&format!(
+                r#"{{"op":"agent.read","name":{},"source":"{source}"}}"#,
+                envelope::json_string(n)
+            ))
+        }
+        (None, Some(id), false) => {
+            let Some(id) = json_safe_id(id) else {
+                eprintln!("{}", envelope::runtime_error("invalid pane id"));
+                return 1;
+            };
+            print_rpc(&format!(
+                r#"{{"op":"agent.read","pane":"{id}","source":"{source}"}}"#
+            ))
+        }
+        (None, None, true) => {
+            let pane = match current::pane_from_current_flag(args) {
+                Ok(id) => match json_safe_id(&id) {
+                    Some(_) => id,
+                    None => {
+                        eprintln!("{}", envelope::runtime_error("invalid pane id"));
+                        return 1;
+                    }
+                },
+                Err(err) => {
+                    match err {
+                        current::TargetError::OutsideEnv => {
+                            eprintln!(
+                                "{}",
+                                envelope::runtime_error(
+                                    "I am not running inside a Dory-managed pane"
+                                )
+                            );
+                        }
+                        current::TargetError::OmitTarget => eprintln!("{USAGE_READ}"),
+                    }
+                    return current::exit_code(err);
+                }
+            };
+            print_rpc(&format!(
+                r#"{{"op":"agent.read","pane":"{pane}","source":"{source}"}}"#
+            ))
+        }
+        _ => {
+            eprintln!("{USAGE_READ}");
+            2
+        }
+    }
 }
 
 fn focus_cmd(args: &[String]) -> i32 {
@@ -1066,5 +1145,37 @@ mod tests {
             cmd(&args(&["agent", "wait", "alice", "--until", "idle"])),
             1
         );
+    }
+
+    #[test]
+    fn read_usage_names_current() {
+        assert!(USAGE_READ.contains("[<name> | --current | --pane <id>]"));
+        assert!(USAGE_READ.contains("--current"));
+        assert!(USAGE_READ.contains("--pane"));
+        assert!(!USAGE_READ.contains("--kind"));
+    }
+
+    #[test]
+    fn read_neither_both_kind_extra_is_usage() {
+        assert_eq!(cmd(&args(&["agent", "read"])), 2);
+        assert_eq!(
+            cmd(&args(&["agent", "read", "alice", "--current"])),
+            2
+        );
+        assert_eq!(
+            cmd(&args(&["agent", "read", "--pane", "w1:p1", "--current"])),
+            2
+        );
+        assert_eq!(cmd(&args(&["agent", "read", "--kind"])), 2);
+        assert_eq!(cmd(&args(&["agent", "read", "alice", "extra"])), 2);
+        assert_eq!(
+            cmd(&args(&["agent", "read", "alice", "--source", "nope"])),
+            2
+        );
+    }
+
+    #[test]
+    fn read_current_without_env_is_runtime_error() {
+        assert_eq!(cmd(&args(&["agent", "read", "--current"])), 1);
     }
 }
