@@ -1085,13 +1085,14 @@ fn workspace_object(ws: &Workspace, focused: &str) -> String {
             out.push(',');
         }
         out.push_str(&format!(
-            "{{\"id\":\"{}\",\"root_pane\":{{\"id\":\"{}\"}},\"occupant\":{}}}",
+            "{{\"id\":\"{}\",\"root_pane\":{{\"id\":\"{}\"}},\"occupant\":{},\"focused\":{}}}",
             tab.id,
             tab.root_pane,
             tab.panes
                 .first()
                 .map(pane_occupant_json)
-                .unwrap_or_else(|| "null".to_string())
+                .unwrap_or_else(|| "null".to_string()),
+            tab.panes.iter().any(|pane| pane.id == focused)
         ));
     }
     out.push_str("]}");
@@ -3153,7 +3154,10 @@ mod tests {
         assert!(get_body.contains("\"pane_count\":"), "{get_body}");
         assert!(get_body.contains("\"tab_count\":1"), "{get_body}");
         assert!(get_body.contains("\"pane_count\":1"), "{get_body}");
-        assert!(get_body.contains("\"focused\":"), "{get_body}");
+        assert!(
+            get_body.matches("\"focused\":").count() >= 2,
+            "{get_body}"
+        );
 
         let tab_out = cli(&xdg, &sock, true, &["tab", "create", "--workspace", &ws]);
         assert!(
@@ -3167,6 +3171,14 @@ mod tests {
         assert_ne!(new_tab, tab);
         assert!(tab_body.contains("\"occupant\":null"), "{tab_body}");
         assert!(new_pane.contains(":p"), "{new_pane}");
+
+        let got2 = cli(&xdg, &sock, true, &["workspace", "get", &ws]);
+        assert!(got2.status.success());
+        let get_body2 = String::from_utf8_lossy(&got2.stdout);
+        assert!(
+            get_body2.matches("\"focused\":").count() >= 3,
+            "{get_body2}"
+        );
 
         let closed = cli(&xdg, &sock, true, &["tab", "close", &new_tab]);
         assert!(
