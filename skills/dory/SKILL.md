@@ -142,6 +142,8 @@ dory tree
 
 Parse `.result.focused` and `.result.items[]`. Each item has `k` = `w` | `t` | `p`. Workspace rows may include `cwd` (`world.cwd`). Pane rows (`k=p`) may include `occ` (name), `st` (five words), and `cwd` via land `proc_cwd` (`/proc/{pid}/cwd` with `world.cwd` fallback). Keep `dory pane get` / `dory pane list` for `pid`. Extra args → usage 2. Land RPC is `desk.tree`. This is Dory tree feel for Herdr roster cwd, not `agent list` and not `pane.process-info`. No `--format`. No `--kind`. No `pane.zoom`.
 
+Keep `dory tree`. Parse `.result.items[].focused`. Land item `focused` is JSON boolean: pane row is `pane.id == world.focused`; tab row is that tab contains that pane; workspace row is that workspace contains that pane. Keep root `.result.focused` as the pane-id string. Do not parse root `focused` as boolean. Keep pane `occ` / `st` / `cwd`. Keep workspace `cwd`. No `pid` on tree rows. USAGE stays `dory tree`. Land RPC is `desk.tree`. No `agent.list`. No `pane.process-info`. No `focused` on `pane.get`. No new RPC. This is Dory tree item focused wrapping land `desk.tree`, not `agent.list` and not `pane.process-info`.
+
 Create a workspace or tab only when the user asked for that topology. Create does not start an occupant.
 
 ## Layout
