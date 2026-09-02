@@ -124,6 +124,8 @@ Keep `dory pane list [--workspace <id> | --current]`. Exactly one of `--workspac
 
 Keep `dory tab list [--workspace <id> | --current]`. Exactly one of `--workspace <id>` or `--current`. Both / neither / extra (including Herdr `--label` / `--kind` / `--format`) → usage 2. `--workspace <id>` is inspect (no env). `--current` requires `DORY_ENV=1` and reads `DORY_WORKSPACE_ID` (exit 1 outside env). JSON stays land `{"op":"tab.list","workspace":"<id>"}`. Parse `.result.tabs[].id`, `.result.tabs[].occupant`, `.result.tabs[].pane_count`. Land `pane_count` is `tab.panes.len()` as a JSON number. Keep first-pane `occupant` (`null` or object). Keep `dory pane list` / `dory tree` as they are. No `tab.get`. No `--label`. No `--format`. No `--kind`. No `pane.zoom`. This is Dory tab-list feel for Herdr `tab list` pane_count, not `tab.get` and not `--label`.
 
+Keep `dory tab list [--workspace <id> | --current]`. Parse `.result.tabs[].focused`. Land `focused` is JSON boolean: tab contains the pane whose id is `world.focused`. Keep `.result.tabs[].id` / `.result.tabs[].occupant` / `.result.tabs[].pane_count`. USAGE stays `dory tab list [--workspace <id> | --current]`. JSON stays land `{"op":"tab.list","workspace":"<id>"}`. No `tab.get`. No `--label`. No `tab.focus`. No new RPC. This is a field on `tab.list`, not implicit focused list (`--current` still required to omit `--workspace`).
+
 Occupants read the live roster with
 
 ```bash
