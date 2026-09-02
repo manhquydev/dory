@@ -414,6 +414,15 @@ Cite land with `git show HEAD:.github/workflows/ci.yml`. Darwin GHA rust-desk wr
 |---|---|
 | Darwin CI `XDG_RUNTIME_DIR` `85d87d4` | `git show HEAD:.github/workflows/ci.yml` |
 
+## Paid occupant tree workspace pane_count
+
+Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `desk.tree`. Occupant parse workspace-row `.pane_count`. Land `pane_count` is sum of `tab.panes.len()` as a JSON number. Root `.result.focused` stays the pane-id string. Keep item `focused`. Keep pane `cwd` / `occ` / `st`. Keep workspace `cwd`. Keep tab `pane_count`. No `pid` on tree rows. There is no new RPC. There is no `agent.list`. CLI USAGE stays `dory tree`. Do not add `focused` on `pane.get`. No `tab.get`. Do not add workspace tree `tab_count`. Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
+
+| Landing | Owner |
+|---|---|
+| Occupant tree workspace pane_count | `git show HEAD:rust/src/server.rs` |
+| Skill tree workspace pane_count | `git show HEAD:skills/dory/SKILL.md` (`2e39122`) |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
