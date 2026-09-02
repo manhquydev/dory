@@ -313,6 +313,15 @@ Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server
 | Occupant `pane get` pid/cwd | `git show HEAD:rust/src/server.rs` |
 | Skill pane get pid/cwd | `git show HEAD:skills/dory/SKILL.md` (`cc99a27`) |
 
+## Paid occupant pane list pid cwd
+
+Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `pane.list`. Occupant parse `.result.panes[].pid` and `.result.panes[].cwd`. cwd via existing `proc_cwd` (`/proc/{pid}/cwd` with `world.cwd` fallback). There is no new RPC. There is no `pane.process-info`. CLI USAGE stays `dory pane list [--workspace <id> | --current]`. Keep `dory tree` for the live occupant roster. Keep `dory pane get` for a single pane. Do not claim argv / cmdline / foreground. No `--format`. No `--kind`. There is no `agent.list` RPC. Do not claim `pane.zoom`.
+
+| Landing | Owner |
+|---|---|
+| Occupant `pane list` pid/cwd | `git show HEAD:rust/src/server.rs` |
+| Skill pane list pid/cwd | `git show HEAD:skills/dory/SKILL.md` (`a29b752`) |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
