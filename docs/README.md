@@ -286,6 +286,15 @@ Cite land with `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs`
 | Occupant `pane send-text` | `git show HEAD:rust/src/main.rs` |
 | Skill pane send-text | `git show HEAD:skills/dory/SKILL.md` (`68f0c25`) |
 
+## Paid occupant pane wait-output --source --lines
+
+Cite land with `git show HEAD:rust/src/main.rs` + `git show HEAD:rust/src/server.rs`. Working-tree leftover `main.rs` / `server.rs` are not the owner. Land wrap stays `pane.wait`. Occupant optional `--source visible|recent|recent-unwrapped` and `--lines N`. Omit source → land still matches `recent_unwrapped` (not `pane read` default `recent`). `--lines N` tails that snapshot. There is no new wait RPC. There is no `agent.list` RPC. Do not claim `pane.zoom`.
+
+| Landing | Owner |
+|---|---|
+| Occupant `pane wait-output` `--source` `--lines` | `git show HEAD:rust/src/main.rs` + `git show HEAD:rust/src/server.rs` |
+| Skill wait-output `--source` `--lines` | `git show HEAD:skills/dory/SKILL.md` (`fe85855`) |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
