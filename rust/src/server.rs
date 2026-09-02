@@ -669,6 +669,7 @@ fn dispatch_line(world: &mut World, line: &str) -> LineReply {
                 id,
                 json_str_field(line, "direction"),
                 json_bool_field(line, "no_focus").unwrap_or(true),
+                json_f32_field(line, "ratio"),
             ),
             None => envelope::runtime_error("pane id required"),
         }),
@@ -1159,7 +1160,13 @@ fn retarget_focus(world: &mut World, prefer: Option<(usize, usize)>) {
         .unwrap_or_default();
 }
 
-fn split_pane(world: &mut World, pane_id: &str, direction: Option<&str>, no_focus: bool) -> String {
+fn split_pane(
+    world: &mut World,
+    pane_id: &str,
+    direction: Option<&str>,
+    no_focus: bool,
+    ratio: Option<f32>,
+) -> String {
     let Some(loc) = locate_pane(world, pane_id) else {
         return envelope::runtime_error(&format!("unknown pane {pane_id}"));
     };
@@ -1204,12 +1211,24 @@ fn split_pane(world: &mut World, pane_id: &str, direction: Option<&str>, no_focu
         occupant: None,
         held,
     });
+    if let Some(r) = ratio {
+        let tab = &mut world.workspaces[loc.wi].tabs[loc.ti];
+        if !crate::layout::set_ratio(&mut tab.layout, pane_id, &new_id, r) {
+            return envelope::runtime_error("no shared split");
+        }
+    }
     if !no_focus {
         world.focused = new_id.clone();
     }
-    envelope::success(&format!(
-        "{{\"pane\":{{\"id\":\"{new_id}\"}},\"direction\":\"{dir}\",\"occupant\":null}}"
-    ))
+    match ratio {
+        Some(r) => envelope::success(&format!(
+            "{{\"pane\":{{\"id\":\"{new_id}\"}},\"direction\":\"{dir}\",\"occupant\":null,\"ratio\":{}}}",
+            crate::layout::clamp_ratio(r)
+        )),
+        None => envelope::success(&format!(
+            "{{\"pane\":{{\"id\":\"{new_id}\"}},\"direction\":\"{dir}\",\"occupant\":null}}"
+        )),
+    }
 }
 
 fn resize_pane(world: &World, pane_id: &str, cols: u16, rows: u16) -> String {

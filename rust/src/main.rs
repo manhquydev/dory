@@ -33,7 +33,7 @@ Usage:
   dory pane close [--current | --pane <id>]
   dory pane get [--current | --pane <id>]
   dory pane current [--current | --pane <id>]
-  dory pane split [--current | --pane <id>] [--direction right|down] [--no-focus]
+  dory pane split [--current | --pane <id>] [--direction right|down] [--ratio F] [--no-focus]
   dory pane run [--current | --pane <id>] <text>
   dory pane send-keys [--current | --pane <id>] <key>
   dory pane send-text [--current | --pane <id>] <text>
@@ -550,8 +550,9 @@ fn pane_get_cmd(args: &[String]) -> i32 {
 }
 
 fn pane_split_cmd(args: &[String]) -> i32 {
-    const USAGE_SPLIT: &str = "dory: usage: dory pane split [--current | --pane <id>] [--direction right|down] [--no-focus]";
+    const USAGE_SPLIT: &str = "dory: usage: dory pane split [--current | --pane <id>] [--direction right|down] [--ratio F] [--no-focus]";
     let mut direction: Option<&str> = None;
+    let mut ratio: Option<f32> = None;
     let mut i = 2;
     while i < args.len() {
         let a = args[i].as_str();
@@ -585,6 +586,40 @@ fn pane_split_cmd(args: &[String]) -> i32 {
             i += 1;
             continue;
         }
+        if a == "--ratio" {
+            if ratio.is_some() {
+                eprintln!("{USAGE_SPLIT}");
+                return 2;
+            }
+            let Some(v) = args.get(i + 1).map(String::as_str) else {
+                eprintln!("{USAGE_SPLIT}");
+                return 2;
+            };
+            ratio = match v.parse() {
+                Ok(n) => Some(n),
+                Err(_) => {
+                    eprintln!("{USAGE_SPLIT}");
+                    return 2;
+                }
+            };
+            i += 2;
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--ratio=") {
+            if ratio.is_some() {
+                eprintln!("{USAGE_SPLIT}");
+                return 2;
+            }
+            ratio = match v.parse() {
+                Ok(n) => Some(n),
+                Err(_) => {
+                    eprintln!("{USAGE_SPLIT}");
+                    return 2;
+                }
+            };
+            i += 1;
+            continue;
+        }
         eprintln!("dory: unknown pane split flag '{a}'");
         return 2;
     }
@@ -606,6 +641,9 @@ fn pane_split_cmd(args: &[String]) -> i32 {
     let mut line = format!(r#"{{"op":"pane.split","pane":"{target}","no_focus":true"#);
     if let Some(d) = direction {
         line.push_str(&format!(r#","direction":"{d}""#));
+    }
+    if let Some(r) = ratio {
+        line.push_str(&format!(r#","ratio":{r}"#));
     }
     line.push('}');
     print_rpc(&line)
@@ -1739,6 +1777,21 @@ mod tests {
         assert_eq!(dispatch(&args(&["pane", "split", "--current"])), 1);
         assert_eq!(dispatch(&args(&["pane", "split", "--pane", "w1:p1"])), 1);
         assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "split",
+                "--pane",
+                "w1:p1",
+                "--ratio",
+                "0.3"
+            ])),
+            1
+        );
+        assert_eq!(
+            dispatch(&args(&["pane", "split", "--current", "--ratio", "0.3"])),
+            1
+        );
+        assert_eq!(
             dispatch(&args(&["pane", "run", "--pane", "w1:p1", "echo hi"])),
             1
         );
@@ -1892,6 +1945,64 @@ mod tests {
         assert_eq!(dispatch(&args(&["pane", "split"])), 2);
         assert_eq!(
             dispatch(&args(&["pane", "split", "--direction", "right"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["pane", "split", "--pane", "w1:p1", "--ratio"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "split",
+                "--pane",
+                "w1:p1",
+                "--ratio",
+                "x"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "split",
+                "--pane",
+                "w1:p1",
+                "--ratio",
+                "0.3",
+                "--ratio",
+                "0.4"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["pane", "split", "--pane", "w1:p1", "--kind"])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "split",
+                "--pane",
+                "w1:p1",
+                "--cwd",
+                "/tmp"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&[
+                "pane",
+                "split",
+                "--pane",
+                "w1:p1",
+                "--env",
+                "FOO=1"
+            ])),
+            2
+        );
+        assert_eq!(
+            dispatch(&args(&["pane", "split", "--pane", "w1:p1", "--focus"])),
             2
         );
         assert_eq!(dispatch(&args(&["pane", "run", "echo hi"])), 2);
@@ -2767,6 +2878,9 @@ mod tests {
         assert!(super::USAGE.contains("dory pane list [--workspace <id> | --current]"));
         assert!(super::USAGE.contains("dory pane get [--current | --pane <id>]"));
         assert!(super::USAGE.contains("dory pane current [--current | --pane <id>]"));
+        assert!(super::USAGE.contains(
+            "dory pane split [--current | --pane <id>] [--direction right|down] [--ratio F] [--no-focus]"
+        ));
         assert!(super::USAGE.contains("dory pane run"));
         assert!(super::USAGE.contains(
             "dory pane send-keys [--current | --pane <id>] <key>"
