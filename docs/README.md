@@ -406,6 +406,14 @@ Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server
 | Occupant tree tab pane_count | `git show HEAD:rust/src/server.rs` |
 | Skill tree tab pane_count | `git show HEAD:skills/dory/SKILL.md` (`8da9162`) |
 
+## Paid Darwin CI XDG_RUNTIME_DIR
+
+Cite land with `git show HEAD:.github/workflows/ci.yml`. Darwin GHA rust-desk writes `XDG_RUNTIME_DIR=/tmp` beside `TMPDIR=/tmp` so occupant inspect (`--tab` / `--pane` without `--current`) hits a missing sock (exit 1) instead of `MissingRuntimeDir` exit 2. Product still refuses unset XDG with exit 2 (`git show HEAD:rust/src/socket.rs`). Do not claim Darwin occupant `done`/`idle` is paid. Do not claim Darwin `/proc` units run. Do not claim `pane.zoom`.
+
+| Landing | Owner |
+|---|---|
+| Darwin CI `XDG_RUNTIME_DIR` `85d87d4` | `git show HEAD:.github/workflows/ci.yml` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
