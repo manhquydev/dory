@@ -1356,16 +1356,19 @@ fn desk_tree(world: &World) -> String {
                     .as_ref()
                     .map(|o| o.name.as_str())
                     .unwrap_or("");
+                let pid = pane.held.child_pid();
+                let cwd = proc_cwd(pid, &world.cwd);
                 items.push(',');
                 items.push_str(&format!(
-                    "{{\"k\":\"p\",\"id\":{},\"occ\":{},\"st\":{}}}",
+                    "{{\"k\":\"p\",\"id\":{},\"occ\":{},\"st\":{},\"cwd\":{}}}",
                     envelope::json_string(&pane.id),
                     envelope::json_string(occ),
                     envelope::json_string(if pane.occupant.is_some() {
                         word.as_str()
                     } else {
                         ""
-                    })
+                    }),
+                    envelope::json_string(&cwd.to_string_lossy())
                 ));
             }
         }
@@ -3756,6 +3759,25 @@ mod tests {
         );
         assert!(got.contains("\"ok\":true"), "{got}");
         assert!(got.contains("\"cwd\":"), "{got}");
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn desk_tree_pane_includes_cwd() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let tree = rpc_op(&sock, "desk.tree");
+        assert!(tree.contains("\"ok\":true"), "{tree}");
+        let pane_start = tree.find("\"k\":\"p\"").expect("pane row");
+        let pane_obj = &tree[pane_start..];
+        let pane_end = pane_obj.find('}').expect("pane close");
+        assert!(
+            pane_obj[..pane_end].contains("\"cwd\":"),
+            "{tree}"
+        );
         let _ = stop_server(&xdg);
         let _ = server.wait();
         let _ = fs::remove_dir_all(&xdg);
