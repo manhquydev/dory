@@ -144,6 +144,8 @@ Parse `.result.focused` and `.result.items[]`. Each item has `k` = `w` | `t` | `
 
 Keep `dory tree`. Parse `.result.items[].focused`. Land item `focused` is JSON boolean: pane row is `pane.id == world.focused`; tab row is that tab contains that pane; workspace row is that workspace contains that pane. Keep root `.result.focused` as the pane-id string. Do not parse root `focused` as boolean. Keep pane `occ` / `st` / `cwd`. Keep workspace `cwd`. No `pid` on tree rows. USAGE stays `dory tree`. Land RPC is `desk.tree`. No `agent.list`. No `pane.process-info`. No `focused` on `pane.get`. No new RPC. This is Dory tree item focused wrapping land `desk.tree`, not `agent.list` and not `pane.process-info`.
 
+Keep `dory tree`. Parse `.result.items[]` tab rows (`k=t`) `.pane_count`. Land `pane_count` is `tab.panes.len()` as a JSON number. Keep root `.result.focused` as the pane-id string. Keep item `focused`. Keep pane `occ` / `st` / `cwd`. Keep workspace `cwd`. No `pid` on tree rows. USAGE stays `dory tree`. Land RPC is `desk.tree`. No `agent.list`. No `pane.process-info`. No `focused` on `pane.get`. No `tab.get`. No new RPC. Do not add workspace tree `pane_count` this slice. This is Dory tree tab pane_count wrapping land `desk.tree`, not `agent.list` and not `pane.process-info`.
+
 Create a workspace or tab only when the user asked for that topology. Create does not start an occupant.
 
 ## Layout
