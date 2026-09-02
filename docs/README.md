@@ -295,6 +295,15 @@ Cite land with `git show HEAD:rust/src/main.rs` + `git show HEAD:rust/src/server
 | Occupant `pane wait-output` `--source` `--lines` | `git show HEAD:rust/src/main.rs` + `git show HEAD:rust/src/server.rs` |
 | Skill wait-output `--source` `--lines` | `git show HEAD:skills/dory/SKILL.md` (`fe85855`) |
 
+## Paid occupant pane split --ratio
+
+Cite land with `git show HEAD:rust/src/main.rs` + `git show HEAD:rust/src/server.rs`. Working-tree leftover `main.rs` / `server.rs` are not the owner. Land wrap stays `pane.split`. Occupant optional `--ratio F`. Omit → land `split_leaf` default `0.5`. Present → land `set_ratio` (clamp `[0.05, 0.95]`). CLI does not re-clamp. There is no new split RPC. Pane split still has no `--cwd`. Keep `dory pane divider` for an existing pair. There is no `agent.list` RPC. Do not claim `pane.zoom`.
+
+| Landing | Owner |
+|---|---|
+| Occupant `pane split` `--ratio` | `git show HEAD:rust/src/main.rs` + `git show HEAD:rust/src/server.rs` |
+| Skill pane split `--ratio` | `git show HEAD:skills/dory/SKILL.md` (`e0a243c`) |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
