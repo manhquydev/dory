@@ -1022,12 +1022,13 @@ fn list_tabs(world: &World, workspace_id: &str) -> String {
                     out.push(',');
                 }
                 out.push_str(&format!(
-                    "{{\"id\":\"{}\",\"occupant\":{}}}",
+                    "{{\"id\":\"{}\",\"occupant\":{},\"pane_count\":{}}}",
                     tab.id,
                     tab.panes
                         .first()
                         .map(pane_occupant_json)
-                        .unwrap_or_else(|| "null".to_string())
+                        .unwrap_or_else(|| "null".to_string()),
+                    tab.panes.len()
                 ));
             }
             out.push_str("]}");
@@ -3591,6 +3592,7 @@ mod tests {
             "{tabs_body}"
         );
         assert!(tabs_body.contains("\"occupant\":null"), "{tabs_body}");
+        assert!(tabs_body.contains("\"pane_count\":"), "{tabs_body}");
         assert!(!tabs_body.contains(":7380"), "{tabs_body}");
 
         let before = cli(&xdg, &sock, false, &["pane", "list", "--workspace", &ws]);
