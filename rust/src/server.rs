@@ -1053,13 +1053,14 @@ fn list_panes(world: &World, workspace_id: &str) -> String {
                     let pid = pane.held.child_pid();
                     let cwd = proc_cwd(pid, &world.cwd);
                     out.push_str(&format!(
-                        "{{\"id\":\"{}\",\"pid\":{},\"cwd\":{},\"occupant\":{},\"focused\":{},\"tab_id\":{}}}",
+                        "{{\"id\":\"{}\",\"pid\":{},\"cwd\":{},\"occupant\":{},\"focused\":{},\"tab_id\":{},\"workspace_id\":{}}}",
                         pane.id,
                         pid,
                         envelope::json_string(&cwd.to_string_lossy()),
                         pane_occupant_json(pane),
                         pane.id == world.focused,
-                        envelope::json_string(&tab.id)
+                        envelope::json_string(&tab.id),
+                        envelope::json_string(&ws.id)
                     ));
                 }
             }
@@ -3699,6 +3700,11 @@ mod tests {
         assert!(after_body.contains("\"tab_id\":"), "{after_body}");
         assert!(
             after_body.contains(&format!("\"tab_id\":\"{tab}\"")),
+            "{after_body}"
+        );
+        assert!(after_body.contains("\"workspace_id\":"), "{after_body}");
+        assert!(
+            after_body.contains(&format!("\"workspace_id\":\"{ws}\"")),
             "{after_body}"
         );
 
