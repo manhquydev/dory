@@ -118,7 +118,7 @@ dory pane list --current
 dory tab list --current
 ```
 
-`--current` reads injected `DORY_WORKSPACE_ID` and requires `DORY_ENV=1` (exit 1 outside env). `--workspace <id>` stays valid and does not require env. Exactly one of the two. Land RPCs stay `pane.list` / `tab.list` with `workspace`. This is Dory list-current, not Herdr implicit focused list and not `dory tree`. Keep `dory tree` for the live roster. No `--kind`. No `pane.zoom`.
+Keep `dory pane list [--workspace <id> | --current]`. Exactly one of `--workspace <id>` or `--current`. Both / neither / extra (including `--kind` / `--format`) → usage 2. `--workspace <id>` is inspect (no env). `--current` requires `DORY_ENV=1` and reads `DORY_WORKSPACE_ID` (exit 1 outside env). JSON stays land `{"op":"pane.list","workspace":"<id>"}`. Parse `.result.panes[].id`, `.result.panes[].pid`, `.result.panes[].cwd`, `.result.panes[].occupant`. Land `cwd` is `proc_cwd` on each pane child (same as `pane get`: `/proc/{pid}/cwd` with `world.cwd` fallback). Keep `dory tab list [--workspace <id> | --current]` as land `tab.list`. Keep `dory tree` for the live occupant roster (`occ` / `st`). Keep `dory pane get` for a single pane. There is **no** `pane.process-info`. Do not parse argv / cmdline / foreground. No `--format`. No `--kind`. No `pane.zoom`. This is Dory list-roster feel for Herdr `pane list` cwd, not a new RPC and not `dory tree`.
 
 Occupants read the live roster with
 
