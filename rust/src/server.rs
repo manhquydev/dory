@@ -996,7 +996,7 @@ fn close_pane(world: &mut World, pane_id: &str) -> String {
 
 fn get_workspace(world: &World, id: &str) -> String {
     match world.workspaces.iter().find(|w| w.id == id) {
-        Some(ws) => envelope::success(&workspace_object(ws)),
+        Some(ws) => envelope::success(&workspace_object(ws, &world.focused)),
         None => envelope::runtime_error(&format!("unknown workspace {id}")),
     }
 }
@@ -1007,7 +1007,7 @@ fn list_workspaces(world: &World) -> String {
         if i > 0 {
             out.push(',');
         }
-        out.push_str(&workspace_object(ws));
+        out.push_str(&workspace_object(ws, &world.focused));
     }
     out.push_str("]}");
     out
@@ -1069,13 +1069,16 @@ fn list_panes(world: &World, workspace_id: &str) -> String {
     }
 }
 
-fn workspace_object(ws: &Workspace) -> String {
+fn workspace_object(ws: &Workspace, focused: &str) -> String {
     let pane_count: usize = ws.tabs.iter().map(|tab| tab.panes.len()).sum();
     let mut out = format!(
-        "{{\"workspace\":{{\"id\":\"{}\"}},\"tab_count\":{},\"pane_count\":{},\"tabs\":[",
+        "{{\"workspace\":{{\"id\":\"{}\"}},\"tab_count\":{},\"pane_count\":{},\"focused\":{},\"tabs\":[",
         ws.id,
         ws.tabs.len(),
-        pane_count
+        pane_count,
+        ws.tabs
+            .iter()
+            .any(|tab| tab.panes.iter().any(|pane| pane.id == focused))
     );
     for (i, tab) in ws.tabs.iter().enumerate() {
         if i > 0 {
@@ -3140,6 +3143,7 @@ mod tests {
         assert!(list_body.contains(&ws), "{list_body}");
         assert!(list_body.contains("\"tab_count\":"), "{list_body}");
         assert!(list_body.contains("\"pane_count\":"), "{list_body}");
+        assert!(list_body.contains("\"focused\":"), "{list_body}");
 
         let got = cli(&xdg, &sock, true, &["workspace", "get", &ws]);
         assert!(got.status.success());
@@ -3149,6 +3153,7 @@ mod tests {
         assert!(get_body.contains("\"pane_count\":"), "{get_body}");
         assert!(get_body.contains("\"tab_count\":1"), "{get_body}");
         assert!(get_body.contains("\"pane_count\":1"), "{get_body}");
+        assert!(get_body.contains("\"focused\":"), "{get_body}");
 
         let tab_out = cli(&xdg, &sock, true, &["tab", "create", "--workspace", &ws]);
         assert!(
