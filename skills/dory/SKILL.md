@@ -126,7 +126,7 @@ Occupants read the live roster with
 dory tree
 ```
 
-Parse `.result.focused` and `.result.items[]`. Each item has `k` = `w` | `t` | `p`. Workspace rows may include `cwd`. Pane rows may include `occ` (name) and `st` (five words). Extra args → usage 2. Land RPC is `desk.tree`. This is Dory tree, not Herdr `agent list`. No `--kind`. No `pane.zoom`.
+Parse `.result.focused` and `.result.items[]`. Each item has `k` = `w` | `t` | `p`. Workspace rows may include `cwd` (`world.cwd`). Pane rows (`k=p`) may include `occ` (name), `st` (five words), and `cwd` via land `proc_cwd` (`/proc/{pid}/cwd` with `world.cwd` fallback). Keep `dory pane get` / `dory pane list` for `pid`. Extra args → usage 2. Land RPC is `desk.tree`. This is Dory tree feel for Herdr roster cwd, not `agent list` and not `pane.process-info`. No `--format`. No `--kind`. No `pane.zoom`.
 
 Create a workspace or tab only when the user asked for that topology. Create does not start an occupant.
 
