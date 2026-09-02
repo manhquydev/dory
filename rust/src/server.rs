@@ -1357,12 +1357,14 @@ fn desk_tree(world: &World) -> String {
             .iter()
             .any(|tab| tab.panes.iter().any(|pane| pane.id == world.focused));
         let pane_count: usize = ws.tabs.iter().map(|tab| tab.panes.len()).sum();
+        let tab_count = ws.tabs.len();
         items.push_str(&format!(
-            "{{\"k\":\"w\",\"id\":{},\"cwd\":{},\"focused\":{},\"pane_count\":{}}}",
+            "{{\"k\":\"w\",\"id\":{},\"cwd\":{},\"focused\":{},\"pane_count\":{},\"tab_count\":{}}}",
             envelope::json_string(&ws.id),
             envelope::json_string(&world.cwd.to_string_lossy()),
             ws_focused,
-            pane_count
+            pane_count,
+            tab_count
         ));
         for tab in &ws.tabs {
             items.push(',');
@@ -3857,6 +3859,10 @@ mod tests {
         );
         assert!(
             ws_obj[..ws_end].contains("\"pane_count\":"),
+            "{tree}"
+        );
+        assert!(
+            ws_obj[..ws_end].contains("\"tab_count\":"),
             "{tree}"
         );
         let _ = stop_server(&xdg);
