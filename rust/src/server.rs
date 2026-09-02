@@ -1595,10 +1595,13 @@ fn get_pane(world: &World, pane_id: &str) -> String {
         return envelope::runtime_error(&format!("unknown pane {pane_id}"));
     };
     let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
+    let pid = pane.held.child_pid();
+    let cwd = proc_cwd(pid, &world.cwd);
     envelope::success(&format!(
-        "{{\"pane\":{{\"id\":\"{}\"}},\"pid\":{},\"occupant\":{}}}",
+        "{{\"pane\":{{\"id\":\"{}\"}},\"pid\":{},\"cwd\":{},\"occupant\":{}}}",
         pane.id,
-        pane.held.child_pid(),
+        pid,
+        envelope::json_string(&cwd.to_string_lossy()),
         pane_occupant_json(pane)
     ))
 }
@@ -3729,6 +3732,24 @@ mod tests {
         let new_pid = json_u32(&new_got, "pid");
         wait_cwd(new_pid, &other, Duration::from_secs(5));
 
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn pane_get_includes_cwd() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let snap = rpc_op(&sock, "snapshot");
+        let pane = json_field(&snap, "pane").to_string();
+        let got = rpc(
+            &sock,
+            &format!(r#"{{"op":"pane.get","pane":"{pane}"}}"#),
+        );
+        assert!(got.contains("\"ok\":true"), "{got}");
+        assert!(got.contains("\"cwd\":"), "{got}");
         let _ = stop_server(&xdg);
         let _ = server.wait();
         let _ = fs::remove_dir_all(&xdg);
