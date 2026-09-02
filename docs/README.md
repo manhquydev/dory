@@ -98,12 +98,14 @@ Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `mai
 
 ## Paid occupant tree
 
-Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs` is not the owner. Land RPC is `desk.tree`. This is Dory tree, not `agent list`. Do not claim `agent.list`. Do not claim `pane.zoom`.
+Cite land rust with `git show HEAD:rust/src/main.rs` + `git show HEAD:rust/src/server.rs`. Working-tree leftover `main.rs` / `server.rs` are not the owner. Land wrap stays `desk.tree`. Pane-row `cwd` via existing `proc_cwd`. Workspace-row cwd still `world.cwd`. No `pid` on the tree row. This is Dory tree, not `agent list`. Do not claim `agent.list`. Do not claim `pane.process-info`. Do not claim `pane.zoom`.
 
 | Landing | Owner |
 |---|---|
 | Occupant `tree` `dd60fd3` | `git show HEAD:rust/src/main.rs` |
+| Occupant `tree` pane cwd | `git show HEAD:rust/src/server.rs` |
 | Skill `tree` `3d03cac` | `git show HEAD:skills/dory/SKILL.md` |
+| Skill tree pane cwd | `git show HEAD:skills/dory/SKILL.md` (`442876b`) |
 
 ## Paid occupant pane neighbor
 
