@@ -1352,16 +1352,23 @@ fn desk_tree(world: &World) -> String {
             items.push(',');
         }
         first = false;
+        let ws_focused = ws
+            .tabs
+            .iter()
+            .any(|tab| tab.panes.iter().any(|pane| pane.id == world.focused));
         items.push_str(&format!(
-            "{{\"k\":\"w\",\"id\":{},\"cwd\":{}}}",
+            "{{\"k\":\"w\",\"id\":{},\"cwd\":{},\"focused\":{}}}",
             envelope::json_string(&ws.id),
-            envelope::json_string(&world.cwd.to_string_lossy())
+            envelope::json_string(&world.cwd.to_string_lossy()),
+            ws_focused
         ));
         for tab in &ws.tabs {
             items.push(',');
+            let tab_focused = tab.panes.iter().any(|pane| pane.id == world.focused);
             items.push_str(&format!(
-                "{{\"k\":\"t\",\"id\":{}}}",
-                envelope::json_string(&tab.id)
+                "{{\"k\":\"t\",\"id\":{},\"focused\":{}}}",
+                envelope::json_string(&tab.id),
+                tab_focused
             ));
             for pane in &tab.panes {
                 let (word, _, _) = classify_word(pane);
@@ -1374,7 +1381,7 @@ fn desk_tree(world: &World) -> String {
                 let cwd = proc_cwd(pid, &world.cwd);
                 items.push(',');
                 items.push_str(&format!(
-                    "{{\"k\":\"p\",\"id\":{},\"occ\":{},\"st\":{},\"cwd\":{}}}",
+                    "{{\"k\":\"p\",\"id\":{},\"occ\":{},\"st\":{},\"cwd\":{},\"focused\":{}}}",
                     envelope::json_string(&pane.id),
                     envelope::json_string(occ),
                     envelope::json_string(if pane.occupant.is_some() {
@@ -1382,7 +1389,8 @@ fn desk_tree(world: &World) -> String {
                     } else {
                         ""
                     }),
-                    envelope::json_string(&cwd.to_string_lossy())
+                    envelope::json_string(&cwd.to_string_lossy()),
+                    pane.id == world.focused
                 ));
             }
         }
@@ -3820,6 +3828,24 @@ mod tests {
         let pane_end = pane_obj.find('}').expect("pane close");
         assert!(
             pane_obj[..pane_end].contains("\"cwd\":"),
+            "{tree}"
+        );
+        assert!(
+            pane_obj[..pane_end].contains("\"focused\":"),
+            "{tree}"
+        );
+        let tab_start = tree.find("\"k\":\"t\"").expect("tab row");
+        let tab_obj = &tree[tab_start..];
+        let tab_end = tab_obj.find('}').expect("tab close");
+        assert!(
+            tab_obj[..tab_end].contains("\"focused\":"),
+            "{tree}"
+        );
+        let ws_start = tree.find("\"k\":\"w\"").expect("workspace row");
+        let ws_obj = &tree[ws_start..];
+        let ws_end = ws_obj.find('}').expect("workspace close");
+        assert!(
+            ws_obj[..ws_end].contains("\"focused\":"),
             "{tree}"
         );
         let _ = stop_server(&xdg);
