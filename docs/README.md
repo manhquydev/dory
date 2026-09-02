@@ -71,12 +71,13 @@ Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `mai
 
 ## Paid occupant pane focus
 
-Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs` is not the owner.
+Cite land rust with `git show HEAD:rust/src/main.rs`. Working-tree leftover `main.rs` is not the owner. Occupant neighbor-then-focus compose is `dory pane neighbor` (land `desk.neighbor`, already paid) then `dory pane focus --pane <id>` (land `pane.focus`). `dory pane focus` stays id-only. Do not claim `--direction` on focus. There is no `pane.neighbor` RPC. Do not claim `pane.zoom`.
 
 | Landing | Owner |
 |---|---|
 | Occupant `pane focus` `73aacfa` | `git show HEAD:rust/src/main.rs` |
 | Skill `pane focus` `2c924df` | `git show HEAD:skills/dory/SKILL.md` |
+| Skill neighbor-then-focus | `git show HEAD:skills/dory/SKILL.md` (`c816657`) |
 
 ## Paid occupant create `--cwd`
 
