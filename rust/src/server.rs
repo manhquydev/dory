@@ -1085,13 +1085,14 @@ fn workspace_object(ws: &Workspace, focused: &str) -> String {
             out.push(',');
         }
         out.push_str(&format!(
-            "{{\"id\":\"{}\",\"root_pane\":{{\"id\":\"{}\"}},\"occupant\":{},\"focused\":{}}}",
+            "{{\"id\":\"{}\",\"root_pane\":{{\"id\":\"{}\"}},\"occupant\":{},\"pane_count\":{},\"focused\":{}}}",
             tab.id,
             tab.root_pane,
             tab.panes
                 .first()
                 .map(pane_occupant_json)
                 .unwrap_or_else(|| "null".to_string()),
+            tab.panes.len(),
             tab.panes.iter().any(|pane| pane.id == focused)
         ));
     }
@@ -3155,6 +3156,10 @@ mod tests {
         assert!(get_body.contains("\"tab_count\":1"), "{get_body}");
         assert!(get_body.contains("\"pane_count\":1"), "{get_body}");
         assert!(
+            get_body.matches("\"pane_count\":").count() >= 2,
+            "{get_body}"
+        );
+        assert!(
             get_body.matches("\"focused\":").count() >= 2,
             "{get_body}"
         );
@@ -3177,6 +3182,10 @@ mod tests {
         let get_body2 = String::from_utf8_lossy(&got2.stdout);
         assert!(
             get_body2.matches("\"focused\":").count() >= 3,
+            "{get_body2}"
+        );
+        assert!(
+            get_body2.matches("\"pane_count\":").count() >= 3,
             "{get_body2}"
         );
 
