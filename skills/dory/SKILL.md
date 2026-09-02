@@ -41,7 +41,8 @@ Live `--help` ships:
 - `pane get [--current | --pane <id>]`
 - `pane current [--current | --pane <id>]`
 - `pane close [--current | --pane <id>]`
-- `pane split|run`
+- `pane split [--current | --pane <id>] [--direction right|down] [--ratio F] [--no-focus]`
+- `pane run [--current | --pane <id>] <text>`
 - `pane wait-output [--current | --pane <id>] [--match LIT | --regex RE] [--source visible|recent|recent-unwrapped] [--lines N] [--timeout MS]`
 - `pane send-keys [--current | --pane <id>] <key>`
 - `pane send-text [--current | --pane <id>] <text>`
@@ -140,6 +141,16 @@ dory pane split --current --direction right --no-focus
 ```
 
 Replace `right` with `down` when appropriate. Read the new pane from `.result.pane.id`.
+
+Optional `--ratio` on the pair just created:
+
+```bash
+dory pane split --current --direction right --ratio 0.4 --no-focus
+```
+
+`--ratio` optional. Omit → land `split_leaf` default `0.5`. Present → land `set_ratio` (clamps `[0.05, 0.95]`). CLI does not re-clamp. Keep `dory pane divider` for an existing pair.
+
+Keep `dory pane split --pane <id>`. Exactly one of `--current` or `--pane <id>`. Both / neither / extra (including `--kind` / `--cwd`) → usage 2. `--direction` optional `right` | `down`. `--ratio F` optional. Missing value / non-float / twice → usage 2. Mutating: `DORY_ENV=1` on every arm. `--current` reads `DORY_PANE_ID` (exit 1 outside env / empty / invalid). `--pane <id>` keeps an explicit pane. JSON stays land `{"op":"pane.split","pane":"<id>","no_focus":true}` plus `"direction":"…"` only when set, plus `"ratio":F` only when set (JSON number, not string). There is **no** new split RPC. Pane split still has no `--cwd`. No `pane.zoom`. No `--kind`.
 
 Occupants may pin cwd only on create:
 
