@@ -1068,7 +1068,13 @@ fn list_panes(world: &World, workspace_id: &str) -> String {
 }
 
 fn workspace_object(ws: &Workspace) -> String {
-    let mut out = format!("{{\"workspace\":{{\"id\":\"{}\"}},\"tabs\":[", ws.id);
+    let pane_count: usize = ws.tabs.iter().map(|tab| tab.panes.len()).sum();
+    let mut out = format!(
+        "{{\"workspace\":{{\"id\":\"{}\"}},\"tab_count\":{},\"pane_count\":{},\"tabs\":[",
+        ws.id,
+        ws.tabs.len(),
+        pane_count
+    );
     for (i, tab) in ws.tabs.iter().enumerate() {
         if i > 0 {
             out.push(',');
@@ -3130,11 +3136,17 @@ mod tests {
         assert!(listed.status.success());
         let list_body = String::from_utf8_lossy(&listed.stdout);
         assert!(list_body.contains(&ws), "{list_body}");
+        assert!(list_body.contains("\"tab_count\":"), "{list_body}");
+        assert!(list_body.contains("\"pane_count\":"), "{list_body}");
 
         let got = cli(&xdg, &sock, true, &["workspace", "get", &ws]);
         assert!(got.status.success());
         let get_body = String::from_utf8_lossy(&got.stdout);
         assert_eq!(result_id(&get_body, "workspace"), ws);
+        assert!(get_body.contains("\"tab_count\":"), "{get_body}");
+        assert!(get_body.contains("\"pane_count\":"), "{get_body}");
+        assert!(get_body.contains("\"tab_count\":1"), "{get_body}");
+        assert!(get_body.contains("\"pane_count\":1"), "{get_body}");
 
         let tab_out = cli(&xdg, &sock, true, &["tab", "create", "--workspace", &ws]);
         assert!(
