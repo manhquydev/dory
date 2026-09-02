@@ -31,7 +31,9 @@ jobs:
           workspaces: rust
       - name: Short TMPDIR on macOS (sockaddr_un SUN_LEN)
         if: runner.os == 'macOS'
-        run: echo "TMPDIR=/tmp" >> "$GITHUB_ENV"
+        run: |
+          echo "TMPDIR=/tmp" >> "$GITHUB_ENV"
+          echo "XDG_RUNTIME_DIR=/tmp" >> "$GITHUB_ENV"
 
       - name: cargo test (land tree, unix desk)
         working-directory: rust
