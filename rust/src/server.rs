@@ -1053,12 +1053,13 @@ fn list_panes(world: &World, workspace_id: &str) -> String {
                     let pid = pane.held.child_pid();
                     let cwd = proc_cwd(pid, &world.cwd);
                     out.push_str(&format!(
-                        "{{\"id\":\"{}\",\"pid\":{},\"cwd\":{},\"occupant\":{},\"focused\":{}}}",
+                        "{{\"id\":\"{}\",\"pid\":{},\"cwd\":{},\"occupant\":{},\"focused\":{},\"tab_id\":{}}}",
                         pane.id,
                         pid,
                         envelope::json_string(&cwd.to_string_lossy()),
                         pane_occupant_json(pane),
-                        pane.id == world.focused
+                        pane.id == world.focused,
+                        envelope::json_string(&tab.id)
                     ));
                 }
             }
@@ -3695,6 +3696,11 @@ mod tests {
         assert!(after_body.contains("\"pid\":"), "{after_body}");
         assert!(after_body.contains("\"cwd\":"), "{after_body}");
         assert!(after_body.contains("\"focused\":"), "{after_body}");
+        assert!(after_body.contains("\"tab_id\":"), "{after_body}");
+        assert!(
+            after_body.contains(&format!("\"tab_id\":\"{tab}\"")),
+            "{after_body}"
+        );
 
         let got = cli(&xdg, &sock, false, &["pane", "get", "--pane", &new_pane]);
         assert!(
