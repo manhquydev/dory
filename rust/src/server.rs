@@ -1372,12 +1372,18 @@ fn desk_tree(world: &World) -> String {
         for tab in &ws.tabs {
             items.push(',');
             let tab_focused = tab.panes.iter().any(|pane| pane.id == world.focused);
+            let tab_occ = tab
+                .panes
+                .first()
+                .map(pane_occupant_json)
+                .unwrap_or_else(|| "null".to_string());
             items.push_str(&format!(
-                "{{\"k\":\"t\",\"id\":{},\"focused\":{},\"pane_count\":{},\"workspace_id\":{}}}",
+                "{{\"k\":\"t\",\"id\":{},\"focused\":{},\"pane_count\":{},\"workspace_id\":{},\"occupant\":{}}}",
                 envelope::json_string(&tab.id),
                 tab_focused,
                 tab.panes.len(),
-                envelope::json_string(&ws.id)
+                envelope::json_string(&ws.id),
+                tab_occ
             ));
             for pane in &tab.panes {
                 let (word, _, _) = classify_word(pane);
@@ -3881,6 +3887,10 @@ mod tests {
         );
         assert!(
             tab_obj[..tab_end].contains("\"workspace_id\":"),
+            "{tree}"
+        );
+        assert!(
+            tab_obj[..tab_end].contains("\"occupant\":"),
             "{tree}"
         );
         let ws_start = tree.find("\"k\":\"w\"").expect("workspace row");
