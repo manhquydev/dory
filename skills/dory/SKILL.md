@@ -354,6 +354,8 @@ Keep `dory agent start <name> --pane <id>`. Parse `.result.workspace_id` on the 
 
 Keep `dory agent start <name> --pane <id>`. Parse `.result.cwd` on the **classify settle** start reply (allowlisted `sleep|cat|sh|bash|true|false` — land `Pending(WaitJob::AgentClassify)`, then `tick_agent_classify`). Land `cwd` is `proc_cwd` on the occupant pane child (same as immediate start / `agent wait`). Keep `.result.agent` `name` / `pane` / `state` / `seen`. USAGE stays `dory agent start <name> --pane <id> | --current -- <argv>`. JSON stays land `{"op":"agent.start",…}`. Do not change immediate start siblings this slice. No `agent.list`. No `focused` / `tab_id` / `workspace_id` on classify settle this slice. No `foreground_cwd`. No `--kind`. No `pane.zoom`. This is Dory agent-start feel for Herdr `agent start` classify cwd, not `agent.list`.
 
+Keep `dory agent start <name> --pane <id>`. Parse `.result.focused` on the **classify settle** start reply. Land `focused` is `pane.id == world.focused` (same as immediate start / `agent wait`). Keep `.result.agent` `name` / `pane` / `state` / `seen`. Keep `.result.cwd`. USAGE stays `dory agent start <name> --pane <id> | --current -- <argv>`. JSON stays land `{"op":"agent.start",…}`. Do not change immediate start siblings this slice. No `agent.list`. No `focused` on `pane.get`. No `tab_id` / `workspace_id` on classify settle this slice. No `foreground_cwd`. No `--kind`. No `pane.zoom`. This is Dory agent-start feel for Herdr `agent start` classify focused, not `agent.list`.
+
 Name: `[a-z][a-z0-9_-]{0,31}`, unique among live occupants. No `--kind`. Coding occupants start as argv after `--`, never `--kind`.
 
 After the env gate, a coding occupant inside the pane that is ready for prompts must run:
