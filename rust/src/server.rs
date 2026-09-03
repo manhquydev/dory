@@ -2057,13 +2057,15 @@ fn agent_get(world: &mut World, name: Option<&str>, pane_id: Option<&str>) -> St
     let cwd = proc_cwd(pid, &world.cwd);
     let focused = pane.id == world.focused;
     let tab_id = world.workspaces[loc.wi].tabs[loc.ti].id.clone();
+    let workspace_id = world.workspaces[loc.wi].id.clone();
     let mut result = agent_snapshot(pane);
     result.pop();
     result.push_str(&format!(
-        ",\"cwd\":{},\"focused\":{},\"tab_id\":{}}}",
+        ",\"cwd\":{},\"focused\":{},\"tab_id\":{},\"workspace_id\":{}}}",
         envelope::json_string(&cwd.to_string_lossy()),
         focused,
-        envelope::json_string(&tab_id)
+        envelope::json_string(&tab_id),
+        envelope::json_string(&workspace_id)
     ));
     envelope::success(&result)
 }
@@ -3937,6 +3939,7 @@ mod tests {
         assert!(got.contains("\"cwd\":"), "{got}");
         assert!(got.contains("\"focused\":"), "{got}");
         assert!(got.contains("\"tab_id\":"), "{got}");
+        assert!(got.contains("\"workspace_id\":"), "{got}");
         assert!(got.contains("\"name\":\"cwdog\""), "{got}");
         let _ = stop_server(&xdg);
         let _ = server.wait();
