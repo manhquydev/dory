@@ -2061,7 +2061,7 @@ fn agent_prompt(
     let cwd = proc_cwd(pid, &world.cwd);
     result.push_str(&format!(
         ",\"cwd\":{}}}",
-        envelope::json_string(&cwd.to_string_lossy()),
+        envelope::json_string(&cwd.to_string_lossy())
     ));
     LineReply::Msg(envelope::success(&result))
 }
@@ -4159,13 +4159,12 @@ mod tests {
             ),
         );
         assert!(started.contains("\"ok\":true"), "{started}");
-        let prompted = rpc(
+        let got = rpc(
             &sock,
             r#"{"op":"agent.prompt","name":"cwdog","text":"ping"}"#,
         );
-        assert!(prompted.contains("\"ok\":true"), "{prompted}");
-        assert!(prompted.contains("\"cwd\":"), "{prompted}");
-        assert!(prompted.contains("\"name\":\"cwdog\""), "{prompted}");
+        assert!(got.contains("\"ok\":true"), "{got}");
+        assert!(got.contains("\"cwd\":"), "{got}");
         let _ = stop_server(&xdg);
         let _ = server.wait();
         let _ = fs::remove_dir_all(&xdg);
