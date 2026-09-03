@@ -684,6 +684,15 @@ Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server
 | Occupant agent wait cwd | `git show HEAD:rust/src/server.rs` |
 | Skill agent wait cwd | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant agent wait focused
+
+Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `agent.wait` (settle via `tick_agent_wait`). Occupant parse `.result.focused`. Land `focused` is `pane.id == world.focused`. Keep `.result.agent` `name` / `pane` / `state` / `seen`. Keep `.result.cwd`. Wait still does not mark seen. There is no new RPC. There is no `agent.list`. CLI USAGE stays `dory agent wait [<name> | --current | --pane <id>] [--until idle|done|blocked|working|unknown] [--timeout MS]`. No `--label`. No `active_tab_id`. Do not add `focused` on `pane.get`. Do not add `tab_id` / `workspace_id` on `agent.wait` this slice. Do not claim `foreground_cwd`. Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
+
+| Landing | Owner |
+|---|---|
+| Occupant agent wait focused | `git show HEAD:rust/src/server.rs` |
+| Skill agent wait focused | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
