@@ -2096,13 +2096,15 @@ fn agent_read(
     let cwd = proc_cwd(pane.held.child_pid(), &world.cwd);
     let focused = pane.id == world.focused;
     let tab_id = world.workspaces[loc.wi].tabs[loc.ti].id.clone();
+    let workspace_id = world.workspaces[loc.wi].id.clone();
     let mut result = agent_snapshot(pane);
     result.pop();
     result.push_str(&format!(
-        ",\"cwd\":{},\"focused\":{},\"tab_id\":{},\"source\":{},\"text\":{}}}",
+        ",\"cwd\":{},\"focused\":{},\"tab_id\":{},\"workspace_id\":{},\"source\":{},\"text\":{}}}",
         envelope::json_string(&cwd.to_string_lossy()),
         focused,
         envelope::json_string(&tab_id),
+        envelope::json_string(&workspace_id),
         envelope::json_string(source),
         envelope::json_string(&text)
     ));
@@ -3976,6 +3978,7 @@ mod tests {
         assert!(got.contains("\"name\":\"cwdog\""), "{got}");
         assert!(got.contains("\"focused\":"), "{got}");
         assert!(got.contains("\"tab_id\":"), "{got}");
+        assert!(got.contains("\"workspace_id\":"), "{got}");
         let _ = stop_server(&xdg);
         let _ = server.wait();
         let _ = fs::remove_dir_all(&xdg);
