@@ -2053,7 +2053,15 @@ fn agent_get(world: &mut World, name: Option<&str>, pane_id: Option<&str>) -> St
     };
     refresh_occupant(&mut world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi]);
     let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
-    envelope::success(&agent_snapshot(pane))
+    let pid = pane.held.child_pid();
+    let cwd = proc_cwd(pid, &world.cwd);
+    let mut result = agent_snapshot(pane);
+    result.pop();
+    result.push_str(&format!(
+        ",\"cwd\":{}}}",
+        envelope::json_string(&cwd.to_string_lossy())
+    ));
+    envelope::success(&result)
 }
 
 fn agent_read(
@@ -3901,6 +3909,29 @@ mod tests {
         );
         assert!(got.contains("\"ok\":true"), "{got}");
         assert!(got.contains("\"cwd\":"), "{got}");
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn agent_get_includes_cwd() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let snap = rpc_op(&sock, "snapshot");
+        let pane = json_field(&snap, "pane").to_string();
+        let started = rpc(
+            &sock,
+            &format!(
+                r#"{{"op":"agent.start","name":"cwdog","pane":"{pane}","argv":["echo"]}}"#
+            ),
+        );
+        assert!(started.contains("\"ok\":true"), "{started}");
+        let got = rpc(&sock, r#"{"op":"agent.get","name":"cwdog"}"#);
+        assert!(got.contains("\"ok\":true"), "{got}");
+        assert!(got.contains("\"cwd\":"), "{got}");
+        assert!(got.contains("\"name\":\"cwdog\""), "{got}");
         let _ = stop_server(&xdg);
         let _ = server.wait();
         let _ = fs::remove_dir_all(&xdg);
