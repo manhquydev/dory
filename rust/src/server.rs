@@ -1097,7 +1097,7 @@ fn workspace_object(ws: &Workspace, focused: &str) -> String {
             out.push(',');
         }
         out.push_str(&format!(
-            "{{\"id\":\"{}\",\"root_pane\":{{\"id\":\"{}\"}},\"occupant\":{},\"pane_count\":{},\"focused\":{},\"workspace_id\":{}}}",
+            "{{\"id\":\"{}\",\"root_pane\":{{\"id\":\"{}\"}},\"occupant\":{},\"pane_count\":{},\"focused\":{},\"workspace_id\":{},\"tab_id\":{}}}",
             tab.id,
             tab.root_pane,
             tab.panes
@@ -1106,7 +1106,8 @@ fn workspace_object(ws: &Workspace, focused: &str) -> String {
                 .unwrap_or_else(|| "null".to_string()),
             tab.panes.len(),
             tab.panes.iter().any(|pane| pane.id == focused),
-            envelope::json_string(&ws.id)
+            envelope::json_string(&ws.id),
+            envelope::json_string(&tab.id)
         ));
     }
     out.push_str("]}");
@@ -3216,6 +3217,10 @@ mod tests {
             "{get_body}"
         );
         assert!(
+            get_body.contains(&format!("\"tab_id\":\"{tab}\"")),
+            "{get_body}"
+        );
+        assert!(
             get_body.matches("\"focused\":").count() >= 2,
             "{get_body}"
         );
@@ -3255,6 +3260,10 @@ mod tests {
         );
         assert!(
             get_body2.matches("\"occupant\":").count() >= 3,
+            "{get_body2}"
+        );
+        assert!(
+            get_body2.matches("\"tab_id\":").count() >= 2,
             "{get_body2}"
         );
 
