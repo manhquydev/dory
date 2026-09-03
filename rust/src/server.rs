@@ -518,12 +518,15 @@ fn tick_agent_wait(
     };
     if wait_hit(word, until) {
         let pid = pane.held.child_pid();
+        let pane_key = pane.id.clone();
         let mut result = agent_snapshot(pane);
         result.pop();
         let cwd = proc_cwd(pid, &world.cwd);
+        let focused = pane_key == world.focused;
         result.push_str(&format!(
-            ",\"cwd\":{}}}",
-            envelope::json_string(&cwd.to_string_lossy())
+            ",\"cwd\":{},\"focused\":{}}}",
+            envelope::json_string(&cwd.to_string_lossy()),
+            focused
         ));
         Some(envelope::success(&result))
     } else if Instant::now() >= deadline {
@@ -4056,6 +4059,7 @@ mod tests {
         let got = rpc(&sock, r#"{"op":"agent.wait","name":"cwdog"}"#);
         assert!(got.contains("\"ok\":true"), "{got}");
         assert!(got.contains("\"cwd\":"), "{got}");
+        assert!(got.contains("\"focused\":"), "{got}");
         assert!(got.contains("\"name\":\"cwdog\""), "{got}");
         let _ = stop_server(&xdg);
         let _ = server.wait();
