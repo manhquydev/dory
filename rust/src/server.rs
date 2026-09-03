@@ -1397,12 +1397,13 @@ fn desk_tree(world: &World) -> String {
                 .map(pane_occupant_json)
                 .unwrap_or_else(|| "null".to_string());
             items.push_str(&format!(
-                "{{\"k\":\"t\",\"id\":{},\"focused\":{},\"pane_count\":{},\"workspace_id\":{},\"occupant\":{}}}",
+                "{{\"k\":\"t\",\"id\":{},\"focused\":{},\"pane_count\":{},\"workspace_id\":{},\"occupant\":{},\"tab_id\":{}}}",
                 envelope::json_string(&tab.id),
                 tab_focused,
                 tab.panes.len(),
                 envelope::json_string(&ws.id),
-                tab_occ
+                tab_occ,
+                envelope::json_string(&tab.id)
             ));
             for pane in &tab.panes {
                 let (word, _, _) = classify_word(pane);
@@ -3985,6 +3986,10 @@ mod tests {
         let tab_id = json_field(&tab_obj[..tab_end], "id");
         assert!(
             pane_obj[..pane_end].contains(&format!("\"tab_id\":\"{tab_id}\"")),
+            "{tree}"
+        );
+        assert!(
+            tab_obj[..tab_end].contains(&format!("\"tab_id\":\"{tab_id}\"")),
             "{tree}"
         );
         let _ = stop_server(&xdg);
