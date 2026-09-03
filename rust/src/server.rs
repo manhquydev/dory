@@ -517,7 +517,15 @@ fn tick_agent_wait(
         None => return Some(envelope::runtime_error(&format!("unknown agent {name}"))),
     };
     if wait_hit(word, until) {
-        Some(envelope::success(&agent_snapshot(pane)))
+        let pid = pane.held.child_pid();
+        let mut result = agent_snapshot(pane);
+        result.pop();
+        let cwd = proc_cwd(pid, &world.cwd);
+        result.push_str(&format!(
+            ",\"cwd\":{}}}",
+            envelope::json_string(&cwd.to_string_lossy())
+        ));
+        Some(envelope::success(&result))
     } else if Instant::now() >= deadline {
         Some(envelope::runtime_error("timeout"))
     } else {
@@ -4017,6 +4025,37 @@ mod tests {
         assert!(got.contains("\"focused\":"), "{got}");
         assert!(got.contains("\"tab_id\":"), "{got}");
         assert!(got.contains("\"workspace_id\":"), "{got}");
+        assert!(got.contains("\"name\":\"cwdog\""), "{got}");
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+
+    #[test]
+    fn agent_wait_includes_cwd() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let snap = rpc_op(&sock, "snapshot");
+        let pane = json_field(&snap, "pane").to_string();
+        let started = rpc(
+            &sock,
+            &format!(
+                r#"{{"op":"agent.start","name":"cwdog","pane":"{pane}","argv":["echo"]}}"#
+            ),
+        );
+        assert!(started.contains("\"ok\":true"), "{started}");
+        let reported = rpc(
+            &sock,
+            &format!(
+                r#"{{"op":"agent.report","pane":"{pane}","state":"idle"}}"#
+            ),
+        );
+        assert!(reported.contains("\"ok\":true"), "{reported}");
+        let got = rpc(&sock, r#"{"op":"agent.wait","name":"cwdog"}"#);
+        assert!(got.contains("\"ok\":true"), "{got}");
+        assert!(got.contains("\"cwd\":"), "{got}");
         assert!(got.contains("\"name\":\"cwdog\""), "{got}");
         let _ = stop_server(&xdg);
         let _ = server.wait();
