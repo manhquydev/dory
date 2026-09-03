@@ -523,10 +523,15 @@ fn tick_agent_wait(
         result.pop();
         let cwd = proc_cwd(pid, &world.cwd);
         let focused = pane_key == world.focused;
+        let tab_id = match locate_agent(world, Some(name), Some(pane_id)) {
+            Ok(loc) => world.workspaces[loc.wi].tabs[loc.ti].id.clone(),
+            Err(err) => return Some(envelope::runtime_error(&err)),
+        };
         result.push_str(&format!(
-            ",\"cwd\":{},\"focused\":{}}}",
+            ",\"cwd\":{},\"focused\":{},\"tab_id\":{}}}",
             envelope::json_string(&cwd.to_string_lossy()),
-            focused
+            focused,
+            envelope::json_string(&tab_id)
         ));
         Some(envelope::success(&result))
     } else if Instant::now() >= deadline {
@@ -4060,6 +4065,7 @@ mod tests {
         assert!(got.contains("\"ok\":true"), "{got}");
         assert!(got.contains("\"cwd\":"), "{got}");
         assert!(got.contains("\"focused\":"), "{got}");
+        assert!(got.contains("\"tab_id\":"), "{got}");
         assert!(got.contains("\"name\":\"cwdog\""), "{got}");
         let _ = stop_server(&xdg);
         let _ = server.wait();
