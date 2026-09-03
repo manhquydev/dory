@@ -1370,14 +1370,21 @@ fn desk_tree(world: &World) -> String {
             .any(|tab| tab.panes.iter().any(|pane| pane.id == world.focused));
         let pane_count: usize = ws.tabs.iter().map(|tab| tab.panes.len()).sum();
         let tab_count = ws.tabs.len();
+        let ws_occ = ws
+            .tabs
+            .first()
+            .and_then(|tab| tab.panes.first())
+            .map(pane_occupant_json)
+            .unwrap_or_else(|| "null".to_string());
         items.push_str(&format!(
-            "{{\"k\":\"w\",\"id\":{},\"cwd\":{},\"focused\":{},\"pane_count\":{},\"tab_count\":{},\"workspace_id\":{}}}",
+            "{{\"k\":\"w\",\"id\":{},\"cwd\":{},\"focused\":{},\"pane_count\":{},\"tab_count\":{},\"workspace_id\":{},\"occupant\":{}}}",
             envelope::json_string(&ws.id),
             envelope::json_string(&world.cwd.to_string_lossy()),
             ws_focused,
             pane_count,
             tab_count,
-            envelope::json_string(&ws.id)
+            envelope::json_string(&ws.id),
+            ws_occ
         ));
         for tab in &ws.tabs {
             items.push(',');
@@ -3947,6 +3954,10 @@ mod tests {
         let ws_id = json_field(&ws_obj[..ws_end], "id");
         assert!(
             ws_obj[..ws_end].contains(&format!("\"workspace_id\":\"{ws_id}\"")),
+            "{tree}"
+        );
+        assert!(
+            ws_obj[..ws_end].contains("\"occupant\":"),
             "{tree}"
         );
         assert!(
