@@ -711,6 +711,15 @@ Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server
 | Occupant agent wait workspace_id | `git show HEAD:rust/src/server.rs` |
 | Skill agent wait workspace_id | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant agent start cwd
+
+Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `agent.start` immediate `LineReply::Msg` (non-allowlisted argv / already classified). Occupant parse `.result.cwd`. Land `cwd` is `proc_cwd` on the occupant pane child (`/proc/{pid}/cwd` with `world.cwd` fallback). Keep `.result.agent` `name` / `pane` / `state` / `seen`. Pending classify is unchanged this slice. There is no new RPC. There is no `agent.list`. CLI USAGE stays `dory agent start <name> --pane <id> | --current -- <argv>`. No `--label`. No `active_tab_id`. Do not add `focused` / `tab_id` / `workspace_id` on `pane.get` or on `agent.start` this slice. Do not claim `foreground_cwd`. Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
+
+| Landing | Owner |
+|---|---|
+| Occupant agent start cwd | `git show HEAD:rust/src/server.rs` |
+| Skill agent start cwd | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
