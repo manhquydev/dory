@@ -430,15 +430,19 @@ fn tick_agent_classify(
         result.pop();
         let cwd = proc_cwd(pid, &world.cwd);
         let focused = pane_key == world.focused;
-        let tab_id = match locate_agent(world, Some(name), Some(pane_id)) {
-            Ok(loc) => world.workspaces[loc.wi].tabs[loc.ti].id.clone(),
+        let (tab_id, workspace_id) = match locate_agent(world, Some(name), Some(pane_id)) {
+            Ok(loc) => (
+                world.workspaces[loc.wi].tabs[loc.ti].id.clone(),
+                world.workspaces[loc.wi].id.clone(),
+            ),
             Err(err) => return Some(envelope::runtime_error(&err)),
         };
         result.push_str(&format!(
-            ",\"cwd\":{},\"focused\":{},\"tab_id\":{}}}",
+            ",\"cwd\":{},\"focused\":{},\"tab_id\":{},\"workspace_id\":{}}}",
             envelope::json_string(&cwd.to_string_lossy()),
             focused,
-            envelope::json_string(&tab_id)
+            envelope::json_string(&tab_id),
+            envelope::json_string(&workspace_id)
         ));
         Some(envelope::success(&result))
     } else {
@@ -4150,6 +4154,7 @@ mod tests {
         assert!(started.contains("\"cwd\":"), "{started}");
         assert!(started.contains("\"focused\":"), "{started}");
         assert!(started.contains("\"tab_id\":"), "{started}");
+        assert!(started.contains("\"workspace_id\":"), "{started}");
         assert!(started.contains("\"name\":\"cwdog\""), "{started}");
         let _ = stop_server(&xdg);
         let _ = server.wait();
