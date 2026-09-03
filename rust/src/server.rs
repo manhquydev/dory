@@ -1022,7 +1022,7 @@ fn list_tabs(world: &World, workspace_id: &str) -> String {
                     out.push(',');
                 }
                 out.push_str(&format!(
-                    "{{\"id\":\"{}\",\"occupant\":{},\"pane_count\":{},\"focused\":{},\"workspace_id\":{}}}",
+                    "{{\"id\":\"{}\",\"occupant\":{},\"pane_count\":{},\"focused\":{},\"workspace_id\":{},\"tab_id\":{}}}",
                     tab.id,
                     tab.panes
                         .first()
@@ -1030,7 +1030,8 @@ fn list_tabs(world: &World, workspace_id: &str) -> String {
                         .unwrap_or_else(|| "null".to_string()),
                     tab.panes.len(),
                     tab.panes.iter().any(|pane| pane.id == world.focused),
-                    envelope::json_string(&ws.id)
+                    envelope::json_string(&ws.id),
+                    envelope::json_string(&tab.id)
                 ));
             }
             out.push_str("]}");
@@ -3705,6 +3706,10 @@ mod tests {
         assert!(tabs_body.contains("\"workspace_id\":"), "{tabs_body}");
         assert!(
             tabs_body.contains(&format!("\"workspace_id\":\"{ws}\"")),
+            "{tabs_body}"
+        );
+        assert!(
+            tabs_body.contains(&format!("\"tab_id\":\"{tab}\"")),
             "{tabs_body}"
         );
         assert!(!tabs_body.contains(":7380"), "{tabs_body}");
