@@ -1919,12 +1919,15 @@ fn agent_start(
         refresh_occupant(pane);
         if !comm_allowlisted(&comm) || pane.occupant.as_ref().is_some_and(|o| o.classified) {
             let pid = pane.held.child_pid();
+            let pane_key = pane.id.clone();
             let mut result = agent_snapshot(pane);
             result.pop();
             let cwd = proc_cwd(pid, &world.cwd);
+            let focused = pane_key == world.focused;
             result.push_str(&format!(
-                ",\"cwd\":{}}}",
-                envelope::json_string(&cwd.to_string_lossy())
+                ",\"cwd\":{},\"focused\":{}}}",
+                envelope::json_string(&cwd.to_string_lossy()),
+                focused
             ));
             return LineReply::Msg(envelope::success(&result));
         }
@@ -4101,6 +4104,7 @@ mod tests {
         );
         assert!(started.contains("\"ok\":true"), "{started}");
         assert!(started.contains("\"cwd\":"), "{started}");
+        assert!(started.contains("\"focused\":"), "{started}");
         assert!(started.contains("\"name\":\"cwdog\""), "{started}");
         let _ = stop_server(&xdg);
         let _ = server.wait();
