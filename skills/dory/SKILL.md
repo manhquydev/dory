@@ -348,6 +348,8 @@ Keep `dory agent start <name> --pane <id>`. Parse `.result.cwd` on the **immedia
 
 Keep `dory agent start <name> --pane <id>`. Parse `.result.focused` on the **immediate** start reply. Land `focused` is `pane.id == world.focused` (same as `agent get` / `agent wait`). Keep `.result.agent` `name` / `pane` / `state` / `seen`. Keep `.result.cwd`. USAGE stays `dory agent start <name> --pane <id> | --current -- <argv>`. JSON stays land `{"op":"agent.start",…}`. Do not change Pending classify this slice. No `agent.list`. No `focused` on `pane.get`. No `tab_id` / `workspace_id` on `agent.start` this slice. No `foreground_cwd`. No `--kind`. No `pane.zoom`. This is Dory agent-start feel for Herdr `agent start` focused, not `agent.list`.
 
+Keep `dory agent start <name> --pane <id>`. Parse `.result.tab_id` on the **immediate** start reply. Land `tab_id` is the enclosing `tab.id` (same as `agent get` / `agent wait`). Keep `.result.agent` `name` / `pane` / `state` / `seen`. Keep `.result.cwd` / `.result.focused`. USAGE stays `dory agent start <name> --pane <id> | --current -- <argv>`. JSON stays land `{"op":"agent.start",…}`. Do not change Pending classify this slice. No `agent.list`. No `tab.get`. No `tab_id` on `pane.get`. No `workspace_id` on `agent.start` this slice. No `foreground_cwd`. No `--kind`. No `pane.zoom`. This is Dory agent-start feel for Herdr `agent start` tab_id, not `tab.get`.
+
 Name: `[a-z][a-z0-9_-]{0,31}`, unique among live occupants. No `--kind`. Coding occupants start as argv after `--`, never `--kind`.
 
 After the env gate, a coding occupant inside the pane that is ready for prompts must run:
