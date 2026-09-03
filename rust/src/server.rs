@@ -1022,14 +1022,15 @@ fn list_tabs(world: &World, workspace_id: &str) -> String {
                     out.push(',');
                 }
                 out.push_str(&format!(
-                    "{{\"id\":\"{}\",\"occupant\":{},\"pane_count\":{},\"focused\":{}}}",
+                    "{{\"id\":\"{}\",\"occupant\":{},\"pane_count\":{},\"focused\":{},\"workspace_id\":{}}}",
                     tab.id,
                     tab.panes
                         .first()
                         .map(pane_occupant_json)
                         .unwrap_or_else(|| "null".to_string()),
                     tab.panes.len(),
-                    tab.panes.iter().any(|pane| pane.id == world.focused)
+                    tab.panes.iter().any(|pane| pane.id == world.focused),
+                    envelope::json_string(&ws.id)
                 ));
             }
             out.push_str("]}");
@@ -3649,6 +3650,11 @@ mod tests {
         assert!(tabs_body.contains("\"occupant\":null"), "{tabs_body}");
         assert!(tabs_body.contains("\"pane_count\":"), "{tabs_body}");
         assert!(tabs_body.contains("\"focused\":"), "{tabs_body}");
+        assert!(tabs_body.contains("\"workspace_id\":"), "{tabs_body}");
+        assert!(
+            tabs_body.contains(&format!("\"workspace_id\":\"{ws}\"")),
+            "{tabs_body}"
+        );
         assert!(!tabs_body.contains(":7380"), "{tabs_body}");
 
         let before = cli(&xdg, &sock, false, &["pane", "list", "--workspace", &ws]);
