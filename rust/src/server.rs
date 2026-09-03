@@ -2129,11 +2129,13 @@ fn agent_focus(world: &mut World, name: Option<&str>, pane_id: Option<&str>) -> 
     }
     let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
     let cwd = proc_cwd(pane.held.child_pid(), &world.cwd);
+    let focused = pane.id == world.focused;
     let mut result = agent_snapshot(pane);
     result.pop();
     result.push_str(&format!(
-        ",\"cwd\":{}}}",
-        envelope::json_string(&cwd.to_string_lossy())
+        ",\"cwd\":{},\"focused\":{}}}",
+        envelope::json_string(&cwd.to_string_lossy()),
+        focused
     ));
     envelope::success(&result)
 }
@@ -4008,6 +4010,7 @@ mod tests {
         let got = rpc(&sock, r#"{"op":"agent.focus","name":"cwdog"}"#);
         assert!(got.contains("\"ok\":true"), "{got}");
         assert!(got.contains("\"cwd\":"), "{got}");
+        assert!(got.contains("\"focused\":"), "{got}");
         assert!(got.contains("\"name\":\"cwdog\""), "{got}");
         let _ = stop_server(&xdg);
         let _ = server.wait();
