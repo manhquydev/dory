@@ -2055,7 +2055,15 @@ fn agent_prompt(
         });
     }
     let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
-    LineReply::Msg(envelope::success(&agent_snapshot(pane)))
+    let pid = pane.held.child_pid();
+    let mut result = agent_snapshot(pane);
+    result.pop();
+    let cwd = proc_cwd(pid, &world.cwd);
+    result.push_str(&format!(
+        ",\"cwd\":{}}}",
+        envelope::json_string(&cwd.to_string_lossy()),
+    ));
+    LineReply::Msg(envelope::success(&result))
 }
 
 fn wait_hit(word: OccupantWord, until: Option<OccupantWord>) -> bool {
@@ -4132,6 +4140,32 @@ mod tests {
         assert!(started.contains("\"tab_id\":"), "{started}");
         assert!(started.contains("\"workspace_id\":"), "{started}");
         assert!(started.contains("\"name\":\"cwdog\""), "{started}");
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn agent_prompt_includes_cwd() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let snap = rpc_op(&sock, "snapshot");
+        let pane = json_field(&snap, "pane").to_string();
+        let started = rpc(
+            &sock,
+            &format!(
+                r#"{{"op":"agent.start","name":"cwdog","pane":"{pane}","argv":["echo"]}}"#
+            ),
+        );
+        assert!(started.contains("\"ok\":true"), "{started}");
+        let prompted = rpc(
+            &sock,
+            r#"{"op":"agent.prompt","name":"cwdog","text":"ping"}"#,
+        );
+        assert!(prompted.contains("\"ok\":true"), "{prompted}");
+        assert!(prompted.contains("\"cwd\":"), "{prompted}");
+        assert!(prompted.contains("\"name\":\"cwdog\""), "{prompted}");
         let _ = stop_server(&xdg);
         let _ = server.wait();
         let _ = fs::remove_dir_all(&xdg);
