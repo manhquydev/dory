@@ -531,6 +531,15 @@ Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server
 | Occupant workspace list/get occupant | `git show HEAD:rust/src/server.rs` |
 | Skill workspace list/get occupant | `git show HEAD:skills/dory/SKILL.md` (`e271b2c`) |
 
+## Paid occupant tree workspace occupant
+
+Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `desk.tree`. Occupant parse workspace-row `.occupant`. Land `occupant` is first-tab first-pane `pane_occupant_json` (`null` or `{name,state,seen}`). Keep workspace `k` / `id` / `cwd` / `focused` / `pane_count` / `tab_count` / `workspace_id`. Keep tab `occupant`. Keep pane `occ` / `st`. Root `.result.focused` stays the pane-id string. There is no new RPC. There is no `tab.get`. CLI USAGE stays `dory tree`. No `--label`. No `active_tab_id`. No `agent_status`. Do not add `occ`/`st` on workspace rows. Do not add `focused` on `pane.get`. Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
+
+| Landing | Owner |
+|---|---|
+| Occupant tree workspace occupant | `git show HEAD:rust/src/server.rs` |
+| Skill tree workspace occupant | `git show HEAD:skills/dory/SKILL.md` (`182d3e5`) |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
