@@ -3992,8 +3992,6 @@ mod tests {
     }
 
     #[test]
-
-    #[test]
     fn agent_focus_includes_cwd() {
         let xdg = temp_xdg();
         let mut server = start_server(&xdg);
@@ -4016,6 +4014,7 @@ mod tests {
         let _ = fs::remove_dir_all(&xdg);
     }
 
+    #[test]
     fn desk_tree_pane_includes_cwd() {
         let xdg = temp_xdg();
         let mut server = start_server(&xdg);
