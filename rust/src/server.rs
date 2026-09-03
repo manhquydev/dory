@@ -1074,15 +1074,22 @@ fn list_panes(world: &World, workspace_id: &str) -> String {
 
 fn workspace_object(ws: &Workspace, focused: &str) -> String {
     let pane_count: usize = ws.tabs.iter().map(|tab| tab.panes.len()).sum();
+    let occupant = ws
+        .tabs
+        .first()
+        .and_then(|tab| tab.panes.first())
+        .map(pane_occupant_json)
+        .unwrap_or_else(|| "null".to_string());
     let mut out = format!(
-        "{{\"workspace\":{{\"id\":\"{}\"}},\"tab_count\":{},\"pane_count\":{},\"focused\":{},\"workspace_id\":{},\"tabs\":[",
+        "{{\"workspace\":{{\"id\":\"{}\"}},\"tab_count\":{},\"pane_count\":{},\"focused\":{},\"workspace_id\":{},\"occupant\":{},\"tabs\":[",
         ws.id,
         ws.tabs.len(),
         pane_count,
         ws.tabs
             .iter()
             .any(|tab| tab.panes.iter().any(|pane| pane.id == focused)),
-        envelope::json_string(&ws.id)
+        envelope::json_string(&ws.id),
+        occupant
     );
     for (i, tab) in ws.tabs.iter().enumerate() {
         if i > 0 {
@@ -3197,6 +3204,10 @@ mod tests {
             "{get_body}"
         );
         assert!(
+            get_body.matches("\"occupant\":").count() >= 2,
+            "{get_body}"
+        );
+        assert!(
             get_body.matches("\"focused\":").count() >= 2,
             "{get_body}"
         );
@@ -3232,6 +3243,10 @@ mod tests {
         );
         assert!(
             get_body2.matches("\"workspace_id\":").count() >= 3,
+            "{get_body2}"
+        );
+        assert!(
+            get_body2.matches("\"occupant\":").count() >= 3,
             "{get_body2}"
         );
 
