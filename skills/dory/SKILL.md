@@ -162,6 +162,8 @@ Keep `dory tree`. Parse `.result.items[]` pane rows (`k=p`) `.workspace_id`. Lan
 
 Keep `dory tree`. Parse `.result.items[]` pane rows (`k=p`) `.tab_id`. Land `tab_id` is `tab.id`. Keep pane `k` / `id` / `occ` / `st` / `cwd` / `focused` / `workspace_id`. Keep tab `workspace_id`. Keep workspace `pane_count` / `tab_count`. Keep workspace `cwd`. No `pid` on tree rows. USAGE stays `dory tree`. Land RPC is `desk.tree`. No `agent.list`. No `pane.process-info`. No `focused` on `pane.get`. No `tab_id` on `pane.get`. No `tab.get`. No new RPC. This is Dory tree pane tab_id wrapping land `desk.tree`, not `agent.list` and not `tab.get`.
 
+Keep `dory tree`. Parse `.result.items[]` tab rows (`k=t`) `.occupant`. Land `occupant` is first-pane `pane_occupant_json` (`null` or `{name,state,seen}`). Keep tab `k` / `id` / `focused` / `pane_count` / `workspace_id`. Keep pane `occ` / `st` / `cwd` / `workspace_id` / `tab_id`. Keep workspace `pane_count` / `tab_count`. Keep workspace `cwd`. No `pid` on tree rows. USAGE stays `dory tree`. Land RPC is `desk.tree`. No `agent.list`. No `pane.process-info`. No `focused` on `pane.get`. No `tab.get`. No new RPC. Do not add `occ` / `st` on tab rows. This is Dory tree tab occupant wrapping land `desk.tree`, not `agent.list` and not `tab.get`.
+
 Create a workspace or tab only when the user asked for that topology. Create does not start an occupant.
 
 ## Layout
