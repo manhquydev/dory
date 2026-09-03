@@ -2094,11 +2094,13 @@ fn agent_read(
         Some(n) => crate::pty::tail_lines(&text, n as usize),
     };
     let cwd = proc_cwd(pane.held.child_pid(), &world.cwd);
+    let focused = pane.id == world.focused;
     let mut result = agent_snapshot(pane);
     result.pop();
     result.push_str(&format!(
-        ",\"cwd\":{},\"source\":{},\"text\":{}}}",
+        ",\"cwd\":{},\"focused\":{},\"source\":{},\"text\":{}}}",
         envelope::json_string(&cwd.to_string_lossy()),
+        focused,
         envelope::json_string(source),
         envelope::json_string(&text)
     ));
@@ -3970,6 +3972,7 @@ mod tests {
         assert!(got.contains("\"cwd\":"), "{got}");
         assert!(got.contains("\"source\":\"recent\""), "{got}");
         assert!(got.contains("\"name\":\"cwdog\""), "{got}");
+        assert!(got.contains("\"focused\":"), "{got}");
         let _ = stop_server(&xdg);
         let _ = server.wait();
         let _ = fs::remove_dir_all(&xdg);
