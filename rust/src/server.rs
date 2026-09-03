@@ -2093,10 +2093,12 @@ fn agent_read(
         Some(0) => return envelope::runtime_error("lines must be >= 1"),
         Some(n) => crate::pty::tail_lines(&text, n as usize),
     };
+    let cwd = proc_cwd(pane.held.child_pid(), &world.cwd);
     let mut result = agent_snapshot(pane);
     result.pop();
     result.push_str(&format!(
-        ",\"source\":{},\"text\":{}}}",
+        ",\"cwd\":{},\"source\":{},\"text\":{}}}",
+        envelope::json_string(&cwd.to_string_lossy()),
         envelope::json_string(source),
         envelope::json_string(&text)
     ));
@@ -3940,6 +3942,33 @@ mod tests {
         assert!(got.contains("\"focused\":"), "{got}");
         assert!(got.contains("\"tab_id\":"), "{got}");
         assert!(got.contains("\"workspace_id\":"), "{got}");
+        assert!(got.contains("\"name\":\"cwdog\""), "{got}");
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn agent_read_includes_cwd() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let snap = rpc_op(&sock, "snapshot");
+        let pane = json_field(&snap, "pane").to_string();
+        let started = rpc(
+            &sock,
+            &format!(
+                r#"{{"op":"agent.start","name":"cwdog","pane":"{pane}","argv":["echo"]}}"#
+            ),
+        );
+        assert!(started.contains("\"ok\":true"), "{started}");
+        let got = rpc(
+            &sock,
+            r#"{"op":"agent.read","name":"cwdog","source":"recent"}"#,
+        );
+        assert!(got.contains("\"ok\":true"), "{got}");
+        assert!(got.contains("\"cwd\":"), "{got}");
+        assert!(got.contains("\"source\":\"recent\""), "{got}");
         assert!(got.contains("\"name\":\"cwdog\""), "{got}");
         let _ = stop_server(&xdg);
         let _ = server.wait();
