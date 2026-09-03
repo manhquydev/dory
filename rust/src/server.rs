@@ -1373,10 +1373,11 @@ fn desk_tree(world: &World) -> String {
             items.push(',');
             let tab_focused = tab.panes.iter().any(|pane| pane.id == world.focused);
             items.push_str(&format!(
-                "{{\"k\":\"t\",\"id\":{},\"focused\":{},\"pane_count\":{}}}",
+                "{{\"k\":\"t\",\"id\":{},\"focused\":{},\"pane_count\":{},\"workspace_id\":{}}}",
                 envelope::json_string(&tab.id),
                 tab_focused,
-                tab.panes.len()
+                tab.panes.len(),
+                envelope::json_string(&ws.id)
             ));
             for pane in &tab.panes {
                 let (word, _, _) = classify_word(pane);
@@ -3868,6 +3869,10 @@ mod tests {
             tab_obj[..tab_end].contains("\"pane_count\":"),
             "{tree}"
         );
+        assert!(
+            tab_obj[..tab_end].contains("\"workspace_id\":"),
+            "{tree}"
+        );
         let ws_start = tree.find("\"k\":\"w\"").expect("workspace row");
         let ws_obj = &tree[ws_start..];
         let ws_end = ws_obj.find('}').expect("workspace close");
@@ -3881,6 +3886,11 @@ mod tests {
         );
         assert!(
             ws_obj[..ws_end].contains("\"tab_count\":"),
+            "{tree}"
+        );
+        let ws_id = json_field(&ws_obj[..ws_end], "id");
+        assert!(
+            tab_obj[..tab_end].contains(&format!("\"workspace_id\":\"{ws_id}\"")),
             "{tree}"
         );
         let _ = stop_server(&xdg);
