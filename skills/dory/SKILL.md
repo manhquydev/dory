@@ -146,6 +146,8 @@ Keep `dory tab list [--workspace <id> | --current]`. Parse `.result.tabs[].focus
 
 Keep `dory tab list [--workspace <id> | --current]`. Parse `.result.tabs[].workspace_id`. Land `workspace_id` is `ws.id`. Keep `.result.tabs[].id` / `.result.tabs[].occupant` / `.result.tabs[].pane_count` / `.result.tabs[].focused`. USAGE stays `dory tab list [--workspace <id> | --current]`. JSON stays land `{"op":"tab.list","workspace":"<id>"}`. No `tab.get`. No `--label`. No `tab.focus`. No new RPC. This is Dory tab-list feel for Herdr `tab list` workspace_id, not `tab.get` and not `--label`.
 
+Keep `dory tab list [--workspace <id> | --current]`. Parse `.result.tabs[].tab_id`. Land `tab_id` is `tab.id` (same as `id`). Keep `.result.tabs[].id` / `.result.tabs[].occupant` / `.result.tabs[].pane_count` / `.result.tabs[].focused` / `.result.tabs[].workspace_id`. USAGE stays `dory tab list [--workspace <id> | --current]`. JSON stays land `{"op":"tab.list","workspace":"<id>"}`. No `tab.get`. No `--label`. No `tab.focus`. No `tab_id` on `pane.get`. No new RPC. This is Dory tab-list feel for Herdr `tab list` tab_id, not `tab.get` and not `--label`.
+
 Occupants read the live roster with
 
 ```bash
