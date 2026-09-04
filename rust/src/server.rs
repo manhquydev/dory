@@ -1592,10 +1592,12 @@ fn desk_divider(world: &mut World, a: Option<&str>, b: Option<&str>, ratio: Opti
         return envelope::runtime_error("no shared split");
     }
     envelope::success(&format!(
-        "{{\"a\":{},\"b\":{},\"ratio\":{}}}",
+        "{{\"a\":{},\"b\":{},\"ratio\":{},\"a_pane_id\":{},\"b_pane_id\":{}}}",
         envelope::json_string(a),
         envelope::json_string(b),
-        crate::layout::clamp_ratio(ratio)
+        crate::layout::clamp_ratio(ratio),
+        envelope::json_string(a),
+        envelope::json_string(b)
     ))
 }
 
@@ -4849,6 +4851,49 @@ mod tests {
         assert!(
             nested.contains(&format!("\"pane_id\":\"{id}\"")),
             "{waited}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn divider_includes_a_b_pane_id() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let caller = json_field(&rpc_op(&sock, "snapshot"), "pane").to_string();
+        let split = rpc(
+            &sock,
+            &format!(
+                r#"{{"op":"pane.split","pane":"{caller}","direction":"right","no_focus":true}}"#
+            ),
+        );
+        assert!(split.contains("\"ok\":true"), "{split}");
+        let pane_start = split.find("\"pane\":{").expect("pane obj");
+        let pane_obj = &split[pane_start + 8..];
+        let pane_end = pane_obj.find('}').expect("pane close");
+        let nested = &pane_obj[..pane_end];
+        let new_id = json_field(nested, "id").to_string();
+        let div = rpc(
+            &sock,
+            &format!(
+                r#"{{"op":"desk.divider","a":"{caller}","b":"{new_id}","ratio":0.25}}"#
+            ),
+        );
+        assert!(div.contains("\"ok\":true"), "{div}");
+        assert!(div.contains(&format!("\"a\":\"{caller}\"")), "{div}");
+        assert!(div.contains(&format!("\"b\":\"{new_id}\"")), "{div}");
+        assert!(div.contains("\"ratio\":"), "{div}");
+        let a = json_field(&div, "a");
+        let b = json_field(&div, "b");
+        assert!(
+            div.contains(&format!("\"a_pane_id\":\"{a}\"")),
+            "{div}"
+        );
+        assert!(
+            div.contains(&format!("\"b_pane_id\":\"{b}\"")),
+            "{div}"
         );
         let _ = stop_server(&xdg);
         let _ = server.wait();
