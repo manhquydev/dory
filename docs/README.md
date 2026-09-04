@@ -920,6 +920,15 @@ Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server
 | Occupant layout cell pane_id | `git show HEAD:rust/src/server.rs` |
 | Skill layout cell pane_id | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant layout tab_id
+
+Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `desk.layout`. Occupant parse `.result.tab_id`. Land `tab_id` is `tab.id` (same as `.result.tab`). Keep `.result.tab` / `.result.focused` / `.result.cols` / `.result.rows`. Keep cells `id` / `x` / `y` / `w` / `h` / `occ` / `st` / `pane_id`. There is no new RPC. There is no `pane.layout` RPC. CLI USAGE stays `dory pane layout [--current | --tab <id>] --cols N --rows N`. Do not add `zoomed`. Do not alias `width`/`height`. Do not add `workspace_id` on layout root this slice. Do not recook pane.get/list/tree pane_id. Do not recook layout cell pane_id. Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
+
+| Landing | Owner |
+|---|---|
+| Occupant layout tab_id | `git show HEAD:rust/src/server.rs` |
+| Skill layout tab_id | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
