@@ -2927,7 +2927,7 @@ fn live_snapshot(world: &World) -> String {
     let (workspace, tab, pane) = first_ids(world);
     let pid = first_pid(world);
     format!(
-        "{{\"live\":true,\"workspace\":\"{workspace}\",\"tab\":\"{tab}\",\"pane\":\"{pane}\",\"pane_id\":\"{pane}\",\"pid\":{pid},\"focused\":\"{}\",\"tab_id\":\"{tab}\"}}",
+        "{{\"live\":true,\"workspace\":\"{workspace}\",\"tab\":\"{tab}\",\"pane\":\"{pane}\",\"pane_id\":\"{pane}\",\"pid\":{pid},\"focused\":\"{}\",\"tab_id\":\"{tab}\",\"workspace_id\":\"{workspace}\"}}",
         world.focused
     )
 }
@@ -5021,6 +5021,24 @@ mod tests {
         let tab = json_field(&snap, "tab");
         assert!(
             snap.contains(&format!("\"tab_id\":\"{tab}\"")),
+            "{snap}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn snapshot_includes_workspace_id() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let snap = rpc_op(&sock, "snapshot");
+        assert!(snap.contains("\"live\":true"), "{snap}");
+        assert!(snap.contains("\"workspace_id\":"), "{snap}");
+        let workspace = json_field(&snap, "workspace");
+        assert!(
+            snap.contains(&format!("\"workspace_id\":\"{workspace}\"")),
             "{snap}"
         );
         let _ = stop_server(&xdg);
