@@ -216,6 +216,8 @@ dory pane split --current --direction right --ratio 0.4 --no-focus
 
 Keep `dory pane split --pane <id>`. Exactly one of `--current` or `--pane <id>`. Both / neither / extra (including `--kind` / `--cwd`) → usage 2. `--direction` optional `right` | `down`. `--ratio F` optional. Missing value / non-float / twice → usage 2. Mutating: `DORY_ENV=1` on every arm. `--current` reads `DORY_PANE_ID` (exit 1 outside env / empty / invalid). `--pane <id>` keeps an explicit pane. JSON stays land `{"op":"pane.split","pane":"<id>","no_focus":true}` plus `"direction":"…"` only when set, plus `"ratio":F` only when set (JSON number, not string). There is **no** new split RPC. Pane split still has no `--cwd`. No `pane.zoom`. No `--kind`.
 
+Keep `dory pane split`. Parse `.result.pane.pane_id`. Land `pane_id` is the new `pane.id` (same as `.result.pane.id`) for Herdr `pane split` `.result.pane.pane_id`. Keep `.result.pane.id` / `.result.direction` / `.result.occupant` / optional `.result.ratio`. USAGE stays `dory pane split [--current | --pane <id>] [--direction right|down] [--ratio F] [--no-focus]`. JSON stays land `{"op":"pane.split",…}`. There is no new split RPC. No `--cwd`. No `pane.zoom`. No `--kind`. This is Dory split pane_id wrapping land `pane.split`, not `pane.zoom`.
+
 Occupants may pin cwd only on create:
 
 ```bash
