@@ -40,12 +40,13 @@ pub fn runtime_error(msg: &str) -> String {
     format!("{{\"ok\":false,\"error\":{}}}", json_string(msg))
 }
 
-/// `{"workspace":{"id":...},"tab":{"id":...},"root_pane":{"id":...,"pane_id":...}}`
+/// `{"workspace":{"id":...,"workspace_id":...},"tab":{"id":...},"root_pane":{"id":...,"pane_id":...}}`
 ///
 /// IDs come from the arguments. This helper never invents `w1`.
 pub fn result_workspace(id: &str, tab_id: &str, pane_id: &str) -> String {
     format!(
-        "{{\"workspace\":{{\"id\":{}}},\"tab\":{{\"id\":{}}},\"root_pane\":{{\"id\":{},\"pane_id\":{}}}}}",
+        "{{\"workspace\":{{\"id\":{},\"workspace_id\":{}}},\"tab\":{{\"id\":{}}},\"root_pane\":{{\"id\":{},\"pane_id\":{}}}}}",
+        json_string(id),
         json_string(id),
         json_string(tab_id),
         json_string(pane_id),
@@ -237,6 +238,15 @@ mod tests {
             "w3"
         );
         assert_eq!(
+            r.get("workspace")
+                .unwrap()
+                .obj()
+                .get("workspace_id")
+                .unwrap()
+                .str(),
+            "w3"
+        );
+        assert_eq!(
             r.get("tab").unwrap().obj().get("id").unwrap().str(),
             "w3:t2"
         );
@@ -257,6 +267,15 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn result_workspace_includes_workspace_id() {
+        let ws = result_workspace("wx", "wx:t9", "wx:p8");
+        let v = P::parse(&ws).expect("parseable");
+        let obj = v.obj().get("workspace").unwrap().obj();
+        assert_eq!(obj.get("id").unwrap().str(), "wx");
+        assert_eq!(obj.get("workspace_id").unwrap().str(), "wx");
+    }
+
     fn runtime_error_is_parseable() {
         let body = runtime_error(r#"no "pane""#);
         let v = P::parse(&body).expect("parseable");
