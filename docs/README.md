@@ -1078,6 +1078,15 @@ Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server
 | Skill read pane_id | `git show HEAD:skills/dory/SKILL.md` |
 
 
+## Paid occupant wait pane_id
+
+Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `pane.wait` settle via `tick_pane_wait`. Occupant parse `.result.pane.pane_id`. Land `pane_id` is waited `pane.id` (same as nested `.result.pane.id`). Keep `.result.pane.id` / `.result.matched` / `.result.text` / optional `.result.source` / `.result.lines`. There is no new RPC. There is no `tab.get`. CLI USAGE stays `dory pane wait-output [--current | --pane <id>] [--match LIT | --regex RE] [--source visible|recent|recent-unwrapped] [--lines N] [--timeout MS]`. Occupant verb stays `dory pane wait-output`. Do not recook pane.read pane_id. Do not recook pane.write pane_id. Timeout error unchanged. Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
+
+| Landing | Owner |
+|---|---|
+| Occupant wait pane_id | `git show HEAD:rust/src/server.rs` |
+| Skill wait pane_id | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
