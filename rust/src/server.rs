@@ -2926,10 +2926,12 @@ fn parse_op(line: &str) -> Option<&str> {
 fn live_snapshot(world: &World) -> String {
     let (workspace, tab, pane) = first_ids(world);
     let pid = first_pid(world);
+    let cwd = proc_cwd(pid, &world.cwd);
     format!(
-        "{{\"live\":true,\"workspace\":\"{workspace}\",\"tab\":\"{tab}\",\"pane\":\"{pane}\",\"pane_id\":\"{pane}\",\"pid\":{pid},\"focused\":\"{}\",\"tab_id\":\"{tab}\",\"workspace_id\":\"{workspace}\",\"focused_pane_id\":\"{}\"}}",
+        "{{\"live\":true,\"workspace\":\"{workspace}\",\"tab\":\"{tab}\",\"pane\":\"{pane}\",\"pane_id\":\"{pane}\",\"pid\":{pid},\"focused\":\"{}\",\"tab_id\":\"{tab}\",\"workspace_id\":\"{workspace}\",\"focused_pane_id\":\"{}\",\"cwd\":{}}}",
         world.focused,
-        world.focused
+        world.focused,
+        envelope::json_string(&cwd.to_string_lossy())
     )
 }
 
@@ -5059,6 +5061,30 @@ mod tests {
         assert!(
             snap.contains(&format!("\"focused_pane_id\":\"{focused}\"")),
             "{snap}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn snapshot_includes_cwd() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let snap = rpc_op(&sock, "snapshot");
+        assert!(snap.contains("\"live\":true"), "{snap}");
+        assert!(snap.contains("\"cwd\":"), "{snap}");
+        let pane = json_field(&snap, "pane").to_string();
+        let got = rpc(
+            &sock,
+            &format!(r#"{{"op":"pane.get","pane":"{pane}"}}"#),
+        );
+        assert!(got.contains("\"ok\":true"), "{got}");
+        let cwd = json_field(&got, "cwd");
+        assert!(
+            snap.contains(&format!("\"cwd\":\"{cwd}\"")),
+            "{snap} vs {got}"
         );
         let _ = stop_server(&xdg);
         let _ = server.wait();
