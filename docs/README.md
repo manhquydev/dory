@@ -1068,6 +1068,16 @@ Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server
 | Occupant write pane_id | `git show HEAD:rust/src/server.rs` |
 | Skill write pane_id | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant read pane_id
+
+Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `pane.read`. Occupant parse `.result.pane.pane_id`. Land `pane_id` is read `pane.id` (same as nested `.result.pane.id`). Keep `.result.pane.id` / `.result.source` / `.result.text`. There is no new RPC. There is no `tab.get`. CLI USAGE stays `dory pane read [--current | --pane <id>] [--source visible|recent|recent-unwrapped] [--lines N]`. Occupant verb stays `dory pane read`. Default source stays `recent`. `--lines` still `tail_lines`. Do not recook pane.write pane_id. `pane.focus` already `get_pane`. Do not add `pane.wait` `pane_id` this slice. Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
+
+| Landing | Owner |
+|---|---|
+| Occupant read pane_id | `git show HEAD:rust/src/server.rs` |
+| Skill read pane_id | `git show HEAD:skills/dory/SKILL.md` |
+
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
