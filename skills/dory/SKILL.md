@@ -308,6 +308,9 @@ dory pane divider --current --b <sibling-id> --ratio 0.4
 
 or `--a <id>`. Exactly one of `--a <id>` or `--current`. Both / neither / extra (including `--kind` / `--direction` / `--amount` / `--cols` / `--rows` / `--tab`) → usage 2. `--b <id>` and `--ratio F` required. Bad number / omit → usage 2. Mutating: `DORY_ENV=1` (exit 1 outside env) for both `--a` and `--current`. `--current` reads `DORY_PANE_ID` for the first pane (exit 1 outside env / empty / invalid). Keep `--a <id>`. JSON stays land `{"op":"desk.divider","a":"<id>","b":"<id>","ratio":F}`. There is no `pane.divider` RPC; occupant verb wraps `desk.divider`. Land returns `"no shared split"` when panes do not share a split — print the envelope (exit 1). Do not invent sibling discovery. Land clamps ratio to `[0.05, 0.95]`. CLI parses `f32` and does not re-clamp. This is Dory divider, not Herdr `--direction` / `--amount`. Keep `dory pane resize` / `dory pane layout` as they are. No `pane.zoom`.
 
+Keep `dory pane divider`. Parse `.result.a_pane_id` / `.result.b_pane_id`. Land `a_pane_id` / `b_pane_id` are `a` / `b` (same as `.result.a` / `.result.b`) for Herdr pane identity. Keep `.result.a` / `.result.b` / `.result.ratio`. USAGE stays `dory pane divider [--a <id> | --current] --b <id> --ratio F`. JSON stays land `{"op":"desk.divider","a":"<id>","b":"<id>","ratio":F}`. There is no `pane.divider` RPC. Occupant verb wraps `desk.divider`. No `pane.zoom`. Do not recook pane.wait pane_id. This is Dory divider a/b pane_id wrapping land `desk.divider`, not `pane.zoom`.
+
+
 ```bash
 dory tab create --workspace "$DORY_WORKSPACE_ID"
 dory tab create --current
