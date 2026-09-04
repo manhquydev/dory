@@ -1049,7 +1049,8 @@ fn close_pane(world: &mut World, pane_id: &str) -> String {
     }
     retarget_focus(world, Some((loc.wi, loc.ti)));
     envelope::success(&format!(
-        "{{\"pane\":{{\"id\":\"{}\"}},\"retired\":true}}",
+        "{{\"pane\":{{\"id\":\"{}\",\"pane_id\":\"{}\"}},\"retired\":true}}",
+        pane.id,
         pane.id
     ))
 }
@@ -4562,6 +4563,46 @@ mod tests {
         assert!(
             nested.contains(&format!("\"pane_id\":\"{id}\"")),
             "{created}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn close_pane_includes_pane_id() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let caller = json_field(&rpc_op(&sock, "snapshot"), "pane").to_string();
+        let split = rpc(
+            &sock,
+            &format!(
+                r#"{{"op":"pane.split","pane":"{caller}","direction":"right","no_focus":true}}"#
+            ),
+        );
+        assert!(split.contains("\"ok\":true"), "{split}");
+        let pane_start = split.find("\"pane\":{").expect("pane obj");
+        let pane_obj = &split[pane_start + 8..];
+        let pane_end = pane_obj.find('}').expect("pane close");
+        let nested = &pane_obj[..pane_end];
+        let new_id = json_field(nested, "id").to_string();
+        let closed = rpc(
+            &sock,
+            &format!(r#"{{"op":"pane.close","pane":"{new_id}"}}"#),
+        );
+        assert!(closed.contains("\"ok\":true"), "{closed}");
+        assert!(closed.contains("\"retired\":true"), "{closed}");
+        let cstart = closed.find("\"pane\":{").expect("close pane");
+        let cobj = &closed[cstart + 8..];
+        let cend = cobj.find('}').expect("close pane close");
+        let cnested = &cobj[..cend];
+        assert!(cnested.contains("\"id\":"), "{closed}");
+        assert!(cnested.contains("\"pane_id\":"), "{closed}");
+        let id = json_field(cnested, "id");
+        assert!(
+            cnested.contains(&format!("\"pane_id\":\"{id}\"")),
+            "{closed}"
         );
         let _ = stop_server(&xdg);
         let _ = server.wait();
