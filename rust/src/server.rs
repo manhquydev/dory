@@ -1625,7 +1625,8 @@ fn desk_neighbor(
         let cells = crate::layout::tiles(&lay, 0, 0, cols, rows);
         return match crate::layout::neighbor_step(&cells, from, step.unwrap_or("")) {
             Some(id) => envelope::success(&format!(
-                "{{\"pane\":{{\"id\":{}}},\"pane_id\":{}}}",
+                "{{\"pane\":{{\"id\":{},\"pane_id\":{}}},\"pane_id\":{}}}",
+                envelope::json_string(&id),
                 envelope::json_string(&id),
                 envelope::json_string(&id)
             )),
@@ -1658,7 +1659,8 @@ fn desk_neighbor(
         _ => (idx + 1) % ids.len(),
     };
     envelope::success(&format!(
-        "{{\"pane\":{{\"id\":{}}},\"pane_id\":{}}}",
+        "{{\"pane\":{{\"id\":{},\"pane_id\":{}}},\"pane_id\":{}}}",
+        envelope::json_string(&ids[next]),
         envelope::json_string(&ids[next]),
         envelope::json_string(&ids[next])
     ))
@@ -4894,6 +4896,34 @@ mod tests {
         assert!(
             div.contains(&format!("\"b_pane_id\":\"{b}\"")),
             "{div}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn desk_neighbor_nested_pane_id() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let snap = rpc_op(&sock, "snapshot");
+        let pane = json_field(&snap, "pane").to_string();
+        let got = rpc(
+            &sock,
+            &format!(r#"{{"op":"desk.neighbor","from":"{pane}","step":"next"}}"#),
+        );
+        assert!(got.contains("\"ok\":true"), "{got}");
+        let pane_start = got.find("\"pane\":{").expect("pane obj");
+        let pane_obj = &got[pane_start + 8..];
+        let pane_end = pane_obj.find('}').expect("pane close");
+        let nested = &pane_obj[..pane_end];
+        assert!(nested.contains("\"id\":"), "{got}");
+        assert!(nested.contains("\"pane_id\":"), "{got}");
+        let id = json_field(nested, "id");
+        assert!(
+            nested.contains(&format!("\"pane_id\":\"{id}\"")),
+            "{got}"
         );
         let _ = stop_server(&xdg);
         let _ = server.wait();
