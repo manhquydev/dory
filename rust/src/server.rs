@@ -1477,7 +1477,7 @@ fn desk_tree(world: &World) -> String {
                 let cwd = proc_cwd(pid, &world.cwd);
                 items.push(',');
                 items.push_str(&format!(
-                    "{{\"k\":\"p\",\"id\":{},\"occ\":{},\"st\":{},\"cwd\":{},\"focused\":{},\"workspace_id\":{},\"tab_id\":{}}}",
+                    "{{\"k\":\"p\",\"id\":{},\"occ\":{},\"st\":{},\"cwd\":{},\"focused\":{},\"workspace_id\":{},\"tab_id\":{},\"pane_id\":{}}}",
                     envelope::json_string(&pane.id),
                     envelope::json_string(occ),
                     envelope::json_string(if pane.occupant.is_some() {
@@ -1488,7 +1488,8 @@ fn desk_tree(world: &World) -> String {
                     envelope::json_string(&cwd.to_string_lossy()),
                     pane.id == world.focused,
                     envelope::json_string(&ws.id),
-                    envelope::json_string(&tab.id)
+                    envelope::json_string(&tab.id),
+                    envelope::json_string(&pane.id)
                 ));
             }
         }
@@ -4306,6 +4307,10 @@ mod tests {
         );
         assert!(
             pane_obj[..pane_end].contains("\"tab_id\":"),
+            "{tree}"
+        );
+        assert!(
+            pane_obj[..pane_end].contains("\"pane_id\":"),
             "{tree}"
         );
         let tab_start = tree.find("\"k\":\"t\"").expect("tab row");
