@@ -1162,6 +1162,15 @@ Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server
 | Occupant snapshot focused_pane_id | `git show HEAD:rust/src/server.rs` |
 | Skill snapshot focused_pane_id | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant snapshot cwd
+
+Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `snapshot` via `live_snapshot`. Occupant parse `.cwd`. Land `cwd` is `proc_cwd` on the first pane child (`/proc/{pid}/cwd` with `world.cwd` fallback). Keep `.live` / `.workspace` / `.tab` / `.pane` / `.pane_id` / `.pid` / `.focused` / `.tab_id` / `.workspace_id` / `.focused_pane_id`. There is no new RPC. There is no `dory snapshot` CLI. There is no `tab.get`. JSON stays `{"op":"snapshot"}`. Do not wrap snapshot `pane` as an object. Do not change `desk.snapshot`. Do not change `dead_snapshot`. Do not recook snapshot id family. Do not claim `foreground_cwd`. Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
+
+| Landing | Owner |
+|---|---|
+| Occupant snapshot cwd | `git show HEAD:rust/src/server.rs` |
+| Skill snapshot cwd | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
