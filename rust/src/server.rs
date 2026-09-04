@@ -1547,14 +1547,15 @@ fn desk_layout(
         }
         let (occ, st) = pane_occ_st(world, &cell.id);
         json.push_str(&format!(
-            "{{\"id\":{},\"x\":{},\"y\":{},\"w\":{},\"h\":{},\"occ\":{},\"st\":{}}}",
+            "{{\"id\":{},\"x\":{},\"y\":{},\"w\":{},\"h\":{},\"occ\":{},\"st\":{},\"pane_id\":{}}}",
             envelope::json_string(&cell.id),
             cell.x,
             cell.y,
             cell.w,
             cell.h,
             envelope::json_string(&occ),
-            envelope::json_string(&st)
+            envelope::json_string(&st),
+            envelope::json_string(&cell.id)
         ));
     }
     json.push(']');
@@ -4372,6 +4373,28 @@ mod tests {
         assert!(
             tab_obj[..tab_end].contains(&format!("\"tab_id\":\"{tab_id}\"")),
             "{tree}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn desk_layout_cell_includes_pane_id() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let lay = rpc(&sock, r#"{"op":"desk.layout","cols":80,"rows":22}"#);
+        assert!(lay.contains("\"ok\":true"), "{lay}");
+        let cells = lay.split_once("\"cells\":[").expect("cells").1;
+        let cell_end = cells.find('}').expect("cell close");
+        let cell = &cells[..cell_end];
+        assert!(cell.contains("\"id\":"), "{lay}");
+        assert!(cell.contains("\"pane_id\":"), "{lay}");
+        let id = json_field(cell, "id");
+        assert!(
+            cell.contains(&format!("\"pane_id\":\"{id}\"")),
+            "{lay}"
         );
         let _ = stop_server(&xdg);
         let _ = server.wait();
