@@ -1015,7 +1015,8 @@ fn close_workspace(world: &mut World, workspace_id: &str) -> String {
     world.ids.retire(&ws.id);
     retarget_focus(world, None);
     envelope::success(&format!(
-        "{{\"workspace\":{{\"id\":\"{}\"}},\"retired\":true}}",
+        "{{\"workspace\":{{\"id\":\"{}\",\"workspace_id\":\"{}\"}},\"retired\":true}}",
+        ws.id,
         ws.id
     ))
 }
@@ -4664,6 +4665,40 @@ mod tests {
         let id = json_field(cnested, "id");
         assert!(
             cnested.contains(&format!("\"tab_id\":\"{id}\"")),
+            "{closed}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn close_workspace_includes_workspace_id() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let created = rpc(&sock, r#"{"op":"workspace.create"}"#);
+        assert!(created.contains("\"ok\":true"), "{created}");
+        let ws_start = created.find("\"workspace\":{").expect("workspace obj");
+        let ws_obj = &created[ws_start + 13..];
+        let ws_end = ws_obj.find('}').expect("workspace close");
+        let nested = &ws_obj[..ws_end];
+        let new_id = json_field(nested, "id").to_string();
+        let closed = rpc(
+            &sock,
+            &format!(r#"{{"op":"workspace.close","workspace":"{new_id}"}}"#),
+        );
+        assert!(closed.contains("\"ok\":true"), "{closed}");
+        assert!(closed.contains("\"retired\":true"), "{closed}");
+        let cstart = closed.find("\"workspace\":{").expect("close workspace");
+        let cobj = &closed[cstart + 13..];
+        let cend = cobj.find('}').expect("close workspace close");
+        let cnested = &cobj[..cend];
+        assert!(cnested.contains("\"id\":"), "{closed}");
+        assert!(cnested.contains("\"workspace_id\":"), "{closed}");
+        let id = json_field(cnested, "id");
+        assert!(
+            cnested.contains(&format!("\"workspace_id\":\"{id}\"")),
             "{closed}"
         );
         let _ = stop_server(&xdg);
