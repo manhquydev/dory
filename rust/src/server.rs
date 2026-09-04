@@ -1162,8 +1162,9 @@ fn workspace_object(ws: &Workspace, focused: &str) -> String {
             out.push(',');
         }
         out.push_str(&format!(
-            "{{\"id\":\"{}\",\"root_pane\":{{\"id\":\"{}\"}},\"occupant\":{},\"pane_count\":{},\"focused\":{},\"workspace_id\":{},\"tab_id\":{}}}",
+            "{{\"id\":\"{}\",\"root_pane\":{{\"id\":\"{}\",\"pane_id\":\"{}\"}},\"occupant\":{},\"pane_count\":{},\"focused\":{},\"workspace_id\":{},\"tab_id\":{}}}",
             tab.id,
+            tab.root_pane,
             tab.root_pane,
             tab.panes
                 .first()
@@ -4951,6 +4952,33 @@ mod tests {
         let pane_obj = &got[pane_start + 8..];
         let pane_end = pane_obj.find('}').expect("pane close");
         let nested = &pane_obj[..pane_end];
+        assert!(nested.contains("\"id\":"), "{got}");
+        assert!(nested.contains("\"pane_id\":"), "{got}");
+        let id = json_field(nested, "id");
+        assert!(
+            nested.contains(&format!("\"pane_id\":\"{id}\"")),
+            "{got}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn workspace_nested_root_pane_includes_pane_id() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let ws = json_field(&rpc_op(&sock, "snapshot"), "workspace").to_string();
+        let got = rpc(
+            &sock,
+            &format!(r#"{{"op":"workspace.get","workspace":"{ws}"}}"#),
+        );
+        assert!(got.contains("\"ok\":true"), "{got}");
+        let root_start = got.find("\"root_pane\":{").expect("root_pane obj");
+        let root_obj = &got[root_start + 13..];
+        let root_end = root_obj.find('}').expect("root_pane close");
+        let nested = &root_obj[..root_end];
         assert!(nested.contains("\"id\":"), "{got}");
         assert!(nested.contains("\"pane_id\":"), "{got}");
         let id = json_field(nested, "id");
