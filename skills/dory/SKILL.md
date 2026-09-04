@@ -234,6 +234,8 @@ Keep `dory tab create --workspace <id>` and optional `--cwd`. Exactly one of `--
 
 Keep `dory tab create`. Parse `.result.root_pane.pane_id`. Land `pane_id` is the new root `pane.id` (same as `.result.root_pane.id`) for Herdr `tab create` `.result.root_pane.pane_id`. Keep `.result.tab.id` / `.result.root_pane.id` / `.result.occupant`. USAGE stays `dory tab create [--workspace <id> | --current] [--cwd <path>]`. JSON stays land `{"op":"tab.create","workspace":"<id>"}`. There is no new create RPC. No `tab.get`. No `--label` / `--no-focus`. No `pane.split --cwd`. No `pane.zoom`. Do not recook neighbor pane_id. Do not recook split pane_id. Do not add `pane.close` `pane_id` this slice. This is Dory tab-create root_pane pane_id wrapping land `tab.create`, not `tab.get`.
 
+Keep `dory tab create`. Parse `.result.tab.tab_id`. Land `tab_id` is the new `tab.id` (same as `.result.tab.id`) for Herdr tab identity. Keep `.result.tab.id` / `.result.root_pane.id` / `.result.root_pane.pane_id` / `.result.occupant`. USAGE stays `dory tab create [--workspace <id> | --current] [--cwd <path>]`. JSON stays land `{"op":"tab.create","workspace":"<id>"}`. There is no new RPC. No `tab.get`. No `--label` / `--no-focus`. No `pane.split --cwd`. No `pane.zoom`. Do not recook tab.create root_pane pane_id. Do not recook workspace.close workspace_id. This is Dory tab-create tab_id wrapping land `tab.create`, not `tab.get`.
+
 Occupants resize with:
 
 ```bash
