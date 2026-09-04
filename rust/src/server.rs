@@ -1913,8 +1913,9 @@ fn agent_snapshot(pane: &Pane) -> String {
     let occ = pane.occupant.as_ref().unwrap();
     let (word, _, _) = classify_word(pane);
     format!(
-        "{{\"agent\":{{\"name\":{},\"pane\":{},\"state\":{},\"seen\":{}}}}}",
+        "{{\"agent\":{{\"name\":{},\"pane\":{},\"pane_id\":{},\"state\":{},\"seen\":{}}}}}",
         envelope::json_string(&occ.name),
+        envelope::json_string(&pane.id),
         envelope::json_string(&pane.id),
         envelope::json_string(word.as_str()),
         if occ.seen { "true" } else { "false" }
@@ -4093,6 +4094,38 @@ mod tests {
         assert!(got.contains("\"tab_id\":"), "{got}");
         assert!(got.contains("\"workspace_id\":"), "{got}");
         assert!(got.contains("\"name\":\"cwdog\""), "{got}");
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn agent_get_includes_pane_id() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let snap = rpc_op(&sock, "snapshot");
+        let pane = json_field(&snap, "pane").to_string();
+        let started = rpc(
+            &sock,
+            &format!(
+                r#"{{"op":"agent.start","name":"cwdog","pane":"{pane}","argv":["echo"]}}"#
+            ),
+        );
+        assert!(started.contains("\"ok\":true"), "{started}");
+        let got = rpc(&sock, r#"{"op":"agent.get","name":"cwdog"}"#);
+        assert!(got.contains("\"ok\":true"), "{got}");
+        let agent_start = got.find("\"agent\":{").expect("agent obj");
+        let agent_obj = &got[agent_start + 9..];
+        let agent_end = agent_obj.find('}').expect("agent close");
+        let nested = &agent_obj[..agent_end];
+        assert!(nested.contains("\"pane\":"), "{got}");
+        assert!(nested.contains("\"pane_id\":"), "{got}");
+        let id = json_field(nested, "pane");
+        assert!(
+            nested.contains(&format!("\"pane_id\":\"{id}\"")),
+            "{got}"
+        );
         let _ = stop_server(&xdg);
         let _ = server.wait();
         let _ = fs::remove_dir_all(&xdg);
