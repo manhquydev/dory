@@ -1087,6 +1087,16 @@ Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server
 | Occupant wait pane_id | `git show HEAD:rust/src/server.rs` |
 | Skill wait pane_id | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant divider a/b pane_id
+
+Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `desk.divider`. Occupant parse `.result.a_pane_id` / `.result.b_pane_id`. Land `a_pane_id` / `b_pane_id` are `a` / `b` (same as `.result.a` / `.result.b`). Keep `.result.a` / `.result.b` / `.result.ratio`. There is no new RPC. There is no `pane.divider` RPC. There is no `tab.get`. CLI USAGE stays `dory pane divider [--a <id> | --current] --b <id> --ratio F`. Occupant verb stays `dory pane divider`. Do not recook pane.wait pane_id. Do not recook pane.send-keys result (`pane.write` already `pane_id`). Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
+
+| Landing | Owner |
+|---|---|
+| Occupant divider a/b pane_id | `git show HEAD:rust/src/server.rs` |
+| Skill divider a/b pane_id | `git show HEAD:skills/dory/SKILL.md` |
+
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
