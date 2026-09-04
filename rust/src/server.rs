@@ -2078,11 +2078,13 @@ fn agent_prompt(
     let cwd = proc_cwd(pid, &world.cwd);
     let focused = pane_key == world.focused;
     let tab_id = world.workspaces[loc.wi].tabs[loc.ti].id.clone();
+    let workspace_id = world.workspaces[loc.wi].id.clone();
     result.push_str(&format!(
-        ",\"cwd\":{},\"focused\":{},\"tab_id\":{}}}",
+        ",\"cwd\":{},\"focused\":{},\"tab_id\":{},\"workspace_id\":{}}}",
         envelope::json_string(&cwd.to_string_lossy()),
         focused,
-        envelope::json_string(&tab_id)
+        envelope::json_string(&tab_id),
+        envelope::json_string(&workspace_id)
     ));
     LineReply::Msg(envelope::success(&result))
 }
@@ -4188,6 +4190,7 @@ mod tests {
         assert!(got.contains("\"cwd\":"), "{got}");
         assert!(got.contains("\"focused\":"), "{got}");
         assert!(got.contains("\"tab_id\":"), "{got}");
+        assert!(got.contains("\"workspace_id\":"), "{got}");
         let _ = stop_server(&xdg);
         let _ = server.wait();
         let _ = fs::remove_dir_all(&xdg);
