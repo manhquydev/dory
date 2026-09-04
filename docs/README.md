@@ -1002,6 +1002,15 @@ Cite land with `git show HEAD:rust/src/envelope.rs`. Working-tree leftover `serv
 | Skill workspace create root_pane pane_id | `git show HEAD:skills/dory/SKILL.md` |
 
 
+## Paid occupant close tab_id
+
+Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `tab.close`. Occupant parse `.result.tab.tab_id`. Land `tab_id` is closed `tab.id` (same as nested `.result.tab.id`). Keep `.result.tab.id` / `.result.retired`. There is no new RPC. There is no `tab.get`. CLI USAGE stays `dory tab close [<id> | --current]`. Occupant verb stays `dory tab close`. Do not recook workspace.create root_pane pane_id. Do not recook pane.close pane_id. Do not recook tab.create root_pane pane_id. Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
+
+| Landing | Owner |
+|---|---|
+| Occupant close tab_id | `git show HEAD:rust/src/server.rs` |
+| Skill close tab_id | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
