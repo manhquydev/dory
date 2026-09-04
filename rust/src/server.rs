@@ -2330,7 +2330,8 @@ fn read_pane(world: &World, pane_id: &str, source: &str, lines: Option<u64>) -> 
         Some(n) => crate::pty::tail_lines(&text, n as usize),
     };
     envelope::success(&format!(
-        "{{\"pane\":{{\"id\":{}}},\"source\":{},\"text\":{}}}",
+        "{{\"pane\":{{\"id\":{},\"pane_id\":{}}},\"source\":{},\"text\":{}}}",
+        envelope::json_string(&pane.id),
         envelope::json_string(&pane.id),
         envelope::json_string(source),
         envelope::json_string(&text)
@@ -4783,6 +4784,33 @@ mod tests {
         assert!(
             nested.contains(&format!("\"pane_id\":\"{id}\"")),
             "{written}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn read_pane_includes_pane_id() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let caller = json_field(&rpc_op(&sock, "snapshot"), "pane").to_string();
+        let got = rpc(
+            &sock,
+            &format!(r#"{{"op":"pane.read","pane":"{caller}"}}"#),
+        );
+        assert!(got.contains("\"ok\":true"), "{got}");
+        let pane_start = got.find("\"pane\":{").expect("pane obj");
+        let pane_obj = &got[pane_start + 8..];
+        let pane_end = pane_obj.find('}').expect("pane close");
+        let nested = &pane_obj[..pane_end];
+        assert!(nested.contains("\"id\":"), "{got}");
+        assert!(nested.contains("\"pane_id\":"), "{got}");
+        let id = json_field(nested, "id");
+        assert!(
+            nested.contains(&format!("\"pane_id\":\"{id}\"")),
+            "{got}"
         );
         let _ = stop_server(&xdg);
         let _ = server.wait();
