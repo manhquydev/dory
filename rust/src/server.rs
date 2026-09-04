@@ -1560,7 +1560,8 @@ fn desk_layout(
     }
     json.push(']');
     envelope::success(&format!(
-        "{{\"tab\":{},\"focused\":{},\"cols\":{cols},\"rows\":{rows},\"cells\":{json}}}",
+        "{{\"tab\":{},\"tab_id\":{},\"focused\":{},\"cols\":{cols},\"rows\":{rows},\"cells\":{json}}}",
+        envelope::json_string(&tab.id),
         envelope::json_string(&tab.id),
         envelope::json_string(&world.focused)
     ))
@@ -4394,6 +4395,24 @@ mod tests {
         let id = json_field(cell, "id");
         assert!(
             cell.contains(&format!("\"pane_id\":\"{id}\"")),
+            "{lay}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn desk_layout_includes_tab_id() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let lay = rpc(&sock, r#"{"op":"desk.layout","cols":80,"rows":22}"#);
+        assert!(lay.contains("\"ok\":true"), "{lay}");
+        assert!(lay.contains("\"tab_id\":"), "{lay}");
+        let tab = json_field(&lay, "tab");
+        assert!(
+            lay.contains(&format!("\"tab_id\":\"{tab}\"")),
             "{lay}"
         );
         let _ = stop_server(&xdg);
