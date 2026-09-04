@@ -1011,6 +1011,25 @@ Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server
 | Occupant close tab_id | `git show HEAD:rust/src/server.rs` |
 | Skill close tab_id | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant close workspace_id
+
+Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `workspace.close`. Occupant parse `.result.workspace.workspace_id`. Land `workspace_id` is closed `ws.id` (same as nested `.result.workspace.id`). Keep `.result.workspace.id` / `.result.retired`. There is no new RPC. There is no `tab.get`. CLI USAGE stays `dory workspace close [<id> | --current]`. Occupant verb stays `dory workspace close`. Do not recook tab.close tab_id. Do not recook workspace.create root_pane pane_id. Do not recook pane.close pane_id. Do not recook tab.create root_pane pane_id. Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
+
+| Landing | Owner |
+|---|---|
+| Occupant close workspace_id | `git show HEAD:rust/src/server.rs` |
+| Skill close workspace_id | `git show HEAD:skills/dory/SKILL.md` |
+
+## Paid occupant tab create tab_id
+
+Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `tab.create`. Occupant parse `.result.tab.tab_id`. Land `tab_id` is the new `tab.id` (same as nested `.result.tab.id`). Keep `.result.tab.id` / `.result.root_pane.id` / `.result.root_pane.pane_id` / `.result.occupant`. There is no new RPC. There is no `tab.get`. CLI USAGE stays `dory tab create [--workspace <id> | --current] [--cwd <path>]`. Occupant verb stays `dory tab create`. Do not recook tab.create root_pane pane_id. Do not recook workspace.close workspace_id. Do not recook tab.close tab_id. Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
+
+| Landing | Owner |
+|---|---|
+| Occupant tab create tab_id | `git show HEAD:rust/src/server.rs` |
+| Skill tab create tab_id | `git show HEAD:skills/dory/SKILL.md` |
+
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
