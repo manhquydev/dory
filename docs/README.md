@@ -974,6 +974,15 @@ Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server
 | Occupant split pane_id | `git show HEAD:rust/src/server.rs` |
 | Skill split pane_id | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant tab create root_pane pane_id
+
+Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `tab.create`. Occupant parse `.result.root_pane.pane_id`. Land `pane_id` is the new root `pane.id` (same as nested `.result.root_pane.id`). Keep `.result.tab.id` / `.result.root_pane.id` / `.result.occupant`. There is no new RPC. There is no `tab.get`. CLI USAGE stays `dory tab create [--workspace <id> | --current] [--cwd <path>]`. Occupant verb stays `dory tab create`. Do not add `pane.close` `pane_id` this slice. Do not recook neighbor pane_id. Do not recook split pane_id. Do not recook layout family. Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
+
+| Landing | Owner |
+|---|---|
+| Occupant tab create root_pane pane_id | `git show HEAD:rust/src/server.rs` |
+| Skill tab create root_pane pane_id | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
