@@ -4543,6 +4543,29 @@ mod tests {
     }
 
     #[test]
+    fn workspace_create_root_pane_includes_pane_id() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let created = rpc(&sock, r#"{"op":"workspace.create"}"#);
+        assert!(created.contains("\"ok\":true"), "{created}");
+        let root_start = created.find("\"root_pane\":{").expect("root_pane obj");
+        let root_obj = &created[root_start + 13..];
+        let root_end = root_obj.find('}').expect("root_pane close");
+        let nested = &root_obj[..root_end];
+        assert!(nested.contains("\"id\":"), "{created}");
+        assert!(nested.contains("\"pane_id\":"), "{created}");
+        let id = json_field(nested, "id");
+        assert!(
+            nested.contains(&format!("\"pane_id\":\"{id}\"")),
+            "{created}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
     fn tab_create_root_pane_includes_pane_id() {
         let xdg = temp_xdg();
         let mut server = start_server(&xdg);

@@ -40,14 +40,15 @@ pub fn runtime_error(msg: &str) -> String {
     format!("{{\"ok\":false,\"error\":{}}}", json_string(msg))
 }
 
-/// `{"workspace":{"id":...},"tab":{"id":...},"root_pane":{"id":...}}`
+/// `{"workspace":{"id":...},"tab":{"id":...},"root_pane":{"id":...,"pane_id":...}}`
 ///
 /// IDs come from the arguments. This helper never invents `w1`.
 pub fn result_workspace(id: &str, tab_id: &str, pane_id: &str) -> String {
     format!(
-        "{{\"workspace\":{{\"id\":{}}},\"tab\":{{\"id\":{}}},\"root_pane\":{{\"id\":{}}}}}",
+        "{{\"workspace\":{{\"id\":{}}},\"tab\":{{\"id\":{}}},\"root_pane\":{{\"id\":{},\"pane_id\":{}}}}}",
         json_string(id),
         json_string(tab_id),
+        json_string(pane_id),
         json_string(pane_id)
     )
 }
@@ -241,6 +242,15 @@ mod tests {
         );
         assert_eq!(
             r.get("root_pane").unwrap().obj().get("id").unwrap().str(),
+            "w3:p4"
+        );
+        assert_eq!(
+            r.get("root_pane")
+                .unwrap()
+                .obj()
+                .get("pane_id")
+                .unwrap()
+                .str(),
             "w3:p4"
         );
         assert!(!body.contains("/workplace"));
