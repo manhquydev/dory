@@ -1721,20 +1721,23 @@ fn get_pane(world: &World, pane_id: &str) -> String {
         return envelope::runtime_error(&format!("unknown pane {pane_id}"));
     };
     let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
+    let pane_key = pane.id.clone();
     let pid = pane.held.child_pid();
+    let occ = pane_occupant_json(pane);
     let cwd = proc_cwd(pid, &world.cwd);
-    let focused = pane.id == world.focused;
+    let focused = pane_key == world.focused;
     let tab_id = world.workspaces[loc.wi].tabs[loc.ti].id.clone();
     let workspace_id = world.workspaces[loc.wi].id.clone();
     envelope::success(&format!(
-        "{{\"pane\":{{\"id\":\"{}\"}},\"pid\":{},\"cwd\":{},\"occupant\":{},\"focused\":{},\"tab_id\":{},\"workspace_id\":{}}}",
-        pane.id,
+        "{{\"pane\":{{\"id\":\"{}\"}},\"pid\":{},\"cwd\":{},\"occupant\":{},\"focused\":{},\"tab_id\":{},\"workspace_id\":{},\"pane_id\":{}}}",
+        pane_key,
         pid,
         envelope::json_string(&cwd.to_string_lossy()),
-        pane_occupant_json(pane),
+        occ,
         focused,
         envelope::json_string(&tab_id),
-        envelope::json_string(&workspace_id)
+        envelope::json_string(&workspace_id),
+        envelope::json_string(&pane_key)
     ))
 }
 
@@ -4035,6 +4038,7 @@ mod tests {
         assert!(got.contains("\"focused\":"), "{got}");
         assert!(got.contains("\"tab_id\":"), "{got}");
         assert!(got.contains("\"workspace_id\":"), "{got}");
+        assert!(got.contains("\"pane_id\":"), "{got}");
         let _ = stop_server(&xdg);
         let _ = server.wait();
         let _ = fs::remove_dir_all(&xdg);
