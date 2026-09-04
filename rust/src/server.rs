@@ -987,7 +987,8 @@ fn close_tab(world: &mut World, tab_id: &str) -> String {
         retarget_focus(world, Some((wi, ti)));
     }
     envelope::success(&format!(
-        "{{\"tab\":{{\"id\":\"{}\"}},\"retired\":true}}",
+        "{{\"tab\":{{\"id\":\"{}\",\"tab_id\":\"{}\"}},\"retired\":true}}",
+        tab.id,
         tab.id
     ))
 }
@@ -4625,6 +4626,44 @@ mod tests {
         let id = json_field(cnested, "id");
         assert!(
             cnested.contains(&format!("\"pane_id\":\"{id}\"")),
+            "{closed}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn close_tab_includes_tab_id() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let ws = json_field(&rpc_op(&sock, "snapshot"), "workspace").to_string();
+        let created = rpc(
+            &sock,
+            &format!(r#"{{"op":"tab.create","workspace":"{ws}"}}"#),
+        );
+        assert!(created.contains("\"ok\":true"), "{created}");
+        let tab_start = created.find("\"tab\":{").expect("tab obj");
+        let tab_obj = &created[tab_start + 7..];
+        let tab_end = tab_obj.find('}').expect("tab close");
+        let nested = &tab_obj[..tab_end];
+        let new_id = json_field(nested, "id").to_string();
+        let closed = rpc(
+            &sock,
+            &format!(r#"{{"op":"tab.close","tab":"{new_id}"}}"#),
+        );
+        assert!(closed.contains("\"ok\":true"), "{closed}");
+        assert!(closed.contains("\"retired\":true"), "{closed}");
+        let cstart = closed.find("\"tab\":{").expect("close tab");
+        let cobj = &closed[cstart + 7..];
+        let cend = cobj.find('}').expect("close tab close");
+        let cnested = &cobj[..cend];
+        assert!(cnested.contains("\"id\":"), "{closed}");
+        assert!(cnested.contains("\"tab_id\":"), "{closed}");
+        let id = json_field(cnested, "id");
+        assert!(
+            cnested.contains(&format!("\"tab_id\":\"{id}\"")),
             "{closed}"
         );
         let _ = stop_server(&xdg);
