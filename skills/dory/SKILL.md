@@ -119,6 +119,8 @@ Keep `dory workspace list` and `dory workspace get [<id> | --current]`. Parse li
 
 Keep `dory pane get --pane <id>`. Exactly one of `--current` or `--pane <id>`. Both / neither / extra (including `--kind` / `--format`) → usage 2. `--pane <id>` is inspect (no env). `--current` requires `DORY_ENV=1` and reads `DORY_PANE_ID` (exit 1 outside env / empty / invalid). JSON stays land `{"op":"pane.get","pane":"<id>"}`. Parse `.result.pid` and `.result.cwd`. Land `cwd` is `proc_cwd` on the pane child (`/proc/{pid}/cwd` with `world.cwd` fallback). Keep `dory pane current` as the same `pane.get` RPC. There is **no** `pane.process-info`. Do not parse argv / cmdline / foreground. No `--format`. No `--kind`. No `pane.zoom`. This is Dory pane get inspect, not a new verb and not Herdr foreground argv.
 
+Keep `dory pane get --pane <id>`. Parse `.result.focused`. Land `focused` is JSON boolean: `pane.id == world.focused`. Keep `.result.pane.id` / `.result.pid` / `.result.cwd` / `.result.occupant`. Keep `dory pane current` as the same `pane.get` RPC. USAGE stays `dory pane get [--current | --pane <id>]`. JSON stays land `{"op":"pane.get","pane":"<id>"}`. No `tab_id` / `workspace_id` on `pane.get` this slice. No `pane.process-info`. No `pane.zoom`. No `--kind`. No `--format`. This is Dory pane-get feel for Herdr `pane current` focused, not `pane.process-info`.
+
 Occupants inspect with:
 
 ```bash
