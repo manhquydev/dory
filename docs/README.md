@@ -496,6 +496,15 @@ Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server
 | Occupant tree pane tab_id | `git show HEAD:rust/src/server.rs` |
 | Skill tree pane tab_id | `git show HEAD:skills/dory/SKILL.md` (`eddf36c`) |
 
+## Paid occupant tree pane pane_id
+
+Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `desk.tree`. Occupant parse pane-row `.pane_id`. Land `pane_id` is `pane.id` (same as row `id`). Keep pane `k` / `id` / `occ` / `st` / `cwd` / `focused` / `workspace_id` / `tab_id`. Root `.result.focused` stays the pane-id string. There is no new RPC. There is no `tab.get`. CLI USAGE stays `dory tree`. Do not add `pane_id` on tab/workspace tree rows this slice. Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
+
+| Landing | Owner |
+|---|---|
+| Occupant tree pane pane_id | `git show HEAD:rust/src/server.rs` |
+| Skill tree pane pane_id | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Paid occupant tree tab occupant
 
 Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `desk.tree`. Occupant parse tab-row `.occupant`. Land `occupant` is first-pane `pane_occupant_json` (`null` or `{name,state,seen}`). Keep tab `k` / `id` / `focused` / `pane_count` / `workspace_id`. Keep pane `occ` / `st` / `cwd` / `workspace_id` / `tab_id`. Root `.result.focused` stays the pane-id string. There is no new RPC. There is no `tab.get`. CLI USAGE stays `dory tree`. Do not add `occ` / `st` on tab rows. Do not add `focused` on `pane.get`. Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
