@@ -1536,6 +1536,7 @@ fn desk_layout(
     let Some((wi, ti)) = tab_loc(world, tab_id) else {
         return envelope::runtime_error("unknown tab");
     };
+    let ws_id = world.workspaces[wi].id.clone();
     let tab = &world.workspaces[wi].tabs[ti];
     let ids: Vec<String> = tab.panes.iter().map(|p| p.id.clone()).collect();
     let lay = crate::layout::ensure_layout(&tab.layout, &ids);
@@ -1560,9 +1561,10 @@ fn desk_layout(
     }
     json.push(']');
     envelope::success(&format!(
-        "{{\"tab\":{},\"tab_id\":{},\"focused\":{},\"cols\":{cols},\"rows\":{rows},\"cells\":{json}}}",
+        "{{\"tab\":{},\"tab_id\":{},\"workspace_id\":{},\"focused\":{},\"cols\":{cols},\"rows\":{rows},\"cells\":{json}}}",
         envelope::json_string(&tab.id),
         envelope::json_string(&tab.id),
+        envelope::json_string(&ws_id),
         envelope::json_string(&world.focused)
     ))
 }
@@ -4413,6 +4415,29 @@ mod tests {
         let tab = json_field(&lay, "tab");
         assert!(
             lay.contains(&format!("\"tab_id\":\"{tab}\"")),
+            "{lay}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn desk_layout_includes_workspace_id() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let tree = rpc_op(&sock, "desk.tree");
+        assert!(tree.contains("\"ok\":true"), "{tree}");
+        let ws_start = tree.find("\"k\":\"w\"").expect("workspace row");
+        let ws_obj = &tree[ws_start..];
+        let ws_end = ws_obj.find('}').expect("ws close");
+        let ws_id = json_field(&ws_obj[..ws_end], "id");
+        let lay = rpc(&sock, r#"{"op":"desk.layout","cols":80,"rows":22}"#);
+        assert!(lay.contains("\"ok\":true"), "{lay}");
+        assert!(lay.contains("\"workspace_id\":"), "{lay}");
+        assert!(
+            lay.contains(&format!("\"workspace_id\":\"{ws_id}\"")),
             "{lay}"
         );
         let _ = stop_server(&xdg);
