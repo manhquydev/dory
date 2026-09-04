@@ -1334,7 +1334,7 @@ fn resize_pane(world: &World, pane_id: &str, cols: u16, rows: u16) -> String {
     let pane = &world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi];
     match pane.held.resize(cols, rows) {
         Ok(()) => envelope::success(&format!(
-            "{{\"pane\":{{\"id\":\"{pane_id}\"}},\"cols\":{cols},\"rows\":{rows}}}"
+            "{{\"pane\":{{\"id\":\"{pane_id}\",\"pane_id\":\"{pane_id}\"}},\"cols\":{cols},\"rows\":{rows}}}"
         )),
         Err(err) => envelope::runtime_error(&err.to_string()),
     }
@@ -4727,6 +4727,35 @@ mod tests {
         assert!(
             cnested.contains(&format!("\"workspace_id\":\"{id}\"")),
             "{closed}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn resize_pane_includes_pane_id() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let caller = json_field(&rpc_op(&sock, "snapshot"), "pane").to_string();
+        let resized = rpc(
+            &sock,
+            &format!(
+                r#"{{"op":"pane.resize","pane":"{caller}","cols":80,"rows":24}}"#
+            ),
+        );
+        assert!(resized.contains("\"ok\":true"), "{resized}");
+        let pane_start = resized.find("\"pane\":{").expect("pane obj");
+        let pane_obj = &resized[pane_start + 8..];
+        let pane_end = pane_obj.find('}').expect("pane close");
+        let nested = &pane_obj[..pane_end];
+        assert!(nested.contains("\"id\":"), "{resized}");
+        assert!(nested.contains("\"pane_id\":"), "{resized}");
+        let id = json_field(nested, "id");
+        assert!(
+            nested.contains(&format!("\"pane_id\":\"{id}\"")),
+            "{resized}"
         );
         let _ = stop_server(&xdg);
         let _ = server.wait();
