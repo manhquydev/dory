@@ -368,6 +368,8 @@ dory pane read --pane <id-from-split> --source recent-unwrapped --lines 120
 
 Keep `dory pane read --pane <id>`. `--lines N` optional, `N >= 1`. Omit → full land snapshot. Missing / `0` / extra (including `--kind` / `--format` / `detection`) → usage 2. Tails the land snapshot (`tail_lines`). Does not fetch more history than land holds. Does not mark seen. JSON adds `"lines":N` only when the flag is set. Land op stays `pane.read`. No `agent.list`. No `pane.zoom`. No `--kind`.
 
+Keep `dory pane read`. Parse `.result.pane.pane_id`. Land `pane_id` is read `pane.id` (same as `.result.pane.id`) for Herdr pane identity. Keep `.result.pane.id` / `.result.source` / `.result.text`. USAGE stays `dory pane read [--current | --pane <id>] [--source visible|recent|recent-unwrapped] [--lines N]`. JSON stays land `{"op":"pane.read","pane":"<id>"}`. Default source stays `recent`. `--lines` still `tail_lines`. There is no new RPC. No `tab.get`. No `pane.zoom`. Do not recook pane.write pane_id. `pane.focus` already `get_pane`. This is Dory read pane_id wrapping land `pane.read`, not `pane.zoom`.
+
 ```bash
 dory pane send-keys --pane <id-from-split> enter
 dory pane send-keys --current esc
