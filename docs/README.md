@@ -1039,6 +1039,16 @@ Cite land with `git show HEAD:rust/src/envelope.rs`. Working-tree leftover `serv
 | Occupant workspace create workspace_id | `git show HEAD:rust/src/envelope.rs` |
 | Skill workspace create workspace_id | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant workspace create tab.tab_id
+
+Cite land with `git show HEAD:rust/src/envelope.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `workspace.create` via `envelope::result_workspace`. Occupant parse `.result.tab.tab_id`. Land `tab_id` is the new `tab.id` (same as nested `.result.tab.id`). Keep `.result.workspace.id` / `.result.workspace.workspace_id` / `.result.tab.id` / `.result.root_pane.id` / `.result.root_pane.pane_id`. There is no new RPC. There is no `tab.get`. CLI USAGE stays `dory workspace create [--cwd <path>]`. Occupant verb stays `dory workspace create`. Do not add `pane.resize` `pane_id` this slice. Do not recook workspace.create workspace_id. Do not recook tab.create tab_id. Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
+
+| Landing | Owner |
+|---|---|
+| Occupant workspace create tab.tab_id | `git show HEAD:rust/src/envelope.rs` |
+| Skill workspace create tab.tab_id | `git show HEAD:skills/dory/SKILL.md` |
+
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
