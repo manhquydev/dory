@@ -361,6 +361,8 @@ dory pane wait-output --current --match "test result" --lines 80
 
 Keep `dory pane wait-output --pane <id>`. Exactly one of `--current` or `--pane <id>`. Both / neither / extra (including `--kind`) → usage 2. Exactly one of `--match` or `--regex`. Both / neither / empty → usage 2. `--source` optional: `visible` | `recent` | `recent-unwrapped`. Omit `--source` → land still matches `recent_unwrapped` (not `pane read` default `recent`). `--lines N` optional, `N >= 1`. Tails that snapshot. Does not fetch more history than land holds. Missing / `0` → usage 2. `--timeout` milliseconds (default 5000). Mutating: `DORY_ENV=1` on every arm. `--current` reads `DORY_PANE_ID` (exit 1 outside env / empty / invalid). `--pane <id>` keeps an explicit pane. JSON stays land `{"op":"pane.wait","pane":"<id>","timeout":MS}` plus `"match"` or `"regex"`, plus `"source":"…"` only when set, plus `"lines":N` only when set. There is **no** new wait RPC. Keep match XOR regex. No `pane.zoom`.
 
+Keep `dory pane wait-output`. Parse `.result.pane.pane_id`. Land `pane_id` is waited `pane.id` (same as `.result.pane.id`) for Herdr pane identity. Keep `.result.pane.id` / `.result.matched` / `.result.text` / optional `.result.source` / `.result.lines`. USAGE stays `dory pane wait-output [--current | --pane <id>] [--match LIT | --regex RE] [--source visible|recent|recent-unwrapped] [--lines N] [--timeout MS]`. JSON stays land `{"op":"pane.wait",…}`. Timeout error shape unchanged. No `pane.zoom`. This is Dory wait pane_id wrapping land `pane.wait`, not `pane.zoom`.
+
 ```bash
 dory pane read --current --source recent-unwrapped --lines 120
 dory pane read --pane <id-from-split> --source recent-unwrapped --lines 120
