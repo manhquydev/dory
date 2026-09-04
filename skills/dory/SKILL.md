@@ -276,6 +276,8 @@ dory pane layout --current --cols 120 --rows 40
 
 or `--tab <id>`. Exactly one of `--tab <id>` or `--current`. Both / neither / extra (including `--kind` / `--direction` / `--amount`) → usage 2. `--cols` and `--rows` required. `--tab <id>` is inspect (no env). `--current` requires `DORY_ENV=1` and reads `DORY_TAB_ID` (exit 1 outside env / empty / invalid). Parse `.result.tab` and `.result.cells[]` (`id`, `x`, `y`, `w`, `h`, `occ`, `st`). JSON stays land `{"op":"desk.layout","tab":"<id>","cols":N,"rows":N}`. There is no `pane.layout` RPC; occupant verb wraps `desk.layout`. This is Dory layout inspect, not Herdr implicit focused layout and not `pane.zoom`. Keep `dory pane resize` / `dory pane neighbor` as they are.
 
+Keep `dory pane layout`. Parse `.result.cells[]` `.pane_id`. Land `pane_id` is `cell.id` (same as cell `id`) for Herdr `pane layout` `panes[].pane_id`. Keep `id` / `x` / `y` / `w` / `h` / `occ` / `st`. Keep `.result.tab` / `.result.focused` / `.result.cols` / `.result.rows`. USAGE stays `dory pane layout [--current | --tab <id>] --cols N --rows N`. JSON stays land `{"op":"desk.layout","tab":"<id>","cols":N,"rows":N}`. There is no `pane.layout` RPC. No `zoomed`. No `width`/`height` alias. No `tab.get`. No `agent.list`. This is Dory layout cell pane_id wrapping land `desk.layout`, not `pane.zoom`.
+
 Occupants move a shared split with
 
 ```bash
