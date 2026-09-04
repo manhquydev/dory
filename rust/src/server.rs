@@ -1724,13 +1724,15 @@ fn get_pane(world: &World, pane_id: &str) -> String {
     let pid = pane.held.child_pid();
     let cwd = proc_cwd(pid, &world.cwd);
     let focused = pane.id == world.focused;
+    let tab_id = world.workspaces[loc.wi].tabs[loc.ti].id.clone();
     envelope::success(&format!(
-        "{{\"pane\":{{\"id\":\"{}\"}},\"pid\":{},\"cwd\":{},\"occupant\":{},\"focused\":{}}}",
+        "{{\"pane\":{{\"id\":\"{}\"}},\"pid\":{},\"cwd\":{},\"occupant\":{},\"focused\":{},\"tab_id\":{}}}",
         pane.id,
         pid,
         envelope::json_string(&cwd.to_string_lossy()),
         pane_occupant_json(pane),
-        focused
+        focused,
+        envelope::json_string(&tab_id)
     ))
 }
 
@@ -4029,6 +4031,7 @@ mod tests {
         assert!(got.contains("\"ok\":true"), "{got}");
         assert!(got.contains("\"cwd\":"), "{got}");
         assert!(got.contains("\"focused\":"), "{got}");
+        assert!(got.contains("\"tab_id\":"), "{got}");
         let _ = stop_server(&xdg);
         let _ = server.wait();
         let _ = fs::remove_dir_all(&xdg);
