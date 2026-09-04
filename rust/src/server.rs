@@ -1180,7 +1180,7 @@ fn workspace_object(ws: &Workspace, focused: &str) -> String {
 
 fn result_tab(tab_id: &str, pane_id: &str) -> String {
     format!(
-        "{{\"tab\":{{\"id\":\"{tab_id}\"}},\"root_pane\":{{\"id\":\"{pane_id}\",\"pane_id\":\"{pane_id}\"}},\"occupant\":null}}"
+        "{{\"tab\":{{\"id\":\"{tab_id}\",\"tab_id\":\"{tab_id}\"}},\"root_pane\":{{\"id\":\"{pane_id}\",\"pane_id\":\"{pane_id}\"}},\"occupant\":null}}"
     )
 }
 
@@ -4587,6 +4587,33 @@ mod tests {
         let id = json_field(nested, "id");
         assert!(
             nested.contains(&format!("\"pane_id\":\"{id}\"")),
+            "{created}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn tab_create_includes_tab_id() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let ws = json_field(&rpc_op(&sock, "snapshot"), "workspace").to_string();
+        let created = rpc(
+            &sock,
+            &format!(r#"{{"op":"tab.create","workspace":"{ws}"}}"#),
+        );
+        assert!(created.contains("\"ok\":true"), "{created}");
+        let tab_start = created.find("\"tab\":{").expect("tab obj");
+        let tab_obj = &created[tab_start + 7..];
+        let tab_end = tab_obj.find('}').expect("tab close");
+        let nested = &tab_obj[..tab_end];
+        assert!(nested.contains("\"id\":"), "{created}");
+        assert!(nested.contains("\"tab_id\":"), "{created}");
+        let id = json_field(nested, "id");
+        assert!(
+            nested.contains(&format!("\"tab_id\":\"{id}\"")),
             "{created}"
         );
         let _ = stop_server(&xdg);
