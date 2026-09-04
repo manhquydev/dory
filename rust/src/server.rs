@@ -1561,10 +1561,11 @@ fn desk_layout(
     }
     json.push(']');
     envelope::success(&format!(
-        "{{\"tab\":{},\"tab_id\":{},\"workspace_id\":{},\"focused\":{},\"cols\":{cols},\"rows\":{rows},\"cells\":{json}}}",
+        "{{\"tab\":{},\"tab_id\":{},\"workspace_id\":{},\"focused\":{},\"focused_pane_id\":{},\"cols\":{cols},\"rows\":{rows},\"cells\":{json}}}",
         envelope::json_string(&tab.id),
         envelope::json_string(&tab.id),
         envelope::json_string(&ws_id),
+        envelope::json_string(&world.focused),
         envelope::json_string(&world.focused)
     ))
 }
@@ -4438,6 +4439,24 @@ mod tests {
         assert!(lay.contains("\"workspace_id\":"), "{lay}");
         assert!(
             lay.contains(&format!("\"workspace_id\":\"{ws_id}\"")),
+            "{lay}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn desk_layout_includes_focused_pane_id() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let lay = rpc(&sock, r#"{"op":"desk.layout","cols":80,"rows":22}"#);
+        assert!(lay.contains("\"ok\":true"), "{lay}");
+        assert!(lay.contains("\"focused_pane_id\":"), "{lay}");
+        let focused = json_field(&lay, "focused");
+        assert!(
+            lay.contains(&format!("\"focused_pane_id\":\"{focused}\"")),
             "{lay}"
         );
         let _ = stop_server(&xdg);
