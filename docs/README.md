@@ -1125,6 +1125,16 @@ Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server
 | Occupant workspace nested root_pane pane_id | `git show HEAD:rust/src/server.rs` |
 | Skill workspace nested root_pane pane_id | `git show HEAD:skills/dory/SKILL.md` |
 
+
+## Paid occupant snapshot pane_id
+
+Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `snapshot` via `live_snapshot`. Occupant parse `.pane_id`. Land `pane_id` is first pane id (same as `.pane`). Keep `.live` / `.workspace` / `.tab` / `.pane` / `.pid` / `.focused`. There is no new RPC. There is no `dory snapshot` CLI. There is no `tab.get`. JSON stays `{"op":"snapshot"}`. Do not recook desk.tree pane pane_id. Do not recook workspace nested root_pane pane_id. Do not recook agent.pane pane_id. Do not wrap snapshot `pane` as an object. Do not change `desk.snapshot` this slice. Do not recook founder `--wait`. Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
+
+| Landing | Owner |
+|---|---|
+| Occupant snapshot pane_id | `git show HEAD:rust/src/server.rs` |
+| Skill snapshot pane_id | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
