@@ -810,6 +810,15 @@ Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server
 | Occupant agent prompt focused | `git show HEAD:rust/src/server.rs` |
 | Skill agent prompt focused | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant agent prompt settle focused
+
+Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `tick_agent_prompt` settle via `agent_snapshot_reply`. Occupant parse `.result.focused`. Land `focused` is `pane.id == world.focused`. Keep `.result.agent` `name` / `pane` / `state` / `seen`. Keep `.result.cwd`. Keep immediate prompt `focused`. `agent_snapshot` is unchanged. There is no new RPC. There is no `agent.list`. There is no `tab.get`. CLI USAGE stays `dory agent prompt [<name> | --current | --pane <id>] [--wait] [--timeout MS] [--] <text>`. No `--label`. No `active_tab_id`. Do not recook founder `--wait`. Do not add `focused` on `pane.get`. Do not add `tab_id` / `workspace_id` on prompt settle this slice. Do not claim `foreground_cwd`. Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
+
+| Landing | Owner |
+|---|---|
+| Occupant agent prompt settle focused | `git show HEAD:rust/src/server.rs` |
+| Skill agent prompt settle focused | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
