@@ -276,6 +276,8 @@ or `--pane <id>` / `--direction prev`. Ring `prev|next` forbids `--cols` / `--ro
 
 Keep `dory pane neighbor`. Parse `.result.pane_id`. Land `pane_id` is neighbor `pane.id` (same as nested `.result.pane.id`) for Herdr `pane neighbor` `pane_id`. Keep `.result.pane.id`. USAGE stays `dory pane neighbor [--current | --pane <id>] --direction left|right|up|down|prev|next [--cols N --rows N]`. JSON stays land `{"op":"desk.neighbor","from":"<id>","step":"…"}`. There is no `pane.neighbor` RPC. Occupant verb wraps `desk.neighbor`. No `zoomed`. No `width`/`height` / `rect`. No `tab.get`. No `pane.zoom`. No `foreground_cwd`. No `agent.list`. Do not recook layout family. Do not add `pane.split` `pane_id` this slice. Do not claim Darwin occupant `done`/`idle`.
 
+Keep `dory pane neighbor`. Parse `.result.pane.pane_id`. Land nested `pane_id` is neighbor `pane.id` (same as `.result.pane.id` and root `.result.pane_id`) for Herdr `.result.pane.pane_id`. Keep root `.result.pane_id` / `.result.pane.id`. USAGE stays `dory pane neighbor [--current | --pane <id>] --direction left|right|up|down|prev|next [--cols N --rows N]`. JSON stays land `{"op":"desk.neighbor",…}`. There is no `pane.neighbor` RPC. No `pane.zoom`. Do not recook root neighbor `pane_id`. This is Dory neighbor nested pane_id wrapping land `desk.neighbor`.
+
 To focus a neighbor, compose neighbor then focus:
 
 1. Run `dory pane neighbor --current --direction next` (or spatial with `--cols --rows`).
