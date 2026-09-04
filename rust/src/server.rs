@@ -566,11 +566,20 @@ fn tick_agent_wait(
 }
 
 fn agent_snapshot_reply(world: &mut World, pane_id: &str, name: &str) -> Option<String> {
-    let pane = match agent_pane_mut(world, pane_id, name) {
-        Ok(p) => p,
-        Err(err) => return Some(envelope::runtime_error(&err)),
+    let (pid, mut result) = {
+        let pane = match agent_pane_mut(world, pane_id, name) {
+            Ok(p) => p,
+            Err(err) => return Some(envelope::runtime_error(&err)),
+        };
+        (pane.held.child_pid(), agent_snapshot(pane))
     };
-    Some(envelope::success(&agent_snapshot(pane)))
+    result.pop();
+    let cwd = proc_cwd(pid, &world.cwd);
+    result.push_str(&format!(
+        ",\"cwd\":{}}}",
+        envelope::json_string(&cwd.to_string_lossy()),
+    ));
+    Some(envelope::success(&result))
 }
 
 
@@ -4159,6 +4168,38 @@ mod tests {
             ),
         );
         assert!(started.contains("\"ok\":true"), "{started}");
+        let got = rpc(
+            &sock,
+            r#"{"op":"agent.prompt","name":"cwdog","text":"ping"}"#,
+        );
+        assert!(got.contains("\"ok\":true"), "{got}");
+        assert!(got.contains("\"cwd\":"), "{got}");
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn agent_prompt_settle_includes_cwd() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let snap = rpc_op(&sock, "snapshot");
+        let pane = json_field(&snap, "pane").to_string();
+        let started = rpc(
+            &sock,
+            &format!(
+                r#"{{"op":"agent.start","name":"cwdog","pane":"{pane}","argv":["echo"]}}"#
+            ),
+        );
+        assert!(started.contains("\"ok\":true"), "{started}");
+        let reported = rpc(
+            &sock,
+            &format!(
+                r#"{{"op":"agent.report","pane":"{pane}","state":"idle"}}"#
+            ),
+        );
+        assert!(reported.contains("\"ok\":true"), "{reported}");
         let got = rpc(
             &sock,
             r#"{"op":"agent.prompt","name":"cwdog","text":"ping"}"#,
