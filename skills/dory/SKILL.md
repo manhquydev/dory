@@ -248,6 +248,8 @@ dory pane resize --current --cols N --rows N
 
 or `--pane <id>`. Omit target → usage 2. Both `--cols` and `--rows` are required. Land RPC is `pane.resize`.
 
+Keep `dory pane resize`. Parse `.result.pane.pane_id`. Land `pane_id` is resized `pane.id` (same as `.result.pane.id`) for Herdr pane identity. Keep `.result.pane.id` / `.result.cols` / `.result.rows`. USAGE stays `dory pane resize [--current | --pane <id>] --cols N --rows N`. JSON stays land `{"op":"pane.resize","pane":"<id>","cols":N,"rows":N}`. No `pane.zoom`. No `--kind`. This is Dory resize pane_id wrapping land `pane.resize`, not `pane.zoom`.
+
 Occupants focus with:
 
 ```bash
