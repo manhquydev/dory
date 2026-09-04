@@ -121,6 +121,8 @@ Keep `dory pane get --pane <id>`. Exactly one of `--current` or `--pane <id>`. B
 
 Keep `dory pane get --pane <id>`. Parse `.result.focused`. Land `focused` is JSON boolean: `pane.id == world.focused`. Keep `.result.pane.id` / `.result.pid` / `.result.cwd` / `.result.occupant`. Keep `dory pane current` as the same `pane.get` RPC. USAGE stays `dory pane get [--current | --pane <id>]`. JSON stays land `{"op":"pane.get","pane":"<id>"}`. No `tab_id` / `workspace_id` on `pane.get` this slice. No `pane.process-info`. No `pane.zoom`. No `--kind`. No `--format`. This is Dory pane-get feel for Herdr `pane current` focused, not `pane.process-info`.
 
+Keep `dory pane get --pane <id>`. Parse `.result.tab_id`. Land `tab_id` is the enclosing `tab.id`. Keep `.result.pane.id` / `.result.pid` / `.result.cwd` / `.result.occupant` / `.result.focused`. Keep `dory pane current` as the same `pane.get` RPC. USAGE stays `dory pane get [--current | --pane <id>]`. JSON stays land `{"op":"pane.get","pane":"<id>"}`. No `workspace_id` on `pane.get` this slice. No `tab.get`. No `pane.process-info`. No `pane.zoom`. No `--kind`. No `--format`. This is Dory pane-get feel for Herdr `pane current` tab_id, not `tab.get` and not `pane.process-info`.
+
 Occupants inspect with:
 
 ```bash
