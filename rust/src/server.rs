@@ -566,18 +566,20 @@ fn tick_agent_wait(
 }
 
 fn agent_snapshot_reply(world: &mut World, pane_id: &str, name: &str) -> Option<String> {
-    let (pid, mut result) = {
+    let (pid, pane_key, mut result) = {
         let pane = match agent_pane_mut(world, pane_id, name) {
             Ok(p) => p,
             Err(err) => return Some(envelope::runtime_error(&err)),
         };
-        (pane.held.child_pid(), agent_snapshot(pane))
+        (pane.held.child_pid(), pane.id.clone(), agent_snapshot(pane))
     };
     result.pop();
     let cwd = proc_cwd(pid, &world.cwd);
+    let focused = pane_key == world.focused;
     result.push_str(&format!(
-        ",\"cwd\":{}}}",
+        ",\"cwd\":{},\"focused\":{}}}",
         envelope::json_string(&cwd.to_string_lossy()),
+        focused
     ));
     Some(envelope::success(&result))
 }
@@ -4210,6 +4212,7 @@ mod tests {
         );
         assert!(got.contains("\"ok\":true"), "{got}");
         assert!(got.contains("\"cwd\":"), "{got}");
+        assert!(got.contains("\"focused\":"), "{got}");
         let _ = stop_server(&xdg);
         let _ = server.wait();
         let _ = fs::remove_dir_all(&xdg);
