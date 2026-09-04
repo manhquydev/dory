@@ -1361,7 +1361,7 @@ fn write_pane(world: &mut World, pane_id: &str, text: &str, raw: bool) -> String
     }
 
     match pane.held.write_all(&bytes) {
-        Ok(()) => envelope::success(&format!("{{\"pane\":{{\"id\":\"{pane_id}\"}}}}")),
+        Ok(()) => envelope::success(&format!("{{\"pane\":{{\"id\":\"{pane_id}\",\"pane_id\":\"{pane_id}\"}}}}")),
         Err(err) => envelope::runtime_error(&err.to_string()),
     }
 }
@@ -4756,6 +4756,33 @@ mod tests {
         assert!(
             nested.contains(&format!("\"pane_id\":\"{id}\"")),
             "{resized}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn write_pane_includes_pane_id() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let caller = json_field(&rpc_op(&sock, "snapshot"), "pane").to_string();
+        let written = rpc(
+            &sock,
+            &format!(r#"{{"op":"pane.write","pane":"{caller}","text":"true"}}"#),
+        );
+        assert!(written.contains("\"ok\":true"), "{written}");
+        let pane_start = written.find("\"pane\":{").expect("pane obj");
+        let pane_obj = &written[pane_start + 8..];
+        let pane_end = pane_obj.find('}').expect("pane close");
+        let nested = &pane_obj[..pane_end];
+        assert!(nested.contains("\"id\":"), "{written}");
+        assert!(nested.contains("\"pane_id\":"), "{written}");
+        let id = json_field(nested, "id");
+        assert!(
+            nested.contains(&format!("\"pane_id\":\"{id}\"")),
+            "{written}"
         );
         let _ = stop_server(&xdg);
         let _ = server.wait();
