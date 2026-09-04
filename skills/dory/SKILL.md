@@ -125,6 +125,8 @@ Keep `dory pane get --pane <id>`. Parse `.result.tab_id`. Land `tab_id` is the e
 
 Keep `dory pane get --pane <id>`. Parse `.result.workspace_id`. Land `workspace_id` is `ws.id`. Keep `.result.pane.id` / `.result.pid` / `.result.cwd` / `.result.occupant` / `.result.focused` / `.result.tab_id`. Keep `dory pane current` as the same `pane.get` RPC. USAGE stays `dory pane get [--current | --pane <id>]`. JSON stays land `{"op":"pane.get","pane":"<id>"}`. No `tab.get`. No `pane.process-info`. No `pane.zoom`. No `--kind`. No `--format`. This is Dory pane-get feel for Herdr `pane current` workspace_id, not `pane.process-info`.
 
+Keep `dory pane get --pane <id>`. Parse `.result.pane_id`. Land `pane_id` is `pane.id` (same as nested `.result.pane.id`) for Herdr `pane current` `pane_id`. Keep `.result.pane.id` / `.result.pid` / `.result.cwd` / `.result.occupant` / `.result.focused` / `.result.tab_id` / `.result.workspace_id`. Keep `dory pane current` as the same `pane.get` RPC. USAGE stays `dory pane get [--current | --pane <id>]`. JSON stays land `{"op":"pane.get","pane":"<id>"}`. No `tab.get`. No `pane.process-info`. No `pane.zoom`. No `foreground_cwd`. No `--kind`. No `--format`. This is Dory pane-get feel for Herdr `pane current` pane_id, not `pane.process-info`.
+
 Occupants inspect with:
 
 ```bash
