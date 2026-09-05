@@ -1520,7 +1520,8 @@ fn desk_snapshot(world: &World) -> String {
         }
     }
     let mut inner = format!(
-        "{{\"focused\":{},\"text\":{},",
+        "{{\"focused\":{},\"focused_pane_id\":{},\"text\":{},",
+        envelope::json_string(&world.focused),
         envelope::json_string(&world.focused),
         envelope::json_string(&text)
     );
@@ -5104,6 +5105,24 @@ mod tests {
         assert!(snap.contains("\"occupant\":"), "{snap}");
         assert!(
             snap.contains("\"occupant\":null"),
+            "{snap}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn desk_snapshot_includes_focused_pane_id() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let snap = rpc_op(&sock, "desk.snapshot");
+        assert!(snap.contains("\"ok\":true"), "{snap}");
+        assert!(snap.contains("\"focused_pane_id\":"), "{snap}");
+        let focused = json_field(&snap, "focused");
+        assert!(
+            snap.contains(&format!("\"focused_pane_id\":\"{focused}\"")),
             "{snap}"
         );
         let _ = stop_server(&xdg);
