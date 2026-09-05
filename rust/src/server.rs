@@ -1538,11 +1538,15 @@ fn desk_snapshot(world: &World) -> String {
                 .child_pid()
         })
         .unwrap_or(0);
+    let tab_id = locate_pane(world, &focused)
+        .map(|loc| world.workspaces[loc.wi].tabs[loc.ti].id.clone())
+        .unwrap_or_else(|| String::new());
     let mut inner = format!(
-        "{{\"focused\":{},\"focused_pane_id\":{},\"pane_id\":{},\"cwd\":{},\"occupant\":{occupant},\"pid\":{pid},\"text\":{},",
+        "{{\"focused\":{},\"focused_pane_id\":{},\"pane_id\":{},\"tab_id\":{},\"cwd\":{},\"occupant\":{occupant},\"pid\":{pid},\"text\":{},",
         envelope::json_string(&focused),
         envelope::json_string(&focused),
         envelope::json_string(&focused),
+        envelope::json_string(&tab_id),
         envelope::json_string(&cwd.to_string_lossy()),
         envelope::json_string(&text)
     );
@@ -5264,6 +5268,23 @@ mod tests {
         let _ = fs::remove_dir_all(&xdg);
     }
 
+    #[test]
+    fn desk_snapshot_includes_tab_id() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let snap = rpc_op(&sock, "desk.snapshot");
+        assert!(snap.contains("\"ok\":true"), "{snap}");
+        assert!(snap.contains("\"tab_id\":"), "{snap}");
+        let live = rpc_op(&sock, "snapshot");
+        let tab_id = json_field(&snap, "tab_id");
+        let live_tab_id = json_field(&live, "tab_id");
+        assert_eq!(tab_id, live_tab_id, "{snap} vs {live}");
+        assert!(!tab_id.is_empty(), "{snap}");
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
 
     fn json_field<'a>(json: &'a str, key: &str) -> &'a str {
         let pat = format!("\"{key}\":\"");
