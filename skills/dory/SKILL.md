@@ -129,6 +129,8 @@ Keep `dory pane get --pane <id>`. Parse `.result.workspace_id`. Land `workspace_
 
 Keep `dory pane get --pane <id>`. Parse `.result.pane_id`. Land `pane_id` is `pane.id` (same as nested `.result.pane.id`) for Herdr `pane current` `pane_id`. Keep `.result.pane.id` / `.result.pid` / `.result.cwd` / `.result.occupant` / `.result.focused` / `.result.tab_id` / `.result.workspace_id`. Keep `dory pane current` as the same `pane.get` RPC. USAGE stays `dory pane get [--current | --pane <id>]`. JSON stays land `{"op":"pane.get","pane":"<id>"}`. No `tab.get`. No `pane.process-info`. No `pane.zoom`. No `foreground_cwd`. No `--kind`. No `--format`. This is Dory pane-get feel for Herdr `pane current` pane_id, not `pane.process-info`.
 
+Keep `dory pane get --pane <id>`. Parse `.result.pane.pane_id`. Land nested `pane_id` is `pane.id` (same as `.result.pane.id` and root `.result.pane_id`) for Herdr `pane current` / `pane get` `.result.pane.pane_id`. Keep root `.result.pane_id` / `.result.pane.id` / `.result.pid` / `.result.cwd` / `.result.occupant` / `.result.focused` / `.result.tab_id` / `.result.workspace_id`. Keep `dory pane current` as the same `pane.get` RPC. USAGE stays `dory pane get [--current | --pane <id>]`. JSON stays land `{"op":"pane.get","pane":"<id>"}`. No `tab.get`. No `pane.process-info`. No `pane.zoom`. No `foreground_cwd`. No `--kind`. No `--format`. Do not recook root pane.get pane_id. Do not recook snapshot family. This is Dory pane-get nested pane_id wrapping land `pane.get`, not `pane.process-info`.
+
 Occupants inspect with:
 
 ```bash
