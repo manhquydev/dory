@@ -1531,8 +1531,15 @@ fn desk_snapshot(world: &World) -> String {
     let occupant = locate_pane(world, &focused)
         .map(|loc| pane_occupant_json(&world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi]))
         .unwrap_or_else(|| "null".to_string());
+    let pid = locate_pane(world, &focused)
+        .map(|loc| {
+            world.workspaces[loc.wi].tabs[loc.ti].panes[loc.pi]
+                .held
+                .child_pid()
+        })
+        .unwrap_or(0);
     let mut inner = format!(
-        "{{\"focused\":{},\"focused_pane_id\":{},\"cwd\":{},\"occupant\":{occupant},\"text\":{},",
+        "{{\"focused\":{},\"focused_pane_id\":{},\"cwd\":{},\"occupant\":{occupant},\"pid\":{pid},\"text\":{},",
         envelope::json_string(&focused),
         envelope::json_string(&focused),
         envelope::json_string(&cwd.to_string_lossy()),
@@ -5207,6 +5214,31 @@ mod tests {
         assert!(
             snap.contains("\"occupant\":null"),
             "{snap}"
+        );
+        let _ = stop_server(&xdg);
+        let _ = server.wait();
+        let _ = fs::remove_dir_all(&xdg);
+    }
+
+    #[test]
+    fn desk_snapshot_includes_pid() {
+        let xdg = temp_xdg();
+        let mut server = start_server(&xdg);
+        let sock = session_sock(&xdg);
+        let snap = rpc_op(&sock, "desk.snapshot");
+        assert!(snap.contains("\"ok\":true"), "{snap}");
+        assert!(snap.contains("\"pid\":"), "{snap}");
+        let focused = json_field(&snap, "focused").to_string();
+        let got = rpc(
+            &sock,
+            &format!(r#"{{"op":"pane.get","pane":"{focused}"}}"#),
+        );
+        assert!(got.contains("\"ok\":true"), "{got}");
+        let rest = got.split_once("\"pid\":").unwrap().1;
+        let pid = rest.split(|c: char| !c.is_ascii_digit()).next().unwrap();
+        assert!(
+            snap.contains(&format!("\"pid\":{pid}")),
+            "{snap} vs {got}"
         );
         let _ = stop_server(&xdg);
         let _ = server.wait();
