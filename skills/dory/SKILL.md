@@ -31,7 +31,7 @@ dory pane
 dory agent
 ```
 
-A group with no subcommand prints usage and exits 2. That is discovery. Do not invent flags if `--help` differs. Bare `dory` / `dory attach` is the **human** desk (sidebar + tiled live panes). Occupants already inside a pane do not re-attach. Humans see a grid after split; occupants still use CLI verbs, not the desk. `dory attach --plain` is the raw PTY client. `dory serve` is the Node journal lamp, not this binary.
+A group with no subcommand prints usage and exits 2. That is discovery. Do not invent flags if `--help` differs. Bare `dory` / `dory attach` starts `dory server` if ping fails, then sits the **human** desk (sidebar + tiled live panes). Occupants already inside a pane do not re-attach. Humans see a grid after split; occupants still use CLI verbs, not the desk. `dory attach --plain` is the raw PTY client. `dory serve` is the Node journal lamp, not this binary.
 
 Live `--help` ships:
 
