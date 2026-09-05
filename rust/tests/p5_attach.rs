@@ -220,7 +220,7 @@ fn neighbor_walks_split_panes() {
 }
 
 #[test]
-fn bare_dory_without_server_fails_closed() {
+fn bare_dory_without_tty_starts_server() {
     let xdg = temp_xdg();
     let out = Command::new(bin())
         .env("XDG_RUNTIME_DIR", &xdg)
@@ -238,29 +238,22 @@ fn bare_dory_without_server_fails_closed() {
         String::from_utf8_lossy(&out.stderr)
     );
     let err = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        err.contains("dory: server not running; start with `dory server`"),
-        "{err}"
-    );
-
-    let list = Command::new(bin())
-        .args(["workspace", "list"])
-        .env("XDG_RUNTIME_DIR", &xdg)
-        .env_remove("DORY_SOCKET")
-        .env_remove("DORY_ENV")
-        .output()
-        .expect("list");
-    assert!(
-        !list.status.success(),
-        "workspace list must fail without server stdout={} stderr={}",
-        String::from_utf8_lossy(&list.stdout),
-        String::from_utf8_lossy(&list.stderr)
-    );
+    assert!(err.contains("needs a tty"), "{err}");
 
     let sock = session_sock(&xdg);
     assert!(
-        UnixStream::connect(&sock).is_err(),
-        "temp XDG sock must not be connectable"
+        UnixStream::connect(&sock).is_ok(),
+        "temp XDG sock must come up"
+    );
+    let stop = Command::new(bin())
+        .args(["server", "stop"])
+        .env("XDG_RUNTIME_DIR", &xdg)
+        .output()
+        .expect("stop");
+    assert!(
+        stop.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&stop.stderr)
     );
 
     let h = start();
