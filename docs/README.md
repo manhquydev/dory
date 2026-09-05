@@ -911,6 +911,15 @@ Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server
 | Occupant pane get pane_id | `git show HEAD:rust/src/server.rs` |
 | Skill pane get pane_id | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid occupant pane get nested pane_id
+
+Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `pane.get`. Occupant parse `.result.pane.pane_id`. Land nested `pane_id` is `pane.id` (same as `.result.pane.id` and root `.result.pane_id`). Keep root `.result.pane_id` / `.result.pane.id` / `.result.pid` / `.result.cwd` / `.result.occupant` / `.result.focused` / `.result.tab_id` / `.result.workspace_id`. `pane current` stays the same RPC. There is no new RPC. There is no `agent.list`. There is no `tab.get`. CLI USAGE stays `dory pane get [--current | --pane <id>]`. No `--label`. Do not recook root pane.get pane_id. Do not recook live `snapshot` occupant/cwd/id family. Do not recook `desk.snapshot`. Do not claim `foreground_cwd`. Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
+
+| Landing | Owner |
+|---|---|
+| Occupant pane get nested pane_id | `git show HEAD:rust/src/server.rs` |
+| Skill pane get nested pane_id | `git show HEAD:skills/dory/SKILL.md` |
+
 ## Paid occupant layout cell pane_id
 
 Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server.rs` is not the owner. Land wrap stays `desk.layout`. Occupant parse `.result.cells[]` `.pane_id`. Land `pane_id` is `cell.id` (same as cell `id`). Keep `id` / `x` / `y` / `w` / `h` / `occ` / `st`. Keep `.result.tab` / `.result.focused` / `.result.cols` / `.result.rows`. There is no new RPC. There is no `pane.layout` RPC. CLI USAGE stays `dory pane layout [--current | --tab <id>] --cols N --rows N`. Do not add `zoomed`. Do not alias `width`/`height`. Do not recook pane.get/list/tree pane_id. Do not claim `pane.zoom`. Do not claim Darwin occupant `done`/`idle`.
