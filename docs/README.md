@@ -1253,6 +1253,15 @@ Cite land with `git show HEAD:rust/src/server.rs`. Working-tree leftover `server
 | Occupant desk.snapshot workspace_id | `git show HEAD:rust/src/server.rs` |
 | Skill desk.snapshot workspace_id | `git show HEAD:skills/dory/SKILL.md` |
 
+## Paid ensure_server auto-spawn
+
+Cite land with `git show HEAD:rust/src/attach.rs`. Working-tree leftover `attach.rs` is leftover 5 — plumbing only, not the owner. Ping-miss sits spawn `current_exe` `server` (`setsid`, stdin/stdout/stderr null). Tests use temp `XDG_RUNTIME_DIR`. Do not spawn `/run/user/$UID/dory/default/dory.sock` from the factory. Do not recook desk.snapshot / pane.get. Do not fold leftover `README.md` / `main.rs`. Do not cargo the leftover tree.
+
+| Landing | Owner |
+|---|---|
+| Sit auto-spawn | `git show HEAD:rust/src/attach.rs` |
+| p5 invert | `git show HEAD:rust/tests/p5_attach.rs` |
+
 ## Named unpaid
 
 - Default occupancy / sit default (dead sock ≠ sâu)
